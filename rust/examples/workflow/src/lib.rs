@@ -5,7 +5,6 @@ use binaryninja::workflow::{Activity, AnalysisContext, Workflow};
 use log::LevelFilter;
 
 const RUST_ACTIVITY_NAME: &'static str = "analysis.plugins.rustexample";
-// TODO: runOnce needs to be on...
 const RUST_ACTIVITY_CONFIG: &'static str = r#"{
     "name": "analysis.plugins.rustexample",
     "title" : "Rust Example",
@@ -56,7 +55,7 @@ fn example_activity(analysis_context: &AnalysisContext) {
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn CorePluginInit() -> bool {
-    binaryninja::logger::init(LevelFilter::Debug).unwrap();
+    binaryninja::logger::init(LevelFilter::Info);
 
     log::info!("Initialized the plugin");
 

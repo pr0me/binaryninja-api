@@ -146,7 +146,7 @@ impl Command for DebugInvalidateCache {
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn CorePluginInit() -> bool {
-    binaryninja::logger::init(LevelFilter::Debug).unwrap();
+    binaryninja::logger::init(LevelFilter::Debug);
 
     // Make sure caches are flushed when the views get destructed.
     register_cache_destructor();
