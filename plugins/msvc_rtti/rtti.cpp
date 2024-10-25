@@ -548,8 +548,16 @@ std::optional<VirtualFunctionTableInfo> MicrosoftRTTIProcessor::ProcessVFT(uint6
         size_t vFuncIdx = 0;
         for (auto &&vFunc: virtualFunctions)
         {
-            // TODO: Identify when the functions name can be used instead of the vFunc_* placeholder.
             auto vFuncName = fmt::format("vFunc_{}", vFuncIdx);
+            // If we have a better name, use it.
+            auto vFuncSymName = vFunc->GetSymbol()->GetShortName();
+            if (vFuncSymName.compare(0, 4, "sub_") != 0)
+                vFuncName = vFunc->GetSymbol()->GetShortName();
+            // MyClass::func -> func
+            std::size_t pos = vFuncName.rfind("::");
+            if (pos != std::string::npos)
+                vFuncName = vFuncName.substr(pos + 2);
+
             // NOTE: The analyzed function type might not be available here.
             vftBuilder.AddMember(
                 Type::PointerType(addrSize, vFunc->GetType(), true), vFuncName);

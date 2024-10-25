@@ -7,33 +7,35 @@ using namespace BinaryNinja;
 static Ref<BackgroundTask> rttiBackgroundTask = nullptr;
 static Ref<BackgroundTask> vftBackgroundTask = nullptr;
 
-void ScanRTTI(Ref<BinaryView> view)
-{
-	std::thread scanThread([view = std::move(view)]() {
-		rttiBackgroundTask = new BackgroundTask("Scanning for RTTI...", false);
-		auto processor = MicrosoftRTTIProcessor(view);
-		processor.ProcessRTTI();
-		view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), true);
-		rttiBackgroundTask->Finish();
-	});
-	scanThread.detach();
-}
-
-void ScanVFT(Ref<BinaryView> view)
-{
-	std::thread scanThread([view = std::move(view)]() {
-		vftBackgroundTask = new BackgroundTask("Scanning for VFTs...", false);
-		auto processor = MicrosoftRTTIProcessor(view);
-		processor.ProcessVFT();
-		view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), true);
-		vftBackgroundTask->Finish();
-	});
-	scanThread.detach();
-}
-
 bool MetadataExists(Ref<BinaryView> view)
 {
 	return view->QueryMetadata(VIEW_METADATA_MSVC) != nullptr;
+}
+
+void RTTIAnalysis(Ref<AnalysisContext> analysisContext)
+{
+	auto view = analysisContext->GetBinaryView();
+	auto platformName = view->GetDefaultPlatform()->GetName();
+	// We currently only want to check for MSVC rtti on windows platforms
+	if (platformName.find("window") == std::string::npos)
+		return;
+	rttiBackgroundTask = new BackgroundTask("Scanning for RTTI...", false);
+	auto processor = MicrosoftRTTIProcessor(view);
+	processor.ProcessRTTI();
+	view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), true);
+	rttiBackgroundTask->Finish();
+}
+
+void VFTAnalysis(Ref<AnalysisContext> analysisContext)
+{
+	auto view = analysisContext->GetBinaryView();
+	if (!MetadataExists(view))
+		return;
+	vftBackgroundTask = new BackgroundTask("Scanning for VFTs...", false);
+	auto processor = MicrosoftRTTIProcessor(view);
+	processor.ProcessVFT();
+	view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), true);
+	vftBackgroundTask->Finish();
 }
 
 
@@ -42,28 +44,42 @@ extern "C" {
 
 	BINARYNINJAPLUGIN bool CorePluginInit()
 	{
-		// TODO: In the future we will have a module level workflow which:
-		// TODO:	1. Symbolizes RTTI information
-		// TODO:	2. Creates Virtual Function Tables
-		// TODO:	3. Populates MSVC metadata entry
-		// TODO: And a function level workflow which:
+		// TODO: In the future we will have a function level workflow which:
 		// TODO:	1. Uses MSVC metadata to identify if a function is apart of a VFT
+		// TODO:		a. Or possibly we can tag some info to the function as apart of the VFT analysis, this would save a lookup.
 		// TODO:	2. Identify if the function is unique to a class, renaming and retyping if true
 		// TODO:	3. Identify functions which address a VFT and are probably a constructor (alloc use), retyping if true
 		// TODO:	4. Identify functions which address a VFT and are probably a deconstructor (free use), retyping if true
+		Ref<Workflow> msvcMetaWorkflow = Workflow::Instance("core.module.metaAnalysis")->Clone("core.module.metaAnalysis");
 
-		// Ref<Workflow> msvcWorkflow = Workflow::Instance("core.function.defaultAnalysis")->Clone("MSVCWorkflow");
-		// msvcWorkflow->RegisterActivity(new Activity("extension.msvc.rttiAnalysis", &RTTIAnalysis));
-		// msvcWorkflow->Insert("core.module.defaultAnalysis", "extension.msvc.rttiAnalysis");
-		// Workflow::RegisterWorkflow(msvcWorkflow,
-		// 	R"#({
-		// 	"title" : "MSVC Workflow",
-		// 	"description" : "Analyze MSVC RTTI",
-		// 	"capabilities" : []
-		// 	})#");
+		// Add RTTI analysis.
+		msvcMetaWorkflow->RegisterActivity(R"~({
+			"title": "MSVC RTTI Analysis",
+			"name": "plugin.msvc.rttiAnalysis",
+			"role": "action",
+			"description": "This analysis step attempts to parse and symbolize msvc rtti information.",
+			"eligibility": {
+				"runOnce": true,
+				"auto": {}
+			}
+		})~", &RTTIAnalysis);
+		// Add Virtual Function Table analysis.
+		msvcMetaWorkflow->RegisterActivity(R"~({
+			"title": "MSVC VFT Analysis",
+			"name": "plugin.msvc.vftAnalysis",
+			"role": "action",
+			"description": "This analysis step attempts to parse and symbolize msvc virtual function table information.",
+			"eligibility": {
+				"runOnce": true,
+				"auto": {}
+			}
+		})~", &VFTAnalysis);
 
-		PluginCommand::Register("MSVC\\Find RTTI", "Scans for all RTTI in view.", ScanRTTI);
-		PluginCommand::Register("MSVC\\Find VFTs", "Scans for all VFTs in the view.", ScanVFT, MetadataExists);
+		// Run rtti before debug info is applied.
+		msvcMetaWorkflow->Insert("core.module.loadDebugInfo", "plugin.msvc.rttiAnalysis");
+		// Run vft after functions have analyzed (so that the virtual functions have analyzed)
+		msvcMetaWorkflow->Insert("core.module.notifyCompletion", "plugin.msvc.vftAnalysis");
+		Workflow::RegisterWorkflow(msvcMetaWorkflow);
 
 		return true;
 	}
