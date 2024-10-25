@@ -23,6 +23,15 @@ AnalysisContext::~AnalysisContext()
 }
 
 
+Ref<BinaryView> AnalysisContext::GetBinaryView()
+{
+	BNBinaryView* view = BNAnalysisContextGetBinaryView(m_object);
+	if (!view)
+		return nullptr;
+	return new BinaryView(view);
+}
+
+
 Ref<Function> AnalysisContext::GetFunction()
 {
 	BNFunction* func = BNAnalysisContextGetFunction(m_object);

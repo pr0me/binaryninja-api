@@ -5371,6 +5371,7 @@ extern "C"
 	BINARYNINJACOREAPI BNAnalysisContext* BNCreateAnalysisContext(void);
 	BINARYNINJACOREAPI BNAnalysisContext* BNNewAnalysisContextReference(BNAnalysisContext* analysisContext);
 	BINARYNINJACOREAPI void BNFreeAnalysisContext(BNAnalysisContext* analysisContext);
+	BINARYNINJACOREAPI BNBinaryView* BNAnalysisContextGetBinaryView(BNAnalysisContext* analysisContext);
 	BINARYNINJACOREAPI BNFunction* BNAnalysisContextGetFunction(BNAnalysisContext* analysisContext);
 	BINARYNINJACOREAPI BNLowLevelILFunction* BNAnalysisContextGetLowLevelILFunction(BNAnalysisContext* analysisContext);
 	BINARYNINJACOREAPI BNMediumLevelILFunction* BNAnalysisContextGetMediumLevelILFunction(

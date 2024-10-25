@@ -31,6 +31,7 @@ from .log import log_error
 from . import _binaryninjacore as core
 from .flowgraph import FlowGraph, CoreFlowGraph
 
+from . import binaryview
 from . import function as _function
 from . import lowlevelil
 from . import mediumlevelil
@@ -47,6 +48,16 @@ class AnalysisContext:
 	def __init__(self, handle: core.BNAnalysisContextHandle):
 		assert handle is not None
 		self.handle = handle
+
+	@property
+	def view(self) -> 'binaryview.BinaryView':
+		"""
+		BinaryView for the current AnalysisContext (writable)
+		"""
+		result = core.BNAnalysisContextGetBinaryView(self.handle)
+		if not result:
+			return None
+		return binaryview.BinaryView(handle=result)
 
 	@property
 	def function(self) -> '_function.Function':

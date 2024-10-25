@@ -9802,6 +9802,12 @@ namespace BinaryNinja {
 		AnalysisContext(BNAnalysisContext* analysisContext);
 		virtual ~AnalysisContext();
 
+		/*! Get the BinaryView for the current AnalysisContext
+
+			\return The binary view for the current context
+		*/
+		Ref<BinaryView> GetBinaryView();
+
 		/*! Get the Function for the current AnalysisContext
 
 			\return The function for the current context

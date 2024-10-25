@@ -10,6 +10,7 @@ use crate::llil::{self, FunctionForm, Mutable};
 use crate::rc::{Array, CoreArrayProvider, CoreArrayProviderInner, Guard, Ref, RefCountable};
 use crate::string::{BnStrCompatible, BnString};
 use crate::{hlil, mlil};
+use crate::binaryview::BinaryView;
 
 #[repr(transparent)]
 /// The AnalysisContext struct is used to represent the current state of
@@ -27,6 +28,13 @@ impl AnalysisContext {
     #[allow(unused)]
     pub(crate) unsafe fn ref_from_raw(handle: NonNull<BNAnalysisContext>) -> Ref<Self> {
         Ref::new(Self { handle })
+    }
+
+    /// BinaryView for the current AnalysisContext
+    pub fn view(&self) -> Ref<BinaryView> {
+        let result = unsafe { BNAnalysisContextGetBinaryView(self.handle.as_ptr()) };
+        assert!(!result.is_null());
+        unsafe { BinaryView::from_raw(result) }
     }
 
     /// Function for the current AnalysisContext
