@@ -4651,9 +4651,12 @@ class BinaryView:
 
 	def update_analysis(self) -> None:
 		"""
-		``update_analysis`` asynchronously starts the analysis running and returns immediately.
-		An analysis update **must** be run after changes are made which could change analysis
-		results such as adding functions.
+		``update_analysis`` asynchronously starts the analysis process and returns immediately.
+
+		Call ``update_analysis`` after making changes that could affect the analysis results,
+		such as adding or modifying functions. This ensures that the analysis is updated to
+		reflect the latest changes. The analysis runs in the background, allowing other operations
+		to continue.
 
 		:rtype: None
 		"""
