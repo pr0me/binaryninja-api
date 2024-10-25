@@ -2828,16 +2828,20 @@ class Function:
 			>>> var_value = PossibleValueSet.constant(5)
 			>>> current_function.set_user_var_value(mlil_var, def_address, var_value)
 		"""
-		var_defs = self.mlil.get_var_definitions(var)
-		if var_defs is None:
-			raise ValueError("Could not get definition for Variable")
-		found = False
-		for site in var_defs:
-			if site.address == def_addr:
-				found = True
-				break
-		if not found:
-			raise ValueError("No definition for Variable found at given address")
+		if var.index == 0:
+			# Special case: function parameters have index 0 and are defined at the start of the function
+			def_addr = self.start
+		else:
+			var_defs = self.mlil.get_var_definitions(var)
+			if var_defs is None:
+				raise ValueError("Could not get definition for Variable")
+			found = False
+			for site in var_defs:
+				if site.address == def_addr:
+					found = True
+					break
+			if not found:
+				raise ValueError("No definition for Variable found at given address")
 		def_site = core.BNArchitectureAndAddress()
 		def_site.arch = self.arch.handle
 		def_site.address = def_addr
@@ -2852,17 +2856,21 @@ class Function:
 		:param int def_addr: Address of the definition site of the variable
 		:rtype: None
 		"""
-		var_defs = self.mlil.get_var_definitions(var)
-		if var_defs is None:
-			raise ValueError("Could not get definition for Variable")
+		if var.index == 0:
+			# Special case: function parameters have index 0 and are defined at the start of the function
+			def_addr = self.start
+		else:
+			var_defs = self.mlil.get_var_definitions(var)
+			if var_defs is None:
+				raise ValueError("Could not get definition for Variable")
 
-		found = False
-		for site in var_defs:
-			if site.address == def_addr:
-				found = True
-				break
-		if not found:
-			raise ValueError("No definition for Variable found at given address")
+			found = False
+			for site in var_defs:
+				if site.address == def_addr:
+					found = True
+					break
+			if not found:
+				raise ValueError("No definition for Variable found at given address")
 		def_site = core.BNArchitectureAndAddress()
 		def_site.arch = self.arch.handle
 		def_site.address = def_addr
