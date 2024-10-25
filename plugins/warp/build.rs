@@ -31,37 +31,40 @@ fn main() {
         );
     }
 
-    // Copy all binaries to OUT_DIR for unit tests.
-    let bin_dir: PathBuf = "fixtures/bin".into();
-    if let Ok(entries) = std::fs::read_dir(bin_dir) {
-        for entry in entries {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.is_file() {
-                let file_name = path.file_name().unwrap();
-                let dest_path = out_dir_path.join(file_name);
-                std::fs::copy(&path, &dest_path).expect("failed to copy binary to OUT_DIR");
+    #[cfg(feature = "build_artifacts")]
+    {
+        // Copy all binaries to OUT_DIR for unit tests.
+        let bin_dir: PathBuf = "fixtures/bin".into();
+        if let Ok(entries) = std::fs::read_dir(bin_dir) {
+            for entry in entries {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_file() {
+                    let file_name = path.file_name().unwrap();
+                    let dest_path = out_dir_path.join(file_name);
+                    std::fs::copy(&path, &dest_path).expect("failed to copy binary to OUT_DIR");
+                }
             }
         }
-    }
 
-    // Compile all .c files in fixtures/src directory for unit tests.
-    let src_dir: PathBuf = "fixtures/src".into();
-    if let Ok(entries) = std::fs::read_dir(src_dir) {
-        for entry in entries {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            match path.extension().map(|s| s.to_str().unwrap()) {
-                Some("c") => {
-                    cc::Build::new()
-                        .file(&path)
-                        .compile(path.file_stem().unwrap().to_str().unwrap());
+        // Compile all .c files in fixtures/src directory for unit tests.
+        let src_dir: PathBuf = "fixtures/src".into();
+        if let Ok(entries) = std::fs::read_dir(src_dir) {
+            for entry in entries {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                match path.extension().map(|s| s.to_str().unwrap()) {
+                    Some("c") => {
+                        cc::Build::new()
+                            .file(&path)
+                            .compile(path.file_stem().unwrap().to_str().unwrap());
+                    }
+                    Some("rs") => {
+                        compile_rust(path);
+                    }
+                    _ => {}
                 }
-                Some("rs") => {
-                    compile_rust(path);
-                }
-                _ => {}
             }
-        }
+        }   
     }
 }

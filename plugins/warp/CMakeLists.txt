@@ -33,7 +33,9 @@ if(FORCE_COLORED_OUTPUT)
     set(CARGO_OPTS ${CARGO_OPTS} --color always)
 endif()
 
-set(CARGO_FEATURES "")
+# NOTE: --no-default-features is set to disable building artifacts used for testing
+# NOTE: the linker is looking in the target dir and linking on it apparently.
+set(CARGO_FEATURES "--no-default-features")
 set(OUTPUT_FILE_NAME ${CMAKE_SHARED_LIBRARY_PREFIX}${PROJECT_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX})
 set(OUTPUT_PDB_NAME ${CMAKE_SHARED_LIBRARY_PREFIX}${PROJECT_NAME}.pdb)
 set(OUTPUT_FILE_PATH ${BN_CORE_PLUGIN_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${PROJECT_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX})
