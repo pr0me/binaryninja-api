@@ -15,7 +15,10 @@ bool MetadataExists(Ref<BinaryView> view)
 void RTTIAnalysis(Ref<AnalysisContext> analysisContext)
 {
 	auto view = analysisContext->GetBinaryView();
-	auto platformName = view->GetDefaultPlatform()->GetName();
+	auto platform = view->GetDefaultPlatform();
+	if (!platform)
+		return;
+	auto platformName = platform->GetName();
 	// We currently only want to check for MSVC rtti on windows platforms
 	if (platformName.find("window") == std::string::npos)
 		return;
@@ -37,7 +40,6 @@ void VFTAnalysis(Ref<AnalysisContext> analysisContext)
 	view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), true);
 	vftBackgroundTask->Finish();
 }
-
 
 extern "C" {
 	BN_DECLARE_CORE_ABI_VERSION
