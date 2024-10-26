@@ -303,6 +303,7 @@ Ref<Metadata> ClassInfo::SerializedMetadata()
         classInfoMeta["classOffset"] = new Metadata(classOffset.value());
     if (vft.has_value())
         classInfoMeta["vft"] = vft->SerializedMetadata();
+    // NOTE: We omit baseVft as it can be resolved manually and just bloats the size.
     return new Metadata(classInfoMeta);
 }
 
@@ -537,15 +538,40 @@ std::optional<VirtualFunctionTableInfo> MicrosoftRTTIProcessor::ProcessVFT(uint6
     auto typeId = Type::GenerateAutoDebugTypeId(vftTypeName);
     Ref<Type> vftType = m_view->GetTypeById(typeId);
 
-    // TODO we need to inherit vtables in cases where the backing functions are coupled to a no member field vtable.
-    // TOOD: Inheriting vtables is a terrible idea usually btw.
-
     if (vftType == nullptr)
     {
         size_t addrSize = m_view->GetAddressSize();
         StructureBuilder vftBuilder = {};
         vftBuilder.SetPropagateDataVariableReferences(true);
         size_t vFuncIdx = 0;
+
+        // Until https://github.com/Vector35/binaryninja-api/issues/5982 is fixed
+        auto vftSize = virtualFunctions.size() * addrSize;
+        vftBuilder.SetWidth(vftSize);
+        
+        if (auto baseVft = classInfo.baseVft)
+        {
+            if (classInfo.baseVft->virtualFunctions.size() <= virtualFunctions.size())
+            {
+                // Adjust the current vFunc index to the end of the shared vFuncs.
+                vFuncIdx = classInfo.baseVft->virtualFunctions.size();
+                virtualFunctions.erase(virtualFunctions.begin(), virtualFunctions.begin() + vFuncIdx);
+                // We should set the vtable as a base class so that xrefs are propagated (among other things).
+                // NOTE: this means that `this` params will be assumed pre-adjusted, this is normally fine assuming type propagation
+                // NOTE: never occurs on the vft types. Other-wise we need to change this.
+                auto baseVftTypeName = fmt::format("{}::VTable", classInfo.baseClassName.value());
+                NamedTypeReferenceBuilder baseVftNTR;
+                baseVftNTR.SetName(baseVftTypeName);
+                // Width is unresolved here so that we can keep non-base vfuncs un-inherited.
+                auto baseVftSize = vFuncIdx * addrSize;
+                vftBuilder.SetBaseStructures({ BaseStructure(baseVftNTR.Finalize(), 0, baseVftSize) });
+            }
+            else
+            {
+                LogWarn("Skipping adjustments for base VFT with more functions than sub VFT... %llx", vftAddr);
+            }
+        }
+        
         for (auto &&vFunc: virtualFunctions)
         {
             auto vFuncName = fmt::format("vFunc_{}", vFuncIdx);
@@ -559,8 +585,9 @@ std::optional<VirtualFunctionTableInfo> MicrosoftRTTIProcessor::ProcessVFT(uint6
                 vFuncName = vFuncName.substr(pos + 2);
 
             // NOTE: The analyzed function type might not be available here.
-            vftBuilder.AddMember(
-                Type::PointerType(addrSize, vFunc->GetType(), true), vFuncName);
+            auto vFuncOffset = vFuncIdx * addrSize;
+            vftBuilder.AddMemberAtOffset(
+                Type::PointerType(addrSize, vFunc->GetType(), true), vFuncName, vFuncOffset);
             vFuncIdx++;
         }
         m_view->DefineType(typeId, vftTypeName,
@@ -665,14 +692,15 @@ void MicrosoftRTTIProcessor::ProcessRTTI()
 
 void MicrosoftRTTIProcessor::ProcessVFT()
 {
+    std::map<uint64_t, uint64_t> vftMap = {};
+    std::map<uint64_t, std::optional<VirtualFunctionTableInfo>> vftFinishedMap = {};
     auto start_time = std::chrono::high_resolution_clock::now();
     for (auto &[coLocatorAddr, classInfo]: m_classInfo)
     {
         for (auto &ref: m_view->GetDataReferences(coLocatorAddr))
         {
             auto vftAddr = ref + m_view->GetAddressSize();
-            if (auto vftInfo = ProcessVFT(vftAddr, classInfo))
-                m_classInfo[coLocatorAddr].vft = vftInfo.value();
+            vftMap[coLocatorAddr] = vftAddr;
         }
     }
 
@@ -691,7 +719,7 @@ void MicrosoftRTTIProcessor::ProcessVFT()
                 if (coLocator == m_classInfo.end())
                     continue;
                 // Found a vtable reference to colocator.
-                ProcessVFT(vtableAddr + addrSize, coLocator->second);
+                vftMap[coLocatorAddr] = vtableAddr + addrSize;
             }
         };
 
@@ -712,6 +740,42 @@ void MicrosoftRTTIProcessor::ProcessVFT()
         }
     }
 
+    auto GetCachedVFTInfo = [&](uint64_t vftAddr, const ClassInfo& classInfo) {
+        // Check in the cache so that we don't process vfts more than once.
+        auto cachedVftInfo = vftFinishedMap.find(vftAddr);
+        if (cachedVftInfo != vftFinishedMap.end())
+            return cachedVftInfo->second;
+        auto vftInfo = ProcessVFT(vftAddr, classInfo);
+        vftFinishedMap[vftAddr] = vftInfo;
+        return vftInfo;
+    };
+    
+    for (const auto &[coLocatorAddr, vftAddr]: vftMap)
+    {
+        auto classInfo = m_classInfo.find(coLocatorAddr)->second;
+        if (classInfo.baseClassName.has_value())
+        {
+            // Process base vtable and add it to the class info.
+            for (auto& [baseCoLocAddr, baseClassInfo] : m_classInfo)
+            {
+                if (baseClassInfo.className == classInfo.baseClassName.value())
+                {
+                    uint64_t baseVftAddr = vftMap[baseCoLocAddr];
+                    if (auto baseVftInfo = GetCachedVFTInfo(baseVftAddr, baseClassInfo))
+                    {
+                        classInfo.baseVft = baseVftInfo.value();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (auto vftInfo = GetCachedVFTInfo(vftAddr, classInfo))
+        {
+            classInfo.vft = vftInfo.value();
+        }
+    }
+    
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_time = end_time - start_time;
     m_logger->LogInfo("ProcessVFT took %f seconds", elapsed_time.count());

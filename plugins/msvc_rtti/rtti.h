@@ -83,6 +83,7 @@ namespace BinaryNinja {
 		std::optional<std::string> baseClassName;
 		std::optional<uint64_t> classOffset;
 		std::optional<VirtualFunctionTableInfo> vft;
+		std::optional<VirtualFunctionTableInfo> baseVft;
 
 		Ref<Metadata> SerializedMetadata();
 
