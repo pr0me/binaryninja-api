@@ -7,10 +7,12 @@ using namespace BinaryNinja;
 static Ref<BackgroundTask> rttiBackgroundTask = nullptr;
 static Ref<BackgroundTask> vftBackgroundTask = nullptr;
 
+
 bool MetadataExists(Ref<BinaryView> view)
 {
 	return view->QueryMetadata(VIEW_METADATA_MSVC) != nullptr;
 }
+
 
 void RTTIAnalysis(Ref<AnalysisContext> analysisContext)
 {
@@ -29,6 +31,7 @@ void RTTIAnalysis(Ref<AnalysisContext> analysisContext)
 	rttiBackgroundTask->Finish();
 }
 
+
 void VFTAnalysis(Ref<AnalysisContext> analysisContext)
 {
 	auto view = analysisContext->GetBinaryView();
@@ -40,6 +43,7 @@ void VFTAnalysis(Ref<AnalysisContext> analysisContext)
 	view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), true);
 	vftBackgroundTask->Finish();
 }
+
 
 extern "C" {
 	BN_DECLARE_CORE_ABI_VERSION

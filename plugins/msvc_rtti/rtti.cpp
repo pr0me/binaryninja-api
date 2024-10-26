@@ -307,6 +307,7 @@ Ref<Metadata> ClassInfo::SerializedMetadata()
     return new Metadata(classInfoMeta);
 }
 
+
 ClassInfo ClassInfo::DeserializedMetadata(const Ref<Metadata> &metadata)
 {
     std::map<std::string, Ref<Metadata> > classInfoMeta = metadata->GetKeyValueStore();
@@ -320,6 +321,7 @@ ClassInfo ClassInfo::DeserializedMetadata(const Ref<Metadata> &metadata)
     return info;
 }
 
+
 Ref<Metadata> VirtualFunctionTableInfo::SerializedMetadata()
 {
     std::vector<Ref<Metadata> > funcsMeta;
@@ -331,6 +333,7 @@ Ref<Metadata> VirtualFunctionTableInfo::SerializedMetadata()
     vftMeta["functions"] = new Metadata(funcsMeta);
     return new Metadata(vftMeta);
 }
+
 
 VirtualFunctionTableInfo VirtualFunctionTableInfo::DeserializedMetadata(const Ref<Metadata> &metadata)
 {
@@ -344,6 +347,7 @@ VirtualFunctionTableInfo VirtualFunctionTableInfo::DeserializedMetadata(const Re
     return vftInfo;
 }
 
+
 Ref<Metadata> VirtualFunctionInfo::SerializedMetadata()
 {
     std::map<std::string, Ref<Metadata> > vFuncMeta;
@@ -351,12 +355,14 @@ Ref<Metadata> VirtualFunctionInfo::SerializedMetadata()
     return new Metadata(vFuncMeta);
 }
 
+
 VirtualFunctionInfo VirtualFunctionInfo::DeserializedMetadata(const Ref<Metadata> &metadata)
 {
     std::map<std::string, Ref<Metadata> > vFuncMeta = metadata->GetKeyValueStore();
     VirtualFunctionInfo vFuncInfo = {vFuncMeta["address"]->GetUnsignedInteger()};
     return vFuncInfo;
 }
+
 
 Ref<Metadata> MicrosoftRTTIProcessor::SerializedMetadata()
 {
@@ -372,6 +378,7 @@ Ref<Metadata> MicrosoftRTTIProcessor::SerializedMetadata()
     return new Metadata(msvcMeta);
 }
 
+
 void MicrosoftRTTIProcessor::DeserializedMetadata(const Ref<Metadata> &metadata)
 {
     std::map<std::string, Ref<Metadata> > msvcMeta = metadata->GetKeyValueStore();
@@ -384,6 +391,7 @@ void MicrosoftRTTIProcessor::DeserializedMetadata(const Ref<Metadata> &metadata)
         }
     }
 }
+
 
 std::optional<std::string> MicrosoftRTTIProcessor::DemangleName(const std::string &mangledName)
 {
@@ -604,9 +612,7 @@ std::optional<VirtualFunctionTableInfo> MicrosoftRTTIProcessor::ProcessVFT(uint6
 }
 
 
-MicrosoftRTTIProcessor::MicrosoftRTTIProcessor(const Ref<BinaryView> &view, bool useMangled, bool checkRData,
-                                               bool vftSweep) : m_view(
-    view)
+MicrosoftRTTIProcessor::MicrosoftRTTIProcessor(const Ref<BinaryView> &view, bool useMangled, bool checkRData, bool vftSweep) : m_view(view)
 {
     m_logger = new Logger("Microsoft RTTI");
     allowMangledClassNames = useMangled;
@@ -689,6 +695,7 @@ void MicrosoftRTTIProcessor::ProcessRTTI()
     std::chrono::duration<double> elapsed_time = end_time - start_time;
     m_logger->LogInfo("ProcessRTTI took %f seconds", elapsed_time.count());
 }
+
 
 void MicrosoftRTTIProcessor::ProcessVFT()
 {
