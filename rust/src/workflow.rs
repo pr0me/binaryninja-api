@@ -52,7 +52,7 @@ impl AnalysisContext {
         let result = unsafe { BNGetFunctionLiftedIL(func.handle) };
         let arch = self.function().arch();
         unsafe {
-            Some(llil::Function::from_raw(
+            Some(llil::Function::ref_from_raw(
                 arch,
                 NonNull::new(result)?.as_ptr(),
             ))
@@ -73,7 +73,7 @@ impl AnalysisContext {
         let result = unsafe { BNAnalysisContextGetLowLevelILFunction(self.handle.as_ptr()) };
         let arch = self.function().arch();
         unsafe {
-            Some(llil::Function::from_raw(
+            Some(llil::Function::ref_from_raw(
                 arch,
                 NonNull::new(result)?.as_ptr(),
             ))

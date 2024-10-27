@@ -427,7 +427,7 @@ impl Function {
                 return Err(());
             }
 
-            Ok(llil::RegularFunction::from_raw(self.arch(), llil))
+            Ok(llil::RegularFunction::ref_from_raw(self.arch(), llil))
         }
     }
 
@@ -435,7 +435,7 @@ impl Function {
         &self,
     ) -> Option<Ref<llil::RegularFunction<CoreArchitecture>>> {
         let llil = unsafe { BNGetFunctionLowLevelILIfAvailable(self.handle) };
-        (!llil.is_null()).then(|| unsafe { llil::RegularFunction::from_raw(self.arch(), llil) })
+        (!llil.is_null()).then(|| unsafe { llil::RegularFunction::ref_from_raw(self.arch(), llil) })
     }
 
     pub fn lifted_il(&self) -> Result<Ref<llil::LiftedFunction<CoreArchitecture>>, ()> {
@@ -446,13 +446,13 @@ impl Function {
                 return Err(());
             }
 
-            Ok(llil::LiftedFunction::from_raw(self.arch(), llil))
+            Ok(llil::LiftedFunction::ref_from_raw(self.arch(), llil))
         }
     }
 
     pub fn lifted_il_if_available(&self) -> Option<Ref<llil::LiftedFunction<CoreArchitecture>>> {
         let llil = unsafe { BNGetFunctionLiftedILIfAvailable(self.handle) };
-        (!llil.is_null()).then(|| unsafe { llil::LiftedFunction::from_raw(self.arch(), llil) })
+        (!llil.is_null()).then(|| unsafe { llil::LiftedFunction::ref_from_raw(self.arch(), llil) })
     }
 
     pub fn return_type(&self) -> Conf<Ref<Type>> {
