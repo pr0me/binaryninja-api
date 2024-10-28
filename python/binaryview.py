@@ -9434,7 +9434,7 @@ to a the type "tagRECT" found in the typelibrary "winX64common"
 			return None
 		return settings.Settings(handle=settings_handle)
 
-	def set_load_settings(self, type_name: str, settings: settings.Settings) -> None:
+	def set_load_settings(self, type_name: str, settings: Optional[settings.Settings]) -> None:
 		"""
 		``set_load_settings`` set a :py:class:`~binaryninja.settings.Settings` object which defines the load settings for the given :py:class:`BinaryViewType` ``type_name``
 
