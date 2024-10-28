@@ -18489,6 +18489,9 @@ namespace BinaryNinja {
 		void SetHasCollapsableRegions(bool state);
 
 		/*! Starts a new line in the output. */
+		void InitLine();
+
+		/*! Starts a new line in the output. */
 		void NewLine();
 
 		/*! Increases the indentation level by one. */

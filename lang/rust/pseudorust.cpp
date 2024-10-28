@@ -716,6 +716,8 @@ void PseudoRustFunction::GetExprText(const HighLevelILInstruction& instr, HighLe
 	auto function = m_highLevelIL->GetFunction();
 	if (instr.ast)
 		tokens.PrependCollapseIndicator(function, instr);
+	if (instr.operation != HLIL_BLOCK)
+		tokens.InitLine();
 	switch (instr.operation)
 	{
 	case HLIL_BLOCK:

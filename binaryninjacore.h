@@ -7961,6 +7961,7 @@ extern "C"
 	BINARYNINJACOREAPI void BNHighLevelILTokenEmitterSetHasCollapsableRegions(BNHighLevelILTokenEmitter* emitter, bool state);
 	BINARYNINJACOREAPI void BNFreeHighLevelILTokenEmitter(BNHighLevelILTokenEmitter* emitter);
 	BINARYNINJACOREAPI void BNHighLevelILTokenEmitterAppend(BNHighLevelILTokenEmitter* emitter, BNInstructionTextToken* token);
+	BINARYNINJACOREAPI void BNHighLevelILTokenEmitterInitLine(BNHighLevelILTokenEmitter* emitter);
 	BINARYNINJACOREAPI void BNHighLevelILTokenEmitterNewLine(BNHighLevelILTokenEmitter* emitter);
 	BINARYNINJACOREAPI void BNHighLevelILTokenEmitterIncreaseIndent(BNHighLevelILTokenEmitter* emitter);
 	BINARYNINJACOREAPI void BNHighLevelILTokenEmitterDecreaseIndent(BNHighLevelILTokenEmitter* emitter);

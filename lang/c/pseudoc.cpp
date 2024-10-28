@@ -681,6 +681,11 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 	auto function = m_highLevelIL->GetFunction();
 	if (instr.ast)
 		tokens.PrependCollapseIndicator(function, instr);
+
+	// ensure we claim the line address for top level instrs on a line
+	if (instr.operation != HLIL_BLOCK)
+		tokens.InitLine();
+
 	switch (instr.operation)
 	{
 	case HLIL_BLOCK:

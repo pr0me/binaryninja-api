@@ -685,6 +685,12 @@ void HighLevelILTokenEmitter::SetHasCollapsableRegions(bool state)
 }
 
 
+void HighLevelILTokenEmitter::InitLine()
+{
+	BNHighLevelILTokenEmitterInitLine(m_object);
+}
+
+
 void HighLevelILTokenEmitter::NewLine()
 {
 	BNHighLevelILTokenEmitterNewLine(m_object);
