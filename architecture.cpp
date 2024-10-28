@@ -100,7 +100,7 @@ InstructionTextToken::InstructionTextToken(BNInstructionTextTokenType t, BNInstr
 InstructionTextToken::InstructionTextToken(const BNInstructionTextToken& token) :
     type(token.type), text(token.text), value(token.value), width(token.width), size(token.size),
     operand(token.operand), context(token.context), confidence(token.confidence), address(token.address),
-    exprIndex(BN_INVALID_EXPR)
+    exprIndex(token.exprIndex)
 {
 	typeNames.reserve(token.namesCount);
 	for (size_t j = 0; j < token.namesCount; j++)
