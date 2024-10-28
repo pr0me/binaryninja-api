@@ -32,9 +32,9 @@ DSCRawView::DSCRawView(const std::string& typeName, BinaryView* data, bool parse
 	// This is going to load _only_ the dyld header of the loaded file.
 	// This written region will be immediately overwritten on image loading by SharedCache.cpp
 	GetFile()->SetFilename(data->GetFile()->GetOriginalFilename());
-	auto reader = new BinaryReader(GetParentView());
-	reader->Seek(16);
-	auto size = reader->Read32() + 0x8;
+	uint32_t size;
+	GetParentView()->Read(&size, 16, 4);
+	size += 8;
 	AddAutoSegment(0, size, 0, size, SegmentReadable);
 	GetParentView()->WriteBuffer(0, GetParentView()->ReadBuffer(0, size));
 }
@@ -762,7 +762,8 @@ DSCViewType::DSCViewType() : BinaryViewType(VIEW_NAME, VIEW_NAME) {}
 
 BinaryNinja::Ref<BinaryNinja::BinaryView> DSCViewType::Create(BinaryNinja::BinaryView* data)
 {
-	return new DSCView(VIEW_NAME, new DSCRawView("DSCRawView", data, false), false);
+	Ref<BinaryView> rawViewRef = new DSCRawView("DSCRawView", data, false);
+	return new DSCView(VIEW_NAME, rawViewRef, false);
 }
 
 

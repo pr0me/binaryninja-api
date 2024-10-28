@@ -5,7 +5,11 @@ file(GLOB SOURCES *.cpp *.h)
 add_library(sharedcacheworkflow OBJECT ${SOURCES})
 
 if (VIEW_NAME)
-    target_compile_definitions(sharedcacheworkflow PRIVATE VIEW_NAME="${VIEW_NAME}")
+    if (BN_REF_COUNT_DEBUG)
+        target_compile_definitions(sharedcacheworkflow PRIVATE VIEW_NAME="${VIEW_NAME}" BN_REF_COUNT_DEBUG)
+    else()
+        target_compile_definitions(sharedcacheworkflow PRIVATE VIEW_NAME="${VIEW_NAME}")
+    endif()
 else()
     error("VIEW_NAME must be defined")
 endif()
@@ -37,6 +41,8 @@ function(get_recursive_include_dirs target result)
     # Set the result to the collected include directories
     set(${result} ${include_dirs} PARENT_SCOPE)
 endfunction()
+
+message(STATUS "RCD: ${BN_REF_COUNT_DEBUG}")
 
 get_recursive_include_dirs(binaryninjaapi INCLUDES)
 

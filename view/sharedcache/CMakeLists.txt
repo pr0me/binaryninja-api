@@ -84,5 +84,5 @@ message("
 ░▒████▓  ▒██████▒▒▒  ▓███▀ ░  Qt Version: ${QT_VERSION}
  ▒▒▓  ▒ ▒ ▒▓▒ ▒ ░░ ░▒ ▒  ░    Crash on Failure: ${HARD_FAIL_MODE}
  ░ ▒  ▒ ░ ░▒  ░ ░  ░  ▒       Slideinfo Debug Tags: ${SLIDEINFO_DEBUG_TAGS}
- ░ ░  ░ ░  ░  ░  ░
+ ░ ░  ░ ░  ░  ░  ░            REFCOUNT_DEBUG: ${BN_REF_COUNT_DEBUG}
 ")

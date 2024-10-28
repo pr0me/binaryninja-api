@@ -15,7 +15,7 @@ void DisplayDSCPicker(UIContext* ctx, Ref<BinaryView> dscView)
 	BackgroundThread::create(ctx ? ctx->mainWindow() : nullptr)->thenBackground(
 		[dscView=dscView](QVariant var) {
 			QStringList entries;
-			SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(dscView);
+			Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(dscView);
 
 			for (const auto& img : cache->GetAvailableImages())
 			  entries.push_back(QString::fromStdString(img));
@@ -36,7 +36,7 @@ void DisplayDSCPicker(UIContext* ctx, Ref<BinaryView> dscView)
 		})->thenBackground([dscView=dscView](QVariant var){
 			if (var.toString().isEmpty())
 				return;
-			SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(dscView);
+			Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(dscView);
 			cache->LoadImageWithInstallName(var.toString().toStdString());
 		})->start();
 }

@@ -20,7 +20,7 @@
 #define QSETTINGS_KEY_ALPHA_POPUP_SEEN "DSCTriage-AlphaPopupSeen"
 
 
-DSCCacheBlocksView::DSCCacheBlocksView(QWidget* parent, BinaryViewRef data, SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache)
+DSCCacheBlocksView::DSCCacheBlocksView(QWidget* parent, BinaryViewRef data, Ref<SharedCacheAPI::SharedCache> cache)
 	: QWidget(parent), m_data(data), m_cache(cache)
 {
 	setMouseTracking(true);
@@ -477,7 +477,7 @@ void SymbolTableModel::setFilter(std::string text)
 }
 
 
-SymbolTableView::SymbolTableView(QWidget* parent, SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache)
+SymbolTableView::SymbolTableView(QWidget* parent, Ref<SharedCacheAPI::SharedCache> cache)
 	: m_model(new SymbolTableModel(this)){
 
 	// Set up the filter model
@@ -863,9 +863,6 @@ Contributions are always welcome! </p>
 
 	m_triageTabs->selectWidget(defaultWidget);
 }
-
-
-DSCTriageView::~DSCTriageView() {}
 
 
 QFont DSCTriageView::getFont()

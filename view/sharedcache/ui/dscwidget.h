@@ -76,7 +76,7 @@ class DSCContentsModel : public QAbstractItemModel {
 Q_OBJECT
 
     BinaryViewRef m_bv;
-    SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> m_cache;
+    Ref<SharedCacheAPI::SharedCache> m_cache;
     DSCContentsModelItem *m_root;
 
     std::unordered_map<std::string, DSCContentsModelItem *> m_dscItems;

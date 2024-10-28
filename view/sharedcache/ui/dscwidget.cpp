@@ -346,7 +346,7 @@ void DSCSidebarView::navigateToIndex(const QModelIndex& index)
 
 	if (reply == QMessageBox::Yes)
 	{
-		SharedCacheAPI::SharedCache* cache = new SharedCacheAPI::SharedCache(m_data);
+		Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(m_data);
 		cache->LoadImageWithInstallName(modelItem->m_installName);
 		m_data->UpdateAnalysis();
 	}

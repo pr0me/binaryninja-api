@@ -48,11 +48,11 @@ void UINotifications::OnViewChange(UIContext* context, ViewFrame* frame, const Q
 			if (!ah->isBoundAction("Load Image by Name"))
 			{
 				ah->bindAction("Load Image by Name", UIAction([view = view](const UIActionContext& ctx) {
-					SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(view);
+					Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(view);
 					DisplayDSCPicker(ctx.context, view);
 				}));
 				ah->bindAction("Load Section by Address", UIAction([view = view](const UIActionContext& ctx) {
-					SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
+					Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
 					uint64_t addr = 0;
 					bool gotAddr = GetAddressInput(addr, "Address", "Address");
 					if (gotAddr)
@@ -67,7 +67,7 @@ void UINotifications::OnViewChange(UIContext* context, ViewFrame* frame, const Q
 					UIAction(
 						[](const UIActionContext& ctx) {
 							Ref<BinaryView> view = ctx.binaryView;
-							SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
+							Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
 							uint64_t addr = ctx.token.token.value;
 							if (addr)
 							{
@@ -78,7 +78,7 @@ void UINotifications::OnViewChange(UIContext* context, ViewFrame* frame, const Q
 							}
 						},
 						[](const UIActionContext& ctx) {
-							SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
+							Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
 							uint64_t addr = ctx.token.token.value;
 							if (isAddrMapped(ctx.binaryView, addr))
 								return false;
@@ -88,7 +88,7 @@ void UINotifications::OnViewChange(UIContext* context, ViewFrame* frame, const Q
 					UIAction(
 						[](const UIActionContext& ctx) {
 							Ref<BinaryView> view = ctx.binaryView;
-							SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(view);
+							Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(view);
 							uint64_t addr = ctx.token.token.value;
 							if (addr)
 							{
@@ -99,21 +99,21 @@ void UINotifications::OnViewChange(UIContext* context, ViewFrame* frame, const Q
 							}
 						},
 						[](const UIActionContext& ctx) {
-							SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
+							Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
 							uint64_t addr = ctx.token.token.value;
 							if (isAddrMapped(ctx.binaryView, addr))
 								return false;
 							return addr && cache->GetImageNameForAddress(addr) != "";  // bool
 						}));
 				ah->setActionDisplayName("Load ADDRHERE", [](const UIActionContext& ctx) {
-					SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
+					Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
 					uint64_t addr = ctx.token.token.value;
 					if (addr)
 						return QString("Load ") + cache->GetNameForAddress(addr).c_str();
 					return QString("Error");
 				});
 				ah->setActionDisplayName("Load IMGHERE", [](const UIActionContext& ctx) {
-					SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
+					Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(ctx.binaryView);
 					uint64_t addr = ctx.token.token.value;
 					if (addr)
 						return QString("Load ") + cache->GetImageNameForAddress(addr).c_str();

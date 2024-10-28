@@ -24,7 +24,7 @@ class DSCCacheBlocksView : public QWidget
 	Q_OBJECT
 
 	BinaryViewRef m_data;
-	SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> m_cache;
+	Ref<SharedCacheAPI::SharedCache> m_cache;
 
 	uint64_t m_backingCacheCount = 0;
 	std::vector<SharedCacheAPI::BackingCache> m_backingCaches;
@@ -45,7 +45,7 @@ class DSCCacheBlocksView : public QWidget
 	void blockSelected(int index);
 
 public:
-	DSCCacheBlocksView(QWidget* parent, BinaryViewRef data, SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache);
+	DSCCacheBlocksView(QWidget* parent, BinaryViewRef data, Ref<SharedCacheAPI::SharedCache> cache);
 	virtual ~DSCCacheBlocksView() override;
 
 protected:
@@ -218,7 +218,7 @@ class SymbolTableView : public QTableView, public FilterTarget
 	SymbolTableModel* m_model;
 
 public:
-	SymbolTableView(QWidget* parent, SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> cache);
+	SymbolTableView(QWidget* parent, Ref<SharedCacheAPI::SharedCache> cache);
 	virtual ~SymbolTableView() override;
 
 	void scrollToFirstItem() override {
@@ -262,7 +262,7 @@ class DSCTriageView : public QWidget, public View
 {
 	BinaryViewRef m_data;
 	QVBoxLayout* m_layout;
-	SharedCacheAPI::SCRef<SharedCacheAPI::SharedCache> m_cache;
+	Ref<SharedCacheAPI::SharedCache> m_cache;
 
 	SplitTabWidget* m_triageTabs;
 	DockableTabCollection* m_triageCollection;
@@ -275,7 +275,6 @@ class DSCTriageView : public QWidget, public View
 
 public:
 	DSCTriageView(QWidget* parent, BinaryViewRef data);
-	virtual ~DSCTriageView() override;
 	BinaryViewRef getData() override;
 	void setSelectionOffsets(BNAddressRange range) override {};
 	QFont getFont() override;
