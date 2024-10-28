@@ -268,7 +268,6 @@ class DSCTriageView : public QWidget, public View
 	DockableTabCollection* m_triageCollection;
 
 	SplitTabWidget* m_bottomRegionTabs;
-	QTimer* m_tabLayoutTimer;
 	DockableTabCollection* m_bottomRegionCollection;
 
 	std::vector<SharedCacheAPI::SharedCacheMachOHeader> m_headers;

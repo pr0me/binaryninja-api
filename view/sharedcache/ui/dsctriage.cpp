@@ -478,7 +478,7 @@ void SymbolTableModel::setFilter(std::string text)
 
 
 SymbolTableView::SymbolTableView(QWidget* parent, Ref<SharedCacheAPI::SharedCache> cache)
-	: m_model(new SymbolTableModel(this)){
+	: m_model(new SymbolTableModel(this)) {
 
 	// Set up the filter model
 	setModel(m_model);
@@ -631,7 +631,7 @@ DSCTriageView::DSCTriageView(QWidget* parent, BinaryViewRef data) : QWidget(pare
 
 	containerWidget->addWidget(cacheInfo);
 
-	QWidget* defaultWidget;
+	QWidget* defaultWidget = nullptr;
 
 	// check for alpha popup qsetting
 	QSettings settings;
@@ -687,7 +687,7 @@ Contributions are always welcome! </p>
 		auto loadImageModel = new QStandardItemModel(0, 2, loadImageTable);
 		{
 			connect(
-				cacheBlocksView, &DSCCacheBlocksView::loadDone, [this, loadImageModel, cacheInfo]()
+				cacheBlocksView, &DSCCacheBlocksView::loadDone, [this, loadImageModel]()
 				{
 					for (const auto& img : m_cache->GetImages())
 					{
@@ -706,7 +706,7 @@ Contributions are always welcome! </p>
 		auto loadImageButton = new CustomStyleFlatPushButton();
 		{
 			connect(loadImageButton, &QPushButton::clicked,
-				[this, loadImageTable, cacheInfo, mappingModel, sectionModel](bool) {
+				[this, loadImageTable](bool) {
 					auto selected = loadImageTable->selectionModel()->selectedRows();
 					if (selected.size() == 0)
 					{

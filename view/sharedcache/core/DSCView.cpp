@@ -207,8 +207,7 @@ bool DSCView::Init()
 	if (!settings)
 	{
 		Ref<Settings> programSettings = Settings::Instance();
-		programSettings->Set("workflows.enable", true, this);
-		programSettings->Set("workflows.functionWorkflow", "core.function.dsc", this);
+		programSettings->Set("analysis.workflows.functionWorkflow", "core.function.dsc", this);
 	}
 
 	// Add Mach-O file header type info
@@ -751,6 +750,7 @@ bool DSCView::Init()
 	}
 
 	AddAutoSegment(primaryBase, 0x200, 0, 0x200, SegmentReadable);
+	AddAutoSection("__dsc_header", primaryBase, 0x200, ReadOnlyCodeSectionSemantics);
 	DefineType("dyld_cache_header", headerType.name, headerType.type);
 	DefineAutoSymbolAndVariableOrFunction(GetDefaultPlatform(), new Symbol(DataSymbol, "primary_cache_header", primaryBase), headerType.type);
 
@@ -789,7 +789,7 @@ Ref<Settings> DSCViewType::GetLoadSettingsForData(BinaryView* data)
 	}
 
 	Ref<Settings> programSettings = Settings::Instance();
-	programSettings->Set("workflows.functionWorkflow", "core.function.dsc", viewRef);
+	programSettings->Set("analysis.workflows.functionWorkflow", "core.function.dsc", viewRef);
 
 	settings->RegisterSetting("loader.dsc.processCFStrings",
 		R"({

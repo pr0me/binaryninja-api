@@ -1341,33 +1341,29 @@ SharedCache::SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView) : m_
 	{
 		if (m_viewState == DSCViewStateUnloaded)
 		{
-			// maybe we are getting called from UI thread. probably. do this on a separate thread just in case.
-			// TODO `wait` argument
-			WorkerEnqueue([this]() {
-				std::unique_lock<std::mutex> lock(viewSpecificMutexes[m_dscView->GetFile()->GetSessionId()].viewOperationsThatInfluenceMetadataMutex);
-				try {
-					PerformInitialLoad();
-				}
-				catch (...)
-				{
-					m_logger->LogError("Failed to perform initial load of Shared Cache");
-				}
+			std::unique_lock<std::mutex> lock(viewSpecificMutexes[m_dscView->GetFile()->GetSessionId()].viewOperationsThatInfluenceMetadataMutex);
+			try {
+				PerformInitialLoad();
+			}
+			catch (...)
+			{
+				m_logger->LogError("Failed to perform initial load of Shared Cache");
+			}
 
-				for (const auto& [_, header] : m_headers)
+			for (const auto& [_, header] : m_headers)
+			{
+				if (header.installName.find("libsystem_c.dylib") != std::string::npos)
 				{
-					if (header.installName.find("libsystem_c.dylib") != std::string::npos)
-					{
-						lock.unlock();
-						m_logger->LogInfo("Loading core libsystem_c.dylib library");
-						LoadImageWithInstallName(header.installName);
-						lock.lock();
-						break ;
-					}
+					lock.unlock();
+					m_logger->LogInfo("Loading core libsystem_c.dylib library");
+					LoadImageWithInstallName(header.installName);
+					lock.lock();
+					break ;
 				}
+			}
 
-				m_viewState = DSCViewStateLoaded;
-				SaveToDSCView();
-			});
+			m_viewState = DSCViewStateLoaded;
+			SaveToDSCView();
 		}
 	}
 	else
