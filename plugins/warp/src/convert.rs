@@ -53,12 +53,11 @@ pub fn from_bn_symbol(raw_symbol: &BNSymbol) -> Symbol {
         BNSymbolType::LocalLabel => {
             todo!()
         }
-        // BN External is our Exported
         BNSymbolType::External => Symbol::new(
             symbol_name,
-            // TODO: Data?
-            SymbolClass::Data,
-            SymbolModifiers::Exported,
+            // TODO: External data?
+            SymbolClass::Function,
+            SymbolModifiers::External,
         ),
         BNSymbolType::ImportedData => {
             Symbol::new(symbol_name, SymbolClass::Data, SymbolModifiers::External)
@@ -68,10 +67,10 @@ pub fn from_bn_symbol(raw_symbol: &BNSymbol) -> Symbol {
             SymbolClass::Function,
             SymbolModifiers::default(),
         ),
-        // BN Imported is our External
         BNSymbolType::ImportedFunction => Symbol::new(
             symbol_name,
             SymbolClass::Function,
+            // TODO: Exported?
             SymbolModifiers::External,
         ),
     }
