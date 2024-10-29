@@ -1,10 +1,14 @@
+use crate::convert::from_bn_symbol;
+use crate::{build_function, function_guid};
 use binaryninja::architecture::Architecture;
 use binaryninja::binaryview::{BinaryView, BinaryViewBase, BinaryViewExt};
 use binaryninja::function::Function as BNFunction;
-use binaryninja::llil;
 use binaryninja::llil::{FunctionMutability, NonSSA, NonSSAVariant};
 use binaryninja::rc::Guard;
 use binaryninja::rc::Ref as BNRef;
+use binaryninja::symbol::Symbol as BNSymbol;
+use binaryninja::{llil, ObjectDestructor};
+use dashmap::mapref::one::Ref;
 use dashmap::try_result::TryResult;
 use dashmap::DashMap;
 use std::collections::HashSet;
@@ -13,11 +17,46 @@ use std::sync::OnceLock;
 use warp::signature::function::constraints::FunctionConstraint;
 use warp::signature::function::{Function, FunctionGUID};
 
-use crate::convert::from_bn_symbol;
-use crate::{build_function, function_guid};
-
+pub static MATCHED_FUNCTION_CACHE: OnceLock<DashMap<ViewID, MatchedFunctionCache>> =
+    OnceLock::new();
 pub static FUNCTION_CACHE: OnceLock<DashMap<ViewID, FunctionCache>> = OnceLock::new();
 pub static GUID_CACHE: OnceLock<DashMap<ViewID, GUIDCache>> = OnceLock::new();
+
+pub fn register_cache_destructor() {
+    pub static mut CACHE_DESTRUCTOR: CacheDestructor = CacheDestructor;
+    unsafe { CACHE_DESTRUCTOR.register() };
+}
+
+pub fn cached_function_match<F>(function: &BNFunction, f: F) -> Option<Function>
+where
+    F: Fn() -> Option<Function>,
+{
+    let view = function.view();
+    let view_id = ViewID::from(view.as_ref());
+    let function_id = FunctionID::from(function);
+    let function_cache = MATCHED_FUNCTION_CACHE.get_or_init(Default::default);
+    match function_cache.get(&view_id) {
+        Some(cache) => cache.get_or_insert(&function_id, f).to_owned(),
+        None => {
+            let cache = MatchedFunctionCache::default();
+            let matched = cache.get_or_insert(&function_id, f).to_owned();
+            function_cache.insert(view_id, cache);
+            matched
+        }
+    }
+}
+
+pub fn try_cached_function_match(function: &BNFunction) -> Option<Function> {
+    let view = function.view();
+    let view_id = ViewID::from(view);
+    let function_id = FunctionID::from(function);
+    let function_cache = MATCHED_FUNCTION_CACHE.get_or_init(Default::default);
+    function_cache
+        .get(&view_id)?
+        .get(&function_id)?
+        .value()
+        .to_owned()
+}
 
 pub fn cached_function<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
     function: &BNFunction,
@@ -85,6 +124,38 @@ pub fn cached_function_guid<A: Architecture, M: FunctionMutability, V: NonSSAVar
     }
 }
 
+pub fn try_cached_function_guid(function: &BNFunction) -> Option<FunctionGUID> {
+    let view = function.view();
+    let view_id = ViewID::from(view);
+    let guid_cache = GUID_CACHE.get_or_init(Default::default);
+    guid_cache.get(&view_id)?.try_function_guid(function)
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct MatchedFunctionCache {
+    pub cache: DashMap<FunctionID, Option<Function>>,
+}
+
+impl MatchedFunctionCache {
+    pub fn get_or_insert<F>(
+        &self,
+        function_id: &FunctionID,
+        f: F,
+    ) -> Ref<'_, FunctionID, Option<Function>>
+    where
+        F: FnOnce() -> Option<Function>,
+    {
+        self.cache.get(function_id).unwrap_or_else(|| {
+            self.cache.insert(*function_id, f());
+            self.cache.get(function_id).unwrap()
+        })
+    }
+
+    pub fn get(&self, function_id: &FunctionID) -> Option<Ref<'_, FunctionID, Option<Function>>> {
+        self.cache.get(function_id)
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct FunctionCache {
     pub cache: DashMap<FunctionID, Function>,
@@ -119,22 +190,33 @@ impl GUIDCache {
         let view = function.view();
         let func_id = FunctionID::from(function);
         let func_start = function.start();
+        let func_platform = function.platform();
         let mut constraints = HashSet::new();
         for call_site in &function.call_sites() {
-            for cs_ref in &view.get_code_refs(call_site.address) {
-                let cs_ref_func = cs_ref.function();
-                let cs_ref_func_id = FunctionID::from(cs_ref_func);
-                if cs_ref_func_id != func_id {
-                    let call_site_offset: i64 = func_start as i64 - call_site.address as i64;
-                    let function_constraint = match cs_ref_func.low_level_il_if_available() {
-                        Some(cs_ref_func_llil) => self.function_constraint_with_guid(
-                            cs_ref_func,
-                            &cs_ref_func_llil,
-                            call_site_offset,
-                        ),
-                        None => self.function_constraint(cs_ref_func, call_site_offset),
-                    };
-                    constraints.insert(function_constraint);
+            for cs_ref_addr in view.get_code_refs_from(call_site.address, Some(function)) {
+                match view.function_at(&func_platform, cs_ref_addr) {
+                    Ok(cs_ref_func) => {
+                        // Call site is a function, constrain on it.
+                        let cs_ref_func_id = FunctionID::from(cs_ref_func.as_ref());
+                        if cs_ref_func_id != func_id {
+                            let call_site_offset: i64 =
+                                func_start as i64 - call_site.address as i64;
+                            constraints
+                                .insert(self.function_constraint(&cs_ref_func, call_site_offset));
+                        }
+                    }
+                    Err(_) => {
+                        // We could be dealing with an extern symbol, get the symbol as a constraint.
+                        let call_site_offset: i64 = func_start as i64 - call_site.address as i64;
+                        if let Ok(call_site_sym) = view.symbol_by_address(cs_ref_addr) {
+                            constraints.insert(
+                                self.function_constraint_from_symbol(
+                                    &call_site_sym,
+                                    call_site_offset,
+                                ),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -152,19 +234,10 @@ impl GUIDCache {
             for curr_func in &view.functions_at(func_start_addr) {
                 let curr_func_id = FunctionID::from(curr_func.as_ref());
                 if curr_func_id != func_id {
-                    // NOTE: We have to get the llil here for the function which is problematic for running
-                    // NOTE: within a workflow (before analysis has finished)
+                    // NOTE: For this to work the GUID has to have already been cached. If not it will just be the symbol.
                     // Function adjacent to another function, constrain on the pattern.
                     let curr_addr_offset = (func_start_addr as i64) - func_start as i64;
-                    let function_constraint = match curr_func.low_level_il_if_available() {
-                        Some(curr_func_llil) => self.function_constraint_with_guid(
-                            &curr_func,
-                            &curr_func_llil,
-                            curr_addr_offset,
-                        ),
-                        None => self.function_constraint(&curr_func, curr_addr_offset),
-                    };
-                    constraints.insert(function_constraint);
+                    constraints.insert(self.function_constraint(&curr_func, curr_addr_offset));
                 }
             }
         };
@@ -186,29 +259,24 @@ impl GUIDCache {
 
     /// Construct a function constraint, must pass the offset at which it is located.
     pub fn function_constraint(&self, function: &BNFunction, offset: i64) -> FunctionConstraint {
+        let guid = self.try_function_guid(function);
         let symbol = from_bn_symbol(&function.symbol());
         FunctionConstraint {
-            guid: None,
+            guid,
             symbol: Some(symbol),
             offset,
         }
     }
 
-    /// Construct a function constraint, must pass the offset at which it is located.
-    pub fn function_constraint_with_guid<
-        A: Architecture,
-        M: FunctionMutability,
-        V: NonSSAVariant,
-    >(
+    /// Construct a function constraint from a symbol, typically used for extern function call sites, must pass the offset at which it is located.
+    pub fn function_constraint_from_symbol(
         &self,
-        function: &BNFunction,
-        llil: &llil::Function<A, M, NonSSA<V>>,
+        symbol: &BNSymbol,
         offset: i64,
     ) -> FunctionConstraint {
-        let guid = self.function_guid(function, llil);
-        let symbol = from_bn_symbol(&function.symbol());
+        let symbol = from_bn_symbol(symbol);
         FunctionConstraint {
-            guid: Some(guid),
+            guid: None,
             symbol: Some(symbol),
             offset,
         }
@@ -227,8 +295,18 @@ impl GUIDCache {
                 self.cache.insert(function_id, function_guid);
                 function_guid
             }
-            TryResult::Locked => function_guid(function, llil),
+            TryResult::Locked => {
+                log::warn!("Failed to acquire function guid cache");
+                function_guid(function, llil)
+            }
         }
+    }
+
+    pub fn try_function_guid(&self, function: &BNFunction) -> Option<FunctionGUID> {
+        let function_id = FunctionID::from(function);
+        self.cache
+            .get(&function_id)
+            .map(|function_guid| function_guid.value().to_owned())
     }
 }
 
@@ -282,5 +360,24 @@ impl From<BNRef<BNFunction>> for FunctionID {
 impl From<Guard<'_, BNFunction>> for FunctionID {
     fn from(value: Guard<'_, BNFunction>) -> Self {
         Self::from(value.as_ref())
+    }
+}
+
+pub struct CacheDestructor;
+
+impl ObjectDestructor for CacheDestructor {
+    fn destruct_view(&self, view: &BinaryView) {
+        // Clear caches as the view is no longer alive.
+        let view_id = ViewID::from(view);
+        if let Some(cache) = MATCHED_FUNCTION_CACHE.get() {
+            cache.remove(&view_id);
+        }
+        if let Some(cache) = FUNCTION_CACHE.get() {
+            cache.remove(&view_id);
+        }
+        if let Some(cache) = GUID_CACHE.get() {
+            cache.remove(&view_id);
+        }
+        log::debug!("Removed WARP caches for {:?}", view);
     }
 }

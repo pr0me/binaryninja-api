@@ -1,5 +1,6 @@
 use crate::cache::cached_function;
 use crate::convert::from_bn_type;
+use crate::matcher::invalidate_function_matcher_cache;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::Command;
 use rayon::prelude::*;
@@ -15,7 +16,6 @@ pub struct CreateSignatureFile;
 impl Command for CreateSignatureFile {
     fn action(&self, view: &BinaryView) {
         let mut signature_dir = binaryninja::user_directory().unwrap().join("signatures/");
-        // TODO: This needs to split out each platform into its own bucket...
         if let Some(default_plat) = view.default_platform() {
             // If there is a default platform, put the signature in there.
             signature_dir.push(default_plat.name().to_string());
@@ -53,7 +53,11 @@ impl Command for CreateSignatureFile {
                 // TODO: Should we overwrite? Prompt user.
                 if let Ok(mut file) = std::fs::File::create(&save_file) {
                     match file.write_all(&data.to_bytes()) {
-                        Ok(_) => log::info!("Signature file saved successfully."),
+                        Ok(_) => {
+                            log::info!("Signature file saved successfully.");
+                            // Force rebuild platform matcher.
+                            invalidate_function_matcher_cache();
+                        }
                         Err(e) => log::error!("Failed to write data to signature file: {:?}", e),
                     }
                 } else {

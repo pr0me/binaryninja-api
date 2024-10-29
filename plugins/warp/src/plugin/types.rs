@@ -23,7 +23,7 @@ impl Command for LoadTypesCommand {
             log::error!("Could not get data from signature file: {:?}", file);
             return;
         };
-        
+
         let Some(arch) = view.default_arch() else {
             log::error!("Could not get default architecture");
             return;

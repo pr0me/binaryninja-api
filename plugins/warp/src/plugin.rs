@@ -1,16 +1,17 @@
 use log::LevelFilter;
 
+use crate::build_function;
+use crate::cache::{
+    register_cache_destructor, ViewID, FUNCTION_CACHE, GUID_CACHE, MATCHED_FUNCTION_CACHE,
+};
+use crate::convert::{to_bn_symbol_at_address, to_bn_type};
+use crate::matcher::{PlatformID, PLAT_MATCHER_CACHE};
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::{Command, FunctionCommand};
 use binaryninja::function::Function;
 use binaryninja::rc::Ref;
 use binaryninja::tags::TagType;
 use warp::signature::function::Function as WarpFunction;
-
-use crate::build_function;
-use crate::cache::{ViewID, FUNCTION_CACHE, GUID_CACHE};
-use crate::convert::{to_bn_symbol_at_address, to_bn_type};
-use crate::matcher::{PlatformID, PLAT_MATCHER_CACHE};
 
 mod apply;
 mod copy;
@@ -67,10 +68,15 @@ struct DebugCache;
 
 impl Command for DebugCache {
     fn action(&self, view: &BinaryView) {
-        let function_cache = FUNCTION_CACHE.get_or_init(Default::default);
         let view_id = ViewID::from(view);
+        let function_cache = FUNCTION_CACHE.get_or_init(Default::default);
         if let Some(cache) = function_cache.get(&view_id) {
             log::info!("View functions: {}", cache.cache.len());
+        }
+
+        let matched_function_cache = MATCHED_FUNCTION_CACHE.get_or_init(Default::default);
+        if let Some(cache) = matched_function_cache.get(&view_id) {
+            log::info!("View matched functions: {}", cache.cache.len());
         }
 
         let function_guid_cache = GUID_CACHE.get_or_init(Default::default);
@@ -84,10 +90,6 @@ impl Command for DebugCache {
             if let Some(cache) = plat_cache.get(&platform_id) {
                 log::info!("Platform functions: {}", cache.functions.len());
                 log::info!("Platform types: {}", cache.types.len());
-                log::info!(
-                    "Platform matched functions: {}",
-                    cache.matched_functions.len()
-                );
             }
         }
     }
@@ -102,7 +104,10 @@ impl Command for DebugCache {
 pub extern "C" fn CorePluginInit() -> bool {
     binaryninja::logger::init(LevelFilter::Debug).unwrap();
 
-    workflow::insert_matcher_workflow();
+    // Make sure caches are flushed when the views get destructed.
+    register_cache_destructor();
+
+    workflow::insert_workflow();
 
     binaryninja::command::register(
         "WARP\\Apply Signature File Types",

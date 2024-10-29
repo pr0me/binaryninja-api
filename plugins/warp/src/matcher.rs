@@ -1,14 +1,11 @@
-use binaryninja::architecture::{Architecture as BNArchitecture, Architecture};
+use binaryninja::architecture::Architecture as BNArchitecture;
 use binaryninja::backgroundtask::BackgroundTask;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::function::{Function as BNFunction, FunctionUpdateType};
-use binaryninja::llil;
-use binaryninja::llil::{FunctionMutability, NonSSA, NonSSAVariant};
 use binaryninja::platform::Platform;
 use binaryninja::rc::Guard;
 use binaryninja::rc::Ref as BNRef;
 use dashmap::DashMap;
-use fastbloom::BloomFilter;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::hash::{DefaultHasher, Hasher};
@@ -18,44 +15,41 @@ use walkdir::{DirEntry, WalkDir};
 use warp::r#type::class::TypeClass;
 use warp::r#type::guid::TypeGUID;
 use warp::r#type::Type;
-use warp::signature::basic_block::BasicBlock;
 use warp::signature::function::{Function, FunctionGUID};
 use warp::signature::Data;
 
-use crate::cache::{cached_call_site_constraints, cached_function_guid, FunctionID};
+use crate::cache::{cached_call_site_constraints, cached_function_match, try_cached_function_guid};
 use crate::convert::to_bn_type;
-use crate::entry_basic_block_guid;
 use crate::plugin::on_matched_function;
 
-pub const TRIVIAL_LLIL_THRESHOLD: usize = 8;
+pub const TRIVIAL_FUNCTION_DELTA_THRESHOLD: u64 = 8;
 
 pub static PLAT_MATCHER_CACHE: OnceLock<DashMap<PlatformID, Matcher>> = OnceLock::new();
 
-pub fn cached_function_match<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
-    function: &BNFunction,
-    llil: &llil::Function<A, M, NonSSA<V>>,
-) {
+pub fn cached_function_matcher(function: &BNFunction) {
     let platform = function.platform();
     let platform_id = PlatformID::from(platform.as_ref());
     let matcher_cache = PLAT_MATCHER_CACHE.get_or_init(Default::default);
     match matcher_cache.get(&platform_id) {
-        Some(matcher) => matcher.match_function(function, llil),
+        Some(matcher) => matcher.match_function(function),
         None => {
             let matcher = Matcher::from_platform(platform);
-            matcher.match_function(function, llil);
+            matcher.match_function(function);
             matcher_cache.insert(platform_id, matcher);
         }
     }
 }
 
+// TODO: Maybe just clear individual platforms? This works well enough either way.
+pub fn invalidate_function_matcher_cache() {
+    let matcher_cache = PLAT_MATCHER_CACHE.get_or_init(Default::default);
+    matcher_cache.clear();
+}
+
 pub struct Matcher {
-    pub matched_functions: DashMap<FunctionID, Function>,
     pub functions: DashMap<FunctionGUID, Vec<Function>>,
     pub types: DashMap<TypeGUID, Type>,
     pub named_types: DashMap<String, Type>,
-    /// This is used to fast-fail on functions not in the dataset.
-    /// NOTE: This can only handle one basic block classification, right now that is the entry block.
-    basic_block_filter: BloomFilter,
 }
 
 impl Matcher {
@@ -83,19 +77,7 @@ impl Matcher {
 
         // TODO: If a user signature has the same name as a core signature, remove the core signature.
 
-        task.set_progress_text("Gathering entry blocks for matcher filtering...");
-
-        // Get entry_blocks for filtering.
-        let entry_blocks = data
-            .iter()
-            .flat_map(|(_, data)| data.functions.iter().map(|function| &function.entry))
-            .collect::<Vec<_>>();
-        // TODO: We need to disable this if we get a None basic block, as it will then fail to match all cases.
-        let basic_block_filter = BloomFilter::with_false_pos(0.1).items(entry_blocks);
-
         task.set_progress_text("Gathering matcher functions...");
-
-        // TODO: Merge like functions, right now we just hope and pray.
 
         // Get functions for comprehensive matching.
         let functions = data
@@ -148,9 +130,7 @@ impl Matcher {
         log::debug!("Loaded signatures: {:?}", data.keys());
 
         Self {
-            matched_functions: Default::default(),
             functions,
-            basic_block_filter,
             types,
             named_types,
         }
@@ -239,18 +219,8 @@ impl Matcher {
         inner_add_type_to_view(self, view, arch, &mut HashSet::new(), ty)
     }
 
-    pub fn match_function<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
-        &self,
-        function: &BNFunction,
-        llil: &llil::Function<A, M, NonSSA<V>>,
-    ) {
-        let function_id = FunctionID::from(function);
-        if let Some(matched_function) = self.matched_functions.get(&function_id) {
-            // Skip computing the match for already matched function.
-            // We do still need to apply the match data through analysis updates.
-            return on_matched_function(function, &matched_function);
-        }
-
+    pub fn match_function(&self, function: &BNFunction) {
+        // Call this the first time you matched on the function.
         let on_new_match = |matched: &Function| {
             // We also want to resolve the types here.
             if let TypeClass::Function(c) = matched.ty.class.as_ref() {
@@ -263,51 +233,32 @@ impl Matcher {
                 for in_member in &c.in_members {
                     self.add_type_to_view(&view, &arch, &in_member.ty);
                 }
-            } else {
-                // This should never happen.
-                log::error!(
-                    "Matched function is not of function type class... 0x{:x}",
-                    function.start()
-                );
             }
-            on_matched_function(function, matched);
-
-            // We matched on the function, great! Now make sure we don't do this again :3
-            self.matched_functions
-                .insert(function_id, matched.to_owned());
             // Also mark this for updates.
             // TODO: Does this do anything?
             function.mark_updates_required(FunctionUpdateType::UserFunctionUpdate);
         };
 
-        // TODO: Expand this check to be less broad.
-        let is_function_trivial = { llil.instruction_count() < TRIVIAL_LLIL_THRESHOLD };
-
-        // Check to see if the functions entry block is even in the dataset
-        let entry_block = entry_basic_block_guid(function, llil).map(BasicBlock::new);
-        if self.basic_block_filter.contains(&entry_block) {
-            // Build the full function guid now
-            let warp_func_guid = cached_function_guid(function, llil);
-            if let Some(matched) = self.functions.get(&warp_func_guid) {
-                if matched.len() == 1 && !is_function_trivial {
+        if let Some(matched_function) = cached_function_match(function, || {
+            // We have yet to match on this function.
+            // TODO: Expand this check to be less broad.
+            let function_delta = function.highest_address() - function.lowest_address();
+            let is_function_trivial = { function_delta < TRIVIAL_FUNCTION_DELTA_THRESHOLD };
+            let warp_func_guid = try_cached_function_guid(function)?;
+            match self.functions.get(&warp_func_guid) {
+                Some(matched) if matched.len() == 1 && !is_function_trivial => {
                     on_new_match(&matched[0]);
-                } else if let Some(matched_function) =
-                    self.match_function_from_constraints(function, &matched)
-                {
-                    log::debug!(
-                        "Found best matching function `{}`... 0x{:x}",
-                        matched_function.symbol.name,
-                        function.start()
-                    );
-                    on_new_match(matched_function);
-                } else {
-                    log::debug!(
-                        "Failed to find matching function `{}`... 0x{:x}",
-                        matched.len(),
-                        function.start()
-                    );
+                    Some(matched[0].to_owned())
                 }
+                Some(matched) => {
+                    let matched_on = self.match_function_from_constraints(function, &matched)?;
+                    on_new_match(matched_on);
+                    Some(matched_on.to_owned())
+                }
+                None => None,
             }
+        }) {
+            on_matched_function(function, &matched_function);
         }
     }
 
@@ -387,7 +338,17 @@ impl Matcher {
         match highest_guid_count.cmp(&highest_symbol_count) {
             Ordering::Less => matched_symbol_func,
             Ordering::Greater => matched_guid_func,
-            Ordering::Equal => None,
+            Ordering::Equal => {
+                // If the two highest our the same we can use it.
+                let ty_is_same = matched_guid_func?.ty == matched_symbol_func?.ty;
+                let sym_is_same = matched_guid_func?.symbol == matched_symbol_func?.symbol;
+                if ty_is_same && sym_is_same {
+                    matched_guid_func
+                } else {
+                    // We matched equally on two different functions
+                    None
+                }
+            }
         }
     }
 }
