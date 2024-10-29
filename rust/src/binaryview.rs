@@ -1307,6 +1307,25 @@ pub trait BinaryViewExt: BinaryViewBase {
         }
     }
 
+    /// Retrieves a list of addresses pointed to by a given address.
+    fn get_code_refs_from(&self, addr: u64, func: Option<&Function>) -> Vec<u64> {
+        unsafe {
+            let mut count = 0;
+            // TODO: We could have done a [CodeReference] however it seems to be poorly written.
+            // TODO: It uses manually drop on a ref that only gets dropped in the array, insane behavior.
+            // TODO: For now just construct it manually.
+            let mut src = BNReferenceSource {
+                func: func.map(|f| f.handle).unwrap_or(std::ptr::null_mut()),
+                arch: func.map(|f| f.arch().0).unwrap_or(std::ptr::null_mut()),
+                addr,
+            };
+            let addresses = BNGetCodeReferencesFrom(self.as_ref().handle, &mut src, &mut count);
+            let res = std::slice::from_raw_parts(addresses, count).to_vec();
+            BNFreeAddressList(addresses);
+            res
+        }
+    }
+
     /// Retrieves a list of [CodeReference]s pointing into a given [Range].
     fn get_code_refs_in_range(&self, range: Range<u64>) -> Array<CodeReference> {
         unsafe {
