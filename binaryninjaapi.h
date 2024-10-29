@@ -13623,9 +13623,8 @@ namespace BinaryNinja {
 		std::vector<DisassemblyTextLine> GetExprText(
 		    ExprId expr, bool asFullAst = true, DisassemblySettings* settings = nullptr);
 		std::vector<DisassemblyTextLine> GetExprText(
-		    const HighLevelILInstruction& instr, bool asFullAst = true, DisassemblySettings* settings = nullptr);
-		std::vector<DisassemblyTextLine> GetInstructionText(
-		    size_t i, bool asFullAst = true, DisassemblySettings* settings = nullptr);
+			const HighLevelILInstruction& instr, DisassemblySettings* settings = nullptr);
+		std::vector<DisassemblyTextLine> GetInstructionText(size_t i, DisassemblySettings* settings = nullptr);
 
 		Confidence<Ref<Type>> GetExprType(size_t expr);
 		Confidence<Ref<Type>> GetExprType(const HighLevelILInstruction& expr);
@@ -13671,25 +13670,22 @@ namespace BinaryNinja {
 
 		    \param instr The instruction to emit lines for.
 		    \param settings The settings for disassembly (optional).
-		    \param asFullAst Whether to emit full AST or single expressions.
 		    \param precedence The current operator precedence level.
 		    \param statement Whether the instruction is a statement or an expression.
 		    \return A list of lines of tokens for the instruction.
 		*/
 		std::vector<DisassemblyTextLine> GetExprText(const HighLevelILInstruction& instr, DisassemblySettings* settings,
-			bool asFullAst = true, BNOperatorPrecedence precedence = TopLevelOperatorPrecedence,
-			bool statement = false);
+			BNOperatorPrecedence precedence = TopLevelOperatorPrecedence, bool statement = false);
 
 		/*! Generates lines for the given High Level IL instruction in the style of the linear view. To get the lines
 		    for the entire function, pass the root instruction of a HighLevelILFunction.
 
 		    \param instr The instruction to emit lines for.
 		    \param settings The settings for disassembly (optional).
-		    \param asFullAst Whether to emit full AST or single expressions.
 		    \return A list of lines of tokens for the instruction.
 		*/
 		std::vector<DisassemblyTextLine> GetLinearLines(
-			const HighLevelILInstruction& instr, DisassemblySettings* settings, bool asFullAst = true);
+			const HighLevelILInstruction& instr, DisassemblySettings* settings);
 
 		/*! Generates lines for a single High Level IL basic block.
 
@@ -13748,13 +13744,12 @@ namespace BinaryNinja {
 		    \param instr The instruction to emit tokens for.
 		    \param tokens The token emitter to use.
 		    \param settings The disassembly settings to use (may be NULL).
-		    \param asFullAst Whether to emit full AST or single expressions.
 		    \param precedence The current operator precedence level.
 		    \param statement Whether the instruction is a statement or an expression.
 		*/
 		virtual void GetExprText(const HighLevelILInstruction& instr, HighLevelILTokenEmitter& tokens,
-			DisassemblySettings* settings, bool asFullAst = true,
-			BNOperatorPrecedence precedence = TopLevelOperatorPrecedence, bool statement = false) = 0;
+			DisassemblySettings* settings, BNOperatorPrecedence precedence = TopLevelOperatorPrecedence,
+			bool statement = false) = 0;
 
 		/*! This method can be overridden to emit tokens at the start of a function.
 
@@ -13800,8 +13795,8 @@ namespace BinaryNinja {
 
 	protected:
 		void GetExprText(const HighLevelILInstruction& instr, HighLevelILTokenEmitter& tokens,
-			DisassemblySettings* settings, bool asFullAst = true,
-			BNOperatorPrecedence precedence = TopLevelOperatorPrecedence, bool statement = false) override;
+			DisassemblySettings* settings, BNOperatorPrecedence precedence = TopLevelOperatorPrecedence,
+			bool statement = false) override;
 	};
 
 	class TypePrinter;

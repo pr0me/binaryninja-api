@@ -31,10 +31,10 @@ class PseudoRustFunction: public BinaryNinja::LanguageRepresentationFunction
 	void AppendSizeToken(size_t size, bool isSigned, BinaryNinja::HighLevelILTokenEmitter& emitter);
 	void AppendSingleSizeToken(size_t size, BNInstructionTextTokenType type, BinaryNinja::HighLevelILTokenEmitter& emitter);
 	void AppendComparison(const std::string& comparison, const BinaryNinja::HighLevelILInstruction& instr,
-		BinaryNinja::HighLevelILTokenEmitter& emitter, BinaryNinja::DisassemblySettings* settings, bool asFullAst,
+		BinaryNinja::HighLevelILTokenEmitter& emitter, BinaryNinja::DisassemblySettings* settings,
 		BNOperatorPrecedence precedence, std::optional<bool> signedHint = std::nullopt);
 	void AppendTwoOperand(const std::string& operand, const BinaryNinja::HighLevelILInstruction& instr,
-		BinaryNinja::HighLevelILTokenEmitter& emitter, BinaryNinja::DisassemblySettings* settings, bool asFullAst,
+		BinaryNinja::HighLevelILTokenEmitter& emitter, BinaryNinja::DisassemblySettings* settings,
 		BNOperatorPrecedence precedence, std::optional<bool> signedHint = std::nullopt);
 	void AppendTwoOperandFunction(const std::string& function, const BinaryNinja::HighLevelILInstruction& instr,
 		BinaryNinja::HighLevelILTokenEmitter& tokens, BinaryNinja::DisassemblySettings* settings, bool sizeToken = true);
@@ -47,14 +47,14 @@ class PseudoRustFunction: public BinaryNinja::LanguageRepresentationFunction
 	bool IsMutable(const BinaryNinja::Variable& var) const;
 
 	void GetExprText(const BinaryNinja::HighLevelILInstruction& instr, BinaryNinja::HighLevelILTokenEmitter& tokens,
-		BinaryNinja::DisassemblySettings* settings, bool asFullAst = true,
-		BNOperatorPrecedence precedence = TopLevelOperatorPrecedence, ExpressionType exprType = InnerExpression,
-		std::optional<bool> signedHint = std::nullopt);
+		BinaryNinja::DisassemblySettings* settings, BNOperatorPrecedence precedence = TopLevelOperatorPrecedence,
+		ExpressionType exprType = InnerExpression, std::optional<bool> signedHint = std::nullopt);
 
 protected:
 	virtual void InitTokenEmitter(BinaryNinja::HighLevelILTokenEmitter& tokens) override;
-	virtual void GetExprText(const BinaryNinja::HighLevelILInstruction& instr, BinaryNinja::HighLevelILTokenEmitter& tokens,
-		BinaryNinja::DisassemblySettings* settings, bool asFullAst, BNOperatorPrecedence precedence, bool statement) override;
+	virtual void GetExprText(const BinaryNinja::HighLevelILInstruction& instr,
+		BinaryNinja::HighLevelILTokenEmitter& tokens, BinaryNinja::DisassemblySettings* settings,
+		BNOperatorPrecedence precedence, bool statement) override;
 	virtual void BeginLines(const BinaryNinja::HighLevelILInstruction& instr, BinaryNinja::HighLevelILTokenEmitter& tokens) override;
 	virtual void EndLines(const BinaryNinja::HighLevelILInstruction& instr, BinaryNinja::HighLevelILTokenEmitter& tokens) override;
 

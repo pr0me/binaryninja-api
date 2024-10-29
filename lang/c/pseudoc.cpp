@@ -246,20 +246,20 @@ void PseudoCFunction::AppendSingleSizeToken(
 
 
 void PseudoCFunction::AppendComparison(const string& comparison, const HighLevelILInstruction& instr,
-	HighLevelILTokenEmitter& emitter, DisassemblySettings* settings, bool asFullAst, BNOperatorPrecedence precedence,
+	HighLevelILTokenEmitter& emitter, DisassemblySettings* settings, BNOperatorPrecedence precedence,
 	std::optional<bool> signedHint)
 {
 	const auto leftExpr = instr.GetLeftExpr();
 	const auto rightExpr = instr.GetRightExpr();
 
-	GetExprTextInternal(leftExpr, emitter, settings, asFullAst, precedence, false, signedHint);
+	GetExprTextInternal(leftExpr, emitter, settings, precedence, false, signedHint);
 	emitter.Append(OperationToken, comparison);
-	GetExprTextInternal(rightExpr, emitter, settings, asFullAst, precedence, false, signedHint);
+	GetExprTextInternal(rightExpr, emitter, settings, precedence, false, signedHint);
 }
 
 
 void PseudoCFunction::AppendTwoOperand(const string& operand, const HighLevelILInstruction& instr,
-	HighLevelILTokenEmitter& emitter, DisassemblySettings* settings, bool asFullAst, BNOperatorPrecedence precedence,
+	HighLevelILTokenEmitter& emitter, DisassemblySettings* settings, BNOperatorPrecedence precedence,
 	std::optional<bool> signedHint)
 {
 	const auto& twoOperand = instr.AsTwoOperand();
@@ -291,9 +291,9 @@ void PseudoCFunction::AppendTwoOperand(const string& operand, const HighLevelILI
 
 		emitter.Append(OperationToken, "COMBINE");
 		emitter.AppendOpenParen();
-		GetExprTextInternal(high, emitter, settings, asFullAst);
+		GetExprTextInternal(high, emitter, settings);
 		emitter.Append(TextToken, ", ");
-		GetExprTextInternal(low, emitter, settings, asFullAst);
+		GetExprTextInternal(low, emitter, settings);
 		emitter.AppendCloseParen();
 	}
 
@@ -317,7 +317,7 @@ void PseudoCFunction::AppendTwoOperand(const string& operand, const HighLevelILI
 		}
 	}
 
-	GetExprTextInternal(leftExpr, emitter, settings, asFullAst, leftPrecedence, false, signedHint);
+	GetExprTextInternal(leftExpr, emitter, settings, leftPrecedence, false, signedHint);
 
 	auto lessThanZero = [](uint64_t value, uint64_t width) -> bool {
 		return ((1UL << ((width * 8) - 1UL)) & value) != 0;
@@ -343,7 +343,7 @@ void PseudoCFunction::AppendTwoOperand(const string& operand, const HighLevelILI
 	}
 
 	emitter.Append(OperationToken, operand);
-	GetExprTextInternal(rightExpr, emitter, settings, asFullAst, precedence, false, signedHint);
+	GetExprTextInternal(rightExpr, emitter, settings, precedence, false, signedHint);
 }
 
 
@@ -521,15 +521,14 @@ void PseudoCFunction::AppendFieldTextTokens(const HighLevelILInstruction& var, u
 
 
 void PseudoCFunction::GetExprText(const HighLevelILInstruction& instr, HighLevelILTokenEmitter& tokens,
-	DisassemblySettings* settings, bool asFullAst, BNOperatorPrecedence precedence, bool statement)
+	DisassemblySettings* settings, BNOperatorPrecedence precedence, bool statement)
 {
-	GetExprTextInternal(instr, tokens, settings, asFullAst, precedence, statement);
+	GetExprTextInternal(instr, tokens, settings, precedence, statement);
 }
 
 
 void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, HighLevelILTokenEmitter& tokens,
-	DisassemblySettings* settings, bool asFullAst, BNOperatorPrecedence precedence, bool statement,
-	optional<bool> signedHint)
+	DisassemblySettings* settings, BNOperatorPrecedence precedence, bool statement, optional<bool> signedHint)
 {
 	// The lambdas in this function are here to reduce stack frame size of this function. Without them,
 	// complex expression can cause the process to crash from a stack overflow.
@@ -699,9 +698,9 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				// normal source code.
 				auto next = i;
 				++next;
-				if (asFullAst && (instr.exprIndex == GetHighLevelILFunction()->GetRootExpr().exprIndex) && (exprs.size() > 1) &&
-					(next == exprs.end()) && ((*i).operation == HLIL_RET) &&
-					((*i).GetSourceExprs<HLIL_RET>().size() == 0))
+				if (instr.ast && (instr.exprIndex == GetHighLevelILFunction()->GetRootExpr().exprIndex)
+					&& (exprs.size() > 1) && (next == exprs.end()) && ((*i).operation == HLIL_RET)
+					&& ((*i).GetSourceExprs<HLIL_RET>().size() == 0))
 					continue;
 
 				// If the statement is one that contains additional blocks of code, insert a scope separator
@@ -730,7 +729,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				needSeparator = hasBlocks;
 
 				// Emit the lines for the statement itself
-				GetExprTextInternal(*i, tokens, settings, true, TopLevelOperatorPrecedence, true);
+				GetExprTextInternal(*i, tokens, settings, TopLevelOperatorPrecedence, true);
 				tokens.NewLine();
 			}
 		}();
@@ -743,18 +742,18 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto updateExpr = instr.GetUpdateExpr<HLIL_FOR>();
 			const auto loopExpr = instr.GetLoopExpr<HLIL_FOR>();
 
-			if (asFullAst)
+			if (instr.ast)
 			{
 				tokens.Append(KeywordToken, "for ");
 				tokens.AppendOpenParen();
 				if (initExpr.operation != HLIL_NOP)
-					GetExprTextInternal(initExpr, tokens, settings, asFullAst);
+					GetExprTextInternal(initExpr, tokens, settings);
 				tokens.Append(TextToken, "; ");
 				if (condExpr.operation != HLIL_NOP)
-					GetExprTextInternal(condExpr, tokens, settings, asFullAst);
+					GetExprTextInternal(condExpr, tokens, settings);
 				tokens.Append(TextToken, "; ");
 				if (updateExpr.operation != HLIL_NOP)
-					GetExprTextInternal(updateExpr, tokens, settings, asFullAst);
+					GetExprTextInternal(updateExpr, tokens, settings);
 				tokens.AppendCloseParen();
 				if (function->IsInstructionCollapsed(instr))
 				{
@@ -764,7 +763,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				{
 					auto scopeType = HighLevelILFunction::GetExprScopeType(loopExpr);
 					tokens.BeginScope(scopeType);
-					GetExprTextInternal(loopExpr, tokens, settings, asFullAst, TopLevelOperatorPrecedence, true);
+					GetExprTextInternal(loopExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 					tokens.EndScope(scopeType);
 					tokens.FinalizeScope();
 				}
@@ -789,9 +788,9 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 
 			tokens.Append(KeywordToken, "if ");
 			tokens.AppendOpenParen();
-			GetExprTextInternal(condExpr, tokens, settings, asFullAst);
+			GetExprTextInternal(condExpr, tokens, settings);
 			tokens.AppendCloseParen();
-			if (!asFullAst)
+			if (!instr.ast)
 				return;
 
 			if (function->IsInstructionCollapsed(instr))
@@ -802,7 +801,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			{
 				auto scopeType = HighLevelILFunction::GetExprScopeType(trueExpr);
 				tokens.BeginScope(scopeType);
-				GetExprTextInternal(trueExpr, tokens, settings, asFullAst, TopLevelOperatorPrecedence, true);
+				GetExprTextInternal(trueExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 				tokens.EndScope(scopeType);
 			}
 			//tokens.SetCurrentExpr(falseExpr);
@@ -810,7 +809,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			{
 				tokens.ScopeContinuation(false);
 				tokens.Append(KeywordToken, "else ");
-				GetExprTextInternal(falseExpr, tokens, settings, asFullAst, TopLevelOperatorPrecedence, true);
+				GetExprTextInternal(falseExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 			}
 			else if (falseExpr.operation != HLIL_NOP)
 			{
@@ -826,7 +825,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				{
 					auto scopeType = HighLevelILFunction::GetExprScopeType(falseExpr);
 					tokens.BeginScope(scopeType);
-					GetExprTextInternal(falseExpr, tokens, settings, asFullAst, TopLevelOperatorPrecedence, true);
+					GetExprTextInternal(falseExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 					tokens.EndScope(scopeType);
 					tokens.FinalizeScope();
 				}
@@ -847,7 +846,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			tokens.AppendOpenParen();
 			GetExprTextInternal(condExpr, tokens, settings);
 			tokens.AppendCloseParen();
-			if (!asFullAst)
+			if (!instr.ast)
 				return;
 
 			if (function->IsInstructionCollapsed(instr))
@@ -858,7 +857,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			{
 				auto scopeType = HighLevelILFunction::GetExprScopeType(loopExpr);
 				tokens.BeginScope(scopeType);
-				GetExprTextInternal(loopExpr, tokens, settings, true, TopLevelOperatorPrecedence, true);
+				GetExprTextInternal(loopExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 				tokens.EndScope(scopeType);
 				tokens.FinalizeScope();
 			}
@@ -870,7 +869,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 		[&]() {
 			const auto loopExpr = instr.GetLoopExpr<HLIL_DO_WHILE>();
 			const auto condExpr = instr.GetConditionExpr<HLIL_DO_WHILE>();
-			if (asFullAst)
+			if (instr.ast)
 			{
 				tokens.Append(KeywordToken, "do");
 				if (function->IsInstructionCollapsed(instr))
@@ -887,7 +886,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				{
 					auto scopeType = HighLevelILFunction::GetExprScopeType(loopExpr);
 					tokens.BeginScope(scopeType);
-					GetExprTextInternal(loopExpr, tokens, settings, true, TopLevelOperatorPrecedence, true);
+					GetExprTextInternal(loopExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 					tokens.EndScope(scopeType);
 
 					tokens.ScopeContinuation(true);
@@ -918,9 +917,9 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 
 			tokens.Append(KeywordToken, "switch ");
 			tokens.AppendOpenParen();
-			GetExprTextInternal(condExpr, tokens, settings, asFullAst);
+			GetExprTextInternal(condExpr, tokens, settings);
 			tokens.AppendCloseParen();
-			if (!asFullAst)
+			if (!instr.ast)
 				return;
 
 			if (function->IsInstructionCollapsed(instr))
@@ -932,7 +931,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				tokens.BeginScope(SwitchScopeType);
 				for (const auto caseExpr: caseExprs)
 				{
-					GetExprTextInternal(caseExpr, tokens, settings, asFullAst, TopLevelOperatorPrecedence, true);
+					GetExprTextInternal(caseExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 					tokens.NewLine();
 				}
 
@@ -948,7 +947,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 					else
 					{
 						tokens.BeginScope(CaseScopeType);
-						GetExprTextInternal(defaultExpr, tokens, settings, asFullAst, TopLevelOperatorPrecedence, true);
+						GetExprTextInternal(defaultExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 						tokens.EndScope(CaseScopeType);
 						tokens.FinalizeScope();
 					}
@@ -969,13 +968,13 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			{
 				const auto& valueExpr = valueExprs[index];
 				tokens.Append(KeywordToken, "case ");
-				GetExprTextInternal(valueExpr, tokens, settings, asFullAst);
+				GetExprTextInternal(valueExpr, tokens, settings);
 				tokens.Append(TextToken, ":");
 				if (index != valueExprs.size() - 1)
 					tokens.NewLine();
 			}
 
-			if (!asFullAst)
+			if (!instr.ast)
 				return;
 
 			if (function->IsInstructionCollapsed(instr))
@@ -986,7 +985,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			{
 				tokens.PrependCollapseIndicator(function, instr);
 				tokens.BeginScope(CaseScopeType);
-				GetExprTextInternal(trueExpr, tokens, settings, asFullAst, TopLevelOperatorPrecedence, true);
+				GetExprTextInternal(trueExpr, tokens, settings, TopLevelOperatorPrecedence, true);
 
 				static const std::vector<BNHighLevelILOperation> operations {
 						HLIL_CONTINUE, HLIL_NORET, HLIL_UNREACHABLE, HLIL_JUMP, HLIL_GOTO, HLIL_TAILCALL};
@@ -1048,7 +1047,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto srcExpr = instr.GetSourceExpr<HLIL_ZX>();
 			if (settings && !settings->IsOptionSet(ShowTypeCasts))
 			{
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(srcExpr, tokens, settings, precedence);
 				return;
 			}
 			bool parens = precedence > UnaryOperatorPrecedence;
@@ -1057,7 +1056,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			tokens.AppendOpenParen();
 			AppendSizeToken(instr.size, false, tokens);
 			tokens.AppendCloseParen();
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence, false, false);
+			GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence, false, false);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -1070,7 +1069,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto srcExpr = instr.GetSourceExpr<HLIL_SX>();
 			if (settings && !settings->IsOptionSet(ShowTypeCasts))
 			{
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(srcExpr, tokens, settings, precedence);
 				return;
 			}
 			bool parens = precedence > UnaryOperatorPrecedence;
@@ -1079,7 +1078,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			tokens.AppendOpenParen();
 			AppendSizeToken(instr.size, true, tokens);
 			tokens.AppendCloseParen();
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence, false, true);
+			GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence, false, true);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -1092,7 +1091,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto destExpr = instr.GetDestExpr<HLIL_CALL>();
 			const auto parameterExprs = instr.GetParameterExprs<HLIL_CALL>();
 
-			GetExprTextInternal(destExpr, tokens, settings, asFullAst, MemberAndFunctionOperatorPrecedence);
+			GetExprTextInternal(destExpr, tokens, settings, MemberAndFunctionOperatorPrecedence);
 			tokens.AppendOpenParen();
 
 			vector<FunctionParameter> namedParams;
@@ -1129,7 +1128,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				}
 
 				if (!renderedAsString)
-					GetExprText(parameterExpr, tokens, settings, asFullAst);
+					GetExprText(parameterExpr, tokens, settings);
 			}
 			tokens.AppendCloseParen();
 			if (statement)
@@ -1162,9 +1161,9 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto srcExpr = instr.GetSourceExpr<HLIL_ARRAY_INDEX>();
 			const auto indexExpr = instr.GetIndexExpr<HLIL_ARRAY_INDEX>();
 
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, MemberAndFunctionOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, MemberAndFunctionOperatorPrecedence);
 			tokens.AppendOpenBracket();
-			GetExprTextInternal(indexExpr, tokens, settings, asFullAst);
+			GetExprTextInternal(indexExpr, tokens, settings);
 			tokens.AppendCloseBracket();
 			if (statement)
 				tokens.AppendSemicolon();
@@ -1229,7 +1228,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				appearsDead = false;
 			}
 
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, AssignmentOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, AssignmentOperatorPrecedence);
 
 			if (appearsDead)
 				tokens.EndForceZeroConfidence();
@@ -1454,16 +1453,16 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				const auto high = destExpr.GetHighExpr<HLIL_SPLIT>();
 				const auto low = destExpr.GetLowExpr<HLIL_SPLIT>();
 
-				GetExprTextInternal(high, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(high, tokens, settings, precedence);
 				tokens.Append(OperationToken, " = ");
 				tokens.Append(OperationToken, "HIGH");
 				AppendSingleSizeToken(high.size, OperationToken, tokens);
 				tokens.AppendOpenParen();
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(srcExpr, tokens, settings, precedence);
 				tokens.AppendCloseParen();
 				tokens.AppendSemicolon();
 				tokens.NewLine();
-				GetExprTextInternal(low, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(low, tokens, settings, precedence);
 			}
 			else
 			{
@@ -1577,7 +1576,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				}
 			}
 
-			GetExprTextInternal(destExpr, tokens, settings, asFullAst, precedence);
+			GetExprTextInternal(destExpr, tokens, settings, precedence);
 			if (assignUpdateOperator.has_value() && assignUpdateSource.has_value())
 				tokens.Append(OperationToken, assignUpdateOperator.value());
 			else
@@ -1612,14 +1611,13 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				}
 				else
 				{
-					GetExprTextInternal(assignUpdateSource.value(), tokens, settings, asFullAst,
-						AssignmentOperatorPrecedence, false, assignSignedHint);
+					GetExprTextInternal(assignUpdateSource.value(), tokens, settings, AssignmentOperatorPrecedence,
+						false, assignSignedHint);
 				}
 			}
 			else
 			{
-				GetExprTextInternal(
-					srcExpr, tokens, settings, asFullAst, AssignmentOperatorPrecedence, false, assignSignedHint);
+				GetExprTextInternal(srcExpr, tokens, settings, AssignmentOperatorPrecedence, false, assignSignedHint);
 			}
 
 			if (isSplit)
@@ -1638,9 +1636,9 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto destExprs = instr.GetDestExprs<HLIL_ASSIGN_UNPACK>();
 			const auto firstExpr = destExprs[0];
 
-			GetExprTextInternal(firstExpr, tokens, settings, asFullAst, AssignmentOperatorPrecedence);
+			GetExprTextInternal(firstExpr, tokens, settings, AssignmentOperatorPrecedence);
 			tokens.Append(OperationToken, " = ");
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, AssignmentOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, AssignmentOperatorPrecedence);
 			if (statement)
 				tokens.AppendSemicolon();
 		}();
@@ -1672,7 +1670,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 					tokens.Append(TextToken, "*");
 					tokens.AppendCloseParen();
 				}
-				GetExprTextInternal(srcExpr, tokens, settings, true, MemberAndFunctionOperatorPrecedence);
+				GetExprTextInternal(srcExpr, tokens, settings, MemberAndFunctionOperatorPrecedence);
 
 				tokens.Append(OperationToken, " + ");
 				tokens.AppendIntegerTextToken(instr, fieldOffset, instr.size);
@@ -1700,7 +1698,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 					tokens.Append(TextToken, "*");
 					tokens.AppendCloseParen();
 				}
-				GetExprTextInternal(srcExpr, tokens, settings, true, MemberAndFunctionOperatorPrecedence);
+				GetExprTextInternal(srcExpr, tokens, settings, MemberAndFunctionOperatorPrecedence);
 				if (!settings || settings->IsOptionSet(ShowTypeCasts))
 				{
 					tokens.AppendCloseParen();
@@ -1709,7 +1707,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			}
 			else
 			{
-				GetExprTextInternal(srcExpr, tokens, settings, true, MemberAndFunctionOperatorPrecedence);
+				GetExprTextInternal(srcExpr, tokens, settings, MemberAndFunctionOperatorPrecedence);
 			}
 
 			AppendFieldTextTokens(srcExpr, fieldOffset, memberIndex, instr.size, tokens, false);
@@ -1829,7 +1827,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 					tokens.AppendCloseParen();
 				}
 
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence);
+				GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence);
 				if (parens)
 					tokens.AppendCloseParen();
 			}
@@ -1847,13 +1845,13 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			tokens.Append(AnnotationToken, "/* tailcall */");
 			tokens.NewLine();
 			tokens.Append(KeywordToken, "return ");
-			GetExprTextInternal(destExpr, tokens, settings, asFullAst, MemberAndFunctionOperatorPrecedence);
+			GetExprTextInternal(destExpr, tokens, settings, MemberAndFunctionOperatorPrecedence);
 			tokens.AppendOpenParen();
 			for (size_t index{}; index < parameterExprs.size(); index++)
 			{
 				const auto& parameterExpr = parameterExprs[index];
 				if (index != 0) tokens.Append(TextToken, ", ");
-				GetExprTextInternal(parameterExpr, tokens, settings, asFullAst);
+				GetExprTextInternal(parameterExpr, tokens, settings);
 			}
 			tokens.AppendCloseParen();
 			if (statement)
@@ -1868,7 +1866,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			if (parens)
 				tokens.AppendOpenParen();
 			tokens.Append(OperationToken, "&");
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -1881,7 +1879,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			bool parens = precedence > EqualityOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendComparison(" == ", instr, tokens, settings, asFullAst, EqualityOperatorPrecedence);
+			AppendComparison(" == ", instr, tokens, settings, EqualityOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -1908,7 +1906,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				bool parens = precedence > EqualityOperatorPrecedence;
 				if (parens)
 					tokens.AppendOpenParen();
-				AppendComparison(" == ", instr, tokens, settings, asFullAst, EqualityOperatorPrecedence);
+				AppendComparison(" == ", instr, tokens, settings, EqualityOperatorPrecedence);
 				if (parens)
 					tokens.AppendCloseParen();
 			}
@@ -1922,7 +1920,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			bool parens = precedence > EqualityOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendComparison(" != ", instr, tokens, settings, asFullAst, EqualityOperatorPrecedence);
+			AppendComparison(" != ", instr, tokens, settings, EqualityOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -1943,7 +1941,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				bool parens = precedence > EqualityOperatorPrecedence;
 				if (parens)
 					tokens.AppendOpenParen();
-				AppendComparison(" != ", instr, tokens, settings, asFullAst, EqualityOperatorPrecedence);
+				AppendComparison(" != ", instr, tokens, settings, EqualityOperatorPrecedence);
 				if (parens)
 					tokens.AppendCloseParen();
 			}
@@ -1964,7 +1962,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				cmpSigned = false;
 			else if (instr.operation == HLIL_CMP_SLT)
 				cmpSigned = true;
-			AppendComparison(" < ", instr, tokens, settings, asFullAst, CompareOperatorPrecedence, cmpSigned);
+			AppendComparison(" < ", instr, tokens, settings, CompareOperatorPrecedence, cmpSigned);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -1984,7 +1982,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				cmpSigned = false;
 			else if (instr.operation == HLIL_CMP_SLE)
 				cmpSigned = true;
-			AppendComparison(" <= ", instr, tokens, settings, asFullAst, CompareOperatorPrecedence, cmpSigned);
+			AppendComparison(" <= ", instr, tokens, settings, CompareOperatorPrecedence, cmpSigned);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2004,7 +2002,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				cmpSigned = false;
 			else if (instr.operation == HLIL_CMP_SGE)
 				cmpSigned = true;
-			AppendComparison(" >= ", instr, tokens, settings, asFullAst, CompareOperatorPrecedence, cmpSigned);
+			AppendComparison(" >= ", instr, tokens, settings, CompareOperatorPrecedence, cmpSigned);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2024,7 +2022,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				cmpSigned = false;
 			else if (instr.operation == HLIL_CMP_SGT)
 				cmpSigned = true;
-			AppendComparison(" > ", instr, tokens, settings, asFullAst, CompareOperatorPrecedence, cmpSigned);
+			AppendComparison(" > ", instr, tokens, settings, CompareOperatorPrecedence, cmpSigned);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2041,7 +2039,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 					precedence == BitwiseXorOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendTwoOperand(instr.size == 0 ? " && " : " & ", instr, tokens, settings, asFullAst,
+			AppendTwoOperand(instr.size == 0 ? " && " : " & ", instr, tokens, settings,
 				instr.size == 0 ? LogicalAndOperatorPrecedence : BitwiseAndOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
@@ -2058,7 +2056,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 					precedence == BitwiseXorOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendTwoOperand(instr.size == 0 ? " || " : " | ", instr, tokens, settings, asFullAst,
+			AppendTwoOperand(instr.size == 0 ? " || " : " | ", instr, tokens, settings,
 				instr.size == 0 ? LogicalOrOperatorPrecedence : BitwiseOrOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
@@ -2073,7 +2071,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				precedence == BitwiseOrOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendTwoOperand(" ^ ", instr, tokens, settings, asFullAst, BitwiseXorOperatorPrecedence);
+			AppendTwoOperand(" ^ ", instr, tokens, settings, BitwiseXorOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2091,7 +2089,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				precedence == BitwiseXorOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendTwoOperand(" + ", instr, tokens, settings, asFullAst, AddOperatorPrecedence);
+			AppendTwoOperand(" + ", instr, tokens, settings, AddOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2117,7 +2115,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 					// Yes
 					tokens.Append(OperationToken, "ADJ");
 					tokens.AppendOpenParen();
-					GetExprTextInternal(left, tokens, settings, true, MemberAndFunctionOperatorPrecedence);
+					GetExprTextInternal(left, tokens, settings, MemberAndFunctionOperatorPrecedence);
 					tokens.AppendCloseParen();
 					return;
 				}
@@ -2129,7 +2127,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				precedence == BitwiseXorOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendTwoOperand(" - ", instr, tokens, settings, asFullAst, SubOperatorPrecedence);
+			AppendTwoOperand(" - ", instr, tokens, settings, SubOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2144,7 +2142,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				precedence == BitwiseXorOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendTwoOperand(" - ", instr, tokens, settings, asFullAst, SubOperatorPrecedence);
+			AppendTwoOperand(" - ", instr, tokens, settings, SubOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2157,7 +2155,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			bool parens = precedence > ShiftOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendTwoOperand(" << ", instr, tokens, settings, asFullAst, ShiftOperatorPrecedence);
+			AppendTwoOperand(" << ", instr, tokens, settings, ShiftOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2171,7 +2169,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			bool parens = precedence > ShiftOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			AppendTwoOperand(" >> ", instr, tokens, settings, asFullAst, ShiftOperatorPrecedence);
+			AppendTwoOperand(" >> ", instr, tokens, settings, ShiftOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2195,7 +2193,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				mulSigned = false;
 			else if (instr.operation == HLIL_MULS_DP)
 				mulSigned = true;
-			AppendTwoOperand(" * ", instr, tokens, settings, asFullAst, MultiplyOperatorPrecedence, mulSigned);
+			AppendTwoOperand(" * ", instr, tokens, settings, MultiplyOperatorPrecedence, mulSigned);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2219,7 +2217,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				divSigned = false;
 			else if (instr.operation == HLIL_DIVS || instr.operation == HLIL_DIVS_DP)
 				divSigned = true;
-			AppendTwoOperand(" / ", instr, tokens, settings, asFullAst, DivideOperatorPrecedence, divSigned);
+			AppendTwoOperand(" / ", instr, tokens, settings, DivideOperatorPrecedence, divSigned);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2242,7 +2240,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				modSigned = false;
 			else if (instr.operation == HLIL_MODS || instr.operation == HLIL_MODS_DP)
 				modSigned = true;
-			AppendTwoOperand(" % ", instr, tokens, settings, asFullAst, DivideOperatorPrecedence, modSigned);
+			AppendTwoOperand(" % ", instr, tokens, settings, DivideOperatorPrecedence, modSigned);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2425,7 +2423,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				tokens.AppendOpenParen();
 			tokens.Append(OperationToken, "-");
 			tokens.AppendOpenParen();
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence, false, true);
+			GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence, false, true);
 			tokens.AppendCloseParen();
 			if (parens)
 				tokens.AppendCloseParen();
@@ -2439,7 +2437,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto srcExpr = instr.GetSourceExpr<HLIL_FLOAT_CONV>();
 			if (settings && !settings->IsOptionSet(ShowTypeCasts))
 			{
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(srcExpr, tokens, settings, precedence);
 				return;
 			}
 			const auto floatType =
@@ -2454,7 +2452,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			tokens.AppendOpenParen();
 			tokens.Append(TypeNameToken, floatType.c_str());
 			tokens.AppendCloseParen();
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2467,7 +2465,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto srcExpr = instr.GetSourceExpr<HLIL_FLOAT_TO_INT>();
 			if (settings && !settings->IsOptionSet(ShowTypeCasts))
 			{
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(srcExpr, tokens, settings, precedence);
 				return;
 			}
 
@@ -2477,7 +2475,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			tokens.AppendOpenParen();
 			AppendSizeToken(instr.size, true, tokens);
 			tokens.AppendCloseParen();
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2492,7 +2490,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			bool parens = precedence > TernaryOperatorPrecedence;
 			if (parens)
 				tokens.AppendOpenParen();
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, TernaryOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, TernaryOperatorPrecedence);
 			tokens.Append(OperationToken, " ? ");
 			tokens.AppendIntegerTextToken(instr, 1, 1);
 			tokens.Append(OperationToken, " : ");
@@ -2509,7 +2507,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto srcExpr = instr.GetSourceExpr<HLIL_INT_TO_FLOAT>();
 			if (settings && !settings->IsOptionSet(ShowTypeCasts))
 			{
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(srcExpr, tokens, settings, precedence);
 				return;
 			}
 			const auto floatType =
@@ -2524,7 +2522,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			tokens.AppendOpenParen();
 			tokens.Append(TypeNameToken, floatType.c_str());
 			tokens.AppendCloseParen();
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)
@@ -2544,7 +2542,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			{
 				const auto& parameterExpr = parameterExprs[index];
 				if (index != 0) tokens.Append(TextToken, ", ");
-				GetExprTextInternal(parameterExpr, tokens, settings, asFullAst);
+				GetExprTextInternal(parameterExpr, tokens, settings);
 			}
 			tokens.AppendCloseParen();
 			if (statement)
@@ -2562,7 +2560,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				const auto& srcExpr = srcExprs[index];
 				if (index == 0) tokens.Append(TextToken, " ");
 				if (index != 0) tokens.Append(TextToken, ", ");
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst);
+				GetExprTextInternal(srcExpr, tokens, settings);
 			}
 			if (statement)
 				tokens.AppendSemicolon();
@@ -2641,8 +2639,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 							}
 							else
 							{
-								GetExprTextInternal(
-									srcExpr, tokens, settings, true, MemberAndFunctionOperatorPrecedence);
+								GetExprTextInternal(srcExpr, tokens, settings, MemberAndFunctionOperatorPrecedence);
 								symbolType = OtherSymbolResult;
 							}
 
@@ -2698,7 +2695,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 				}
 				else
 				{
-					GetExprTextInternal(srcExpr, tokens, settings, true, AddOperatorPrecedence);
+					GetExprTextInternal(srcExpr, tokens, settings, AddOperatorPrecedence);
 				}
 
 				tokens.Append(OperationToken, " + ");
@@ -2849,7 +2846,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto srcExpr = instr.GetSourceExpr<HLIL_LOW_PART>();
 			if (settings && !settings->IsOptionSet(ShowTypeCasts))
 			{
-				GetExprTextInternal(srcExpr, tokens, settings, asFullAst, precedence);
+				GetExprTextInternal(srcExpr, tokens, settings, precedence);
 				return;
 			}
 			bool parens = precedence > UnaryOperatorPrecedence;
@@ -2858,7 +2855,7 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			tokens.AppendOpenParen();
 			AppendSizeToken(instr.size, signedHint.value_or(true), tokens);
 			tokens.AppendCloseParen();
-			GetExprTextInternal(srcExpr, tokens, settings, asFullAst, UnaryOperatorPrecedence);
+			GetExprTextInternal(srcExpr, tokens, settings, UnaryOperatorPrecedence);
 			if (parens)
 				tokens.AppendCloseParen();
 			if (statement)

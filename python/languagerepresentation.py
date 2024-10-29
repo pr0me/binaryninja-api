@@ -395,11 +395,11 @@ class LanguageRepresentationFunction:
 	):
 		try:
 			hlil = highlevelil.HighLevelILFunction(handle=core.BNNewHighLevelILFunctionReference(hlil))
-			instr = hlil.get_expr(highlevelil.ExpressionIndex(expr_index))
+			instr = hlil.get_expr(highlevelil.ExpressionIndex(expr_index), as_full_ast)
 			tokens = HighLevelILTokenEmitter(core.BNNewHighLevelILTokenEmitterReference(tokens))
 			if settings is not None:
 				settings = function.DisassemblySettings(core.BNNewDisassemblySettingsReference(settings))
-			self.perform_get_expr_text(instr, tokens, settings, as_full_ast, precedence, statement)
+			self.perform_get_expr_text(instr, tokens, settings, precedence, statement)
 		except:
 			log_error(traceback.format_exc())
 
@@ -461,7 +461,7 @@ class LanguageRepresentationFunction:
 
 	def perform_get_expr_text(
 			self, instr: 'highlevelil.HighLevelILInstruction', tokens: HighLevelILTokenEmitter,
-			settings: Optional['function.DisassemblySettings'], as_full_ast: bool = True,
+			settings: Optional['function.DisassemblySettings'],
 			precedence: OperatorPrecedence = OperatorPrecedence.TopLevelOperatorPrecedence, statement: bool = False
 	):
 		"""
@@ -481,15 +481,17 @@ class LanguageRepresentationFunction:
 
 	def get_expr_text(
 			self, instr: 'highlevelil.HighLevelILInstruction', settings: Optional['function.DisassemblySettings'],
-			as_full_ast: bool = True, precedence: OperatorPrecedence = OperatorPrecedence.TopLevelOperatorPrecedence,
+			precedence: OperatorPrecedence = OperatorPrecedence.TopLevelOperatorPrecedence,
 			statement: bool = False
 	) -> List['function.DisassemblyTextLine']:
 		"""Gets the lines of tokens for a given High Level IL instruction."""
 		count = ctypes.c_ulonglong()
 		if settings is not None:
 			settings = settings.handle
-		lines = core.BNGetLanguageRepresentationFunctionExprText(self.handle, instr.function.handle, instr.expr_index,
-			settings, as_full_ast, precedence, statement, count)
+		lines = core.BNGetLanguageRepresentationFunctionExprText(
+			self.handle, instr.function.handle, instr.expr_index,
+			settings, instr.as_ast, precedence, statement, count
+		)
 		result = []
 		if lines is not None:
 			result = []
@@ -507,8 +509,7 @@ class LanguageRepresentationFunction:
 
 	def get_linear_lines(
 			self, instr: 'highlevelil.HighLevelILInstruction',
-			settings: Optional['function.DisassemblySettings'] = None,
-			as_full_ast: bool = True
+			settings: Optional['function.DisassemblySettings'] = None
 	) -> List['function.DisassemblyTextLine']:
 		"""
 		Generates lines for the given High Level IL instruction in the style of the linear view. To get the lines
@@ -517,8 +518,10 @@ class LanguageRepresentationFunction:
 		count = ctypes.c_ulonglong()
 		if settings is not None:
 			settings = settings.handle
-		lines = core.BNGetLanguageRepresentationFunctionLinearLines(self.handle, instr.function.handle, instr.expr_index,
-			settings, as_full_ast, count)
+		lines = core.BNGetLanguageRepresentationFunctionLinearLines(
+			self.handle, instr.function.handle, instr.expr_index,
+			settings, instr.as_ast, count
+		)
 		result = []
 		if lines is not None:
 			result = []

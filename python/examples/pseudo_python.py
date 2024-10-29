@@ -42,7 +42,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
 
     def perform_get_expr_text(
             self, instr: HighLevelILInstruction, tokens: HighLevelILTokenEmitter, settings: Optional[DisassemblySettings],
-            as_full_ast: bool = True, precedence: OperatorPrecedence = OperatorPrecedence.TopLevelOperatorPrecedence,
+            precedence: OperatorPrecedence = OperatorPrecedence.TopLevelOperatorPrecedence,
             statement: bool = False
     ):
         with tokens.expr(instr):
@@ -52,7 +52,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 # Emit the lines for each statement in the body
                 for (idx, i) in enumerate(body):
                     # Don't display trailing return statements that don't have values
-                    if (as_full_ast and idx + 1 == len(body) and i.operation == HighLevelILOperation.HLIL_RET and
+                    if (instr.as_ast and idx + 1 == len(body) and i.operation == HighLevelILOperation.HLIL_RET and
                             len(i.src) == 0 and instr.expr_index == self.hlil.root.expr_index):
                         continue
 
@@ -66,18 +66,17 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                     need_separator = has_blocks
 
                     # Emit the lines for the statement itself
-                    self.perform_get_expr_text(i, tokens, settings, as_full_ast,
-                                               OperatorPrecedence.TopLevelOperatorPrecedence, True)
+                    self.perform_get_expr_text(i, tokens, settings, OperatorPrecedence.TopLevelOperatorPrecedence, True)
                     tokens.new_line()
             elif instr.operation == HighLevelILOperation.HLIL_IF:
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "if "))
                 self.perform_get_expr_text(instr.condition, tokens, settings)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, ":\n"))
-                if as_full_ast:
+                if instr.as_ast:
                     # Only display the if body when printing the full AST. When printing basic blocks in graph view,
                     # the body of the if and the else part are rendered as other nodes in the graph.
                     tokens.begin_scope(ScopeType.BlockScopeType)
-                    self.perform_get_expr_text(instr.true, tokens, settings, as_full_ast,
+                    self.perform_get_expr_text(instr.true, tokens, settings,
                                                OperatorPrecedence.TopLevelOperatorPrecedence, True)
                     tokens.end_scope(ScopeType.BlockScopeType)
 
@@ -88,10 +87,10 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                                                               HighLevelILOperation.HLIL_UNREACHABLE]:
                         if if_chain.operation == HighLevelILOperation.HLIL_IF:
                             tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "elif "))
-                            self.perform_get_expr_text(if_chain.condition, tokens, settings, as_full_ast)
+                            self.perform_get_expr_text(if_chain.condition, tokens, settings)
                             tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, ":"))
                             tokens.begin_scope(ScopeType.BlockScopeType)
-                            self.perform_get_expr_text(if_chain.true, tokens, settings, as_full_ast,
+                            self.perform_get_expr_text(if_chain.true, tokens, settings,
                                                        OperatorPrecedence.TopLevelOperatorPrecedence, True)
                             tokens.end_scope(ScopeType.BlockScopeType)
                             if_chain = if_chain.false
@@ -99,7 +98,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                             tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "else"))
                             tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, ":"))
                             tokens.begin_scope(ScopeType.BlockScopeType)
-                            self.perform_get_expr_text(if_chain, tokens, settings, as_full_ast,
+                            self.perform_get_expr_text(if_chain, tokens, settings,
                                                        OperatorPrecedence.TopLevelOperatorPrecedence, True)
                             tokens.end_scope(ScopeType.BlockScopeType)
                             break
@@ -153,49 +152,57 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                     if instr.update.operation != HighLevelILOperation.HLIL_NOP:
                         self.perform_get_expr_text(instr.update, tokens, settings)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, ":"))
-                tokens.begin_scope(ScopeType.BlockScopeType)
-                self.perform_get_expr_text(instr.body, tokens, settings, as_full_ast,
-                                           OperatorPrecedence.TopLevelOperatorPrecedence, True)
-                tokens.end_scope(ScopeType.BlockScopeType)
+                if instr.as_ast:
+                    tokens.begin_scope(ScopeType.BlockScopeType)
+                    self.perform_get_expr_text(instr.body, tokens, settings,
+                                               OperatorPrecedence.TopLevelOperatorPrecedence, True)
+                    tokens.end_scope(ScopeType.BlockScopeType)
             elif instr.operation == HighLevelILOperation.HLIL_WHILE:
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "while "))
-                self.perform_get_expr_text(instr.condition, tokens, settings, as_full_ast)
+                self.perform_get_expr_text(instr.condition, tokens, settings)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, ":"))
-                tokens.begin_scope(ScopeType.BlockScopeType)
-                self.perform_get_expr_text(instr.body, tokens, settings, as_full_ast,
-                                           OperatorPrecedence.TopLevelOperatorPrecedence, True)
-                tokens.end_scope(ScopeType.BlockScopeType)
+                if instr.as_ast:
+                    tokens.begin_scope(ScopeType.BlockScopeType)
+                    self.perform_get_expr_text(instr.body, tokens, settings,
+                                               OperatorPrecedence.TopLevelOperatorPrecedence, True)
+                    tokens.end_scope(ScopeType.BlockScopeType)
             elif instr.operation == HighLevelILOperation.HLIL_DO_WHILE:
-                tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "do"))
-                tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, ":"))
-                tokens.begin_scope(ScopeType.BlockScopeType)
-                self.perform_get_expr_text(instr.body, tokens, settings, as_full_ast,
-                                           OperatorPrecedence.TopLevelOperatorPrecedence, True)
-                tokens.end_scope(ScopeType.BlockScopeType)
-                tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "while "))
-                self.perform_get_expr_text(instr.condition, tokens, settings, as_full_ast)
+                if instr.as_ast:
+                    tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "do"))
+                    tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, ":"))
+                    tokens.begin_scope(ScopeType.BlockScopeType)
+                    self.perform_get_expr_text(instr.body, tokens, settings,
+                                               OperatorPrecedence.TopLevelOperatorPrecedence, True)
+                    tokens.end_scope(ScopeType.BlockScopeType)
+                    tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "while "))
+                    self.perform_get_expr_text(instr.condition, tokens, settings)
+                else:
+                    tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "do "))
+                    tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "while "))
+                    self.perform_get_expr_text(instr.condition, tokens, settings)
             elif instr.operation == HighLevelILOperation.HLIL_SWITCH:
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "match "))
                 self.perform_get_expr_text(instr.condition, tokens, settings)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, ":"))
                 tokens.begin_scope(ScopeType.SwitchScopeType)
 
-                # Output each case
-                for case in instr.cases:
-                    self.perform_get_expr_text(case, tokens, settings, as_full_ast,
-                                               OperatorPrecedence.TopLevelOperatorPrecedence, True)
-                    tokens.new_line()
+                if instr.as_ast:
+                    # Output each case
+                    for case in instr.cases:
+                        self.perform_get_expr_text(case, tokens, settings,
+                                                   OperatorPrecedence.TopLevelOperatorPrecedence, True)
+                        tokens.new_line()
 
-                # Check for default case
-                if instr.default is not None and instr.default.operation not in [HighLevelILOperation.HLIL_NOP,
-                                                                                 HighLevelILOperation.HLIL_UNREACHABLE]:
-                    tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "default"))
-                    tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, ":"))
-                    tokens.begin_scope(ScopeType.CaseScopeType)
-                    self.perform_get_expr_text(instr.default, tokens, settings, as_full_ast,
-                                               OperatorPrecedence.TopLevelOperatorPrecedence, True)
-                    tokens.end_scope(ScopeType.CaseScopeType)
-                tokens.end_scope(ScopeType.SwitchScopeType)
+                    # Check for default case
+                    if instr.default is not None and instr.default.operation not in [HighLevelILOperation.HLIL_NOP,
+                                                                                     HighLevelILOperation.HLIL_UNREACHABLE]:
+                        tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "default"))
+                        tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, ":"))
+                        tokens.begin_scope(ScopeType.CaseScopeType)
+                        self.perform_get_expr_text(instr.default, tokens, settings,
+                                                   OperatorPrecedence.TopLevelOperatorPrecedence, True)
+                        tokens.end_scope(ScopeType.CaseScopeType)
+                    tokens.end_scope(ScopeType.SwitchScopeType)
             elif instr.operation == HighLevelILOperation.HLIL_CASE:
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "case "))
                 for (i, value) in enumerate(instr.values):
@@ -204,7 +211,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                     self.perform_get_expr_text(value, tokens, settings)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, ":"))
                 tokens.begin_scope(ScopeType.CaseScopeType)
-                self.perform_get_expr_text(instr.body, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.body, tokens, settings,
                                            OperatorPrecedence.TopLevelOperatorPrecedence, True)
                 tokens.end_scope(ScopeType.CaseScopeType)
             elif instr.operation == HighLevelILOperation.HLIL_BREAK:
@@ -212,7 +219,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
             elif instr.operation == HighLevelILOperation.HLIL_CONTINUE:
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "continue"))
             elif instr.operation == HighLevelILOperation.HLIL_CALL:
-                self.perform_get_expr_text(instr.dest, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.dest, tokens, settings,
                                            OperatorPrecedence.MemberAndFunctionOperatorPrecedence)
                 tokens.append_open_paren()
                 for (i, param) in enumerate(instr.params):
@@ -222,7 +229,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 tokens.append_close_paren()
             elif instr.operation == HighLevelILOperation.HLIL_TAILCALL:
                 tokens.append(InstructionTextToken(InstructionTextTokenType.KeywordToken, "return "))
-                self.perform_get_expr_text(instr.dest, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.dest, tokens, settings,
                                            OperatorPrecedence.MemberAndFunctionOperatorPrecedence)
                 tokens.append_open_paren()
                 for (i, param) in enumerate(instr.params):
@@ -278,7 +285,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 tokens.append_pointer_text_token(instr, instr.constant, settings,
                                                  SymbolDisplayType.DereferenceNonDataSymbols, precedence)
             elif instr.operation == HighLevelILOperation.HLIL_ARRAY_INDEX:
-                self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.src, tokens, settings,
                                            OperatorPrecedence.MemberAndFunctionOperatorPrecedence)
                 tokens.append_open_bracket()
                 self.perform_get_expr_text(instr.index, tokens, settings)
@@ -301,7 +308,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 # For the right side of the assignment, only use zero confidence if the instruction does
                 # not have any side effects
                 with tokens.force_zero_confidence(appears_dead and not instr.src.has_side_effects):
-                    self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                    self.perform_get_expr_text(instr.src, tokens, settings,
                                                OperatorPrecedence.AssignmentOperatorPrecedence)
             elif instr.operation == HighLevelILOperation.HLIL_VAR_DECLARE:
                 tokens.append_var_text_token(instr.var, instr, instr.size)
@@ -402,14 +409,14 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
 
                 # If the variable does not appear live, show the assignment as zero confidence (grayed out)
                 with tokens.force_zero_confidence(appears_dead):
-                    self.perform_get_expr_text(instr.dest, tokens, settings, as_full_ast,
+                    self.perform_get_expr_text(instr.dest, tokens, settings,
                                                OperatorPrecedence.AssignmentOperatorPrecedence)
                     tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, " = "))
 
                 # For the right side of the assignment, only use zero confidence if the instruction does
                 # not have any side effects
                 with tokens.force_zero_confidence(appears_dead and not instr.src.has_side_effects):
-                    self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                    self.perform_get_expr_text(instr.src, tokens, settings,
                                                OperatorPrecedence.AssignmentOperatorPrecedence)
             elif instr.operation == HighLevelILOperation.HLIL_ASSIGN_UNPACK:
                 tokens.append_open_paren()
@@ -419,13 +426,13 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                     self.perform_get_expr_text(dest, tokens, settings)
                 tokens.append_close_paren()
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, " = "))
-                self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.src, tokens, settings,
                                            OperatorPrecedence.AssignmentOperatorPrecedence)
             elif instr.operation == HighLevelILOperation.HLIL_STRUCT_FIELD:
                 parens = precedence > OperatorPrecedence.MemberAndFunctionOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.src, tokens, settings,
                                            OperatorPrecedence.MemberAndFunctionOperatorPrecedence)
                 self.append_field_text_tokens(instr.src, instr.offset, instr.member_index, instr.size, tokens)
                 if parens:
@@ -439,7 +446,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                                      SymbolDisplayType.DisplaySymbolOnly,
                                                      OperatorPrecedence.MemberAndFunctionOperatorPrecedence)
                 else:
-                    self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                    self.perform_get_expr_text(instr.src, tokens, settings,
                                                OperatorPrecedence.MemberAndFunctionOperatorPrecedence)
                 self.append_field_text_tokens(instr.src, instr.offset, instr.member_index, instr.size, tokens)
                 if parens:
@@ -463,7 +470,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                     if parens:
                         tokens.append_open_paren()
                     tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, "*"))
-                    self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                    self.perform_get_expr_text(instr.src, tokens, settings,
                                                OperatorPrecedence.UnaryOperatorPrecedence)
                     if parens:
                         tokens.append_close_paren()
@@ -472,7 +479,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 if parens:
                     tokens.append_open_paren()
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, "&"))
-                self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.src, tokens, settings,
                                            OperatorPrecedence.UnaryOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -480,10 +487,10 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 parens = precedence > OperatorPrecedence.EqualityOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.perform_get_expr_text(instr.left, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.left, tokens, settings,
                                            OperatorPrecedence.EqualityOperatorPrecedence)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, " == "))
-                self.perform_get_expr_text(instr.right, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.right, tokens, settings,
                                            OperatorPrecedence.EqualityOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -491,10 +498,10 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 parens = precedence > OperatorPrecedence.EqualityOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.perform_get_expr_text(instr.left, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.left, tokens, settings,
                                            OperatorPrecedence.EqualityOperatorPrecedence)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, " != "))
-                self.perform_get_expr_text(instr.right, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.right, tokens, settings,
                                            OperatorPrecedence.EqualityOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -503,10 +510,10 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 parens = precedence > OperatorPrecedence.CompareOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.perform_get_expr_text(instr.left, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.left, tokens, settings,
                                            OperatorPrecedence.CompareOperatorPrecedence)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, " < "))
-                self.perform_get_expr_text(instr.right, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.right, tokens, settings,
                                            OperatorPrecedence.CompareOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -515,10 +522,10 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 parens = precedence > OperatorPrecedence.CompareOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.perform_get_expr_text(instr.left, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.left, tokens, settings,
                                            OperatorPrecedence.CompareOperatorPrecedence)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, " <= "))
-                self.perform_get_expr_text(instr.right, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.right, tokens, settings,
                                            OperatorPrecedence.CompareOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -527,10 +534,10 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 parens = precedence > OperatorPrecedence.CompareOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.perform_get_expr_text(instr.left, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.left, tokens, settings,
                                            OperatorPrecedence.CompareOperatorPrecedence)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, " >= "))
-                self.perform_get_expr_text(instr.right, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.right, tokens, settings,
                                            OperatorPrecedence.CompareOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -539,10 +546,10 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 parens = precedence > OperatorPrecedence.CompareOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.perform_get_expr_text(instr.left, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.left, tokens, settings,
                                            OperatorPrecedence.CompareOperatorPrecedence)
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, " > "))
-                self.perform_get_expr_text(instr.right, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.right, tokens, settings,
                                            OperatorPrecedence.CompareOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -561,7 +568,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                     precedence = OperatorPrecedence.BitwiseAndOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens(operation, instr, tokens, settings, as_full_ast, precedence)
+                self.append_two_operand_tokens(operation, instr, tokens, settings, precedence)
                 if parens:
                     tokens.append_close_paren()
             elif instr.operation == HighLevelILOperation.HLIL_OR:
@@ -579,7 +586,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                     precedence = OperatorPrecedence.BitwiseOrOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens(operation, instr, tokens, settings, as_full_ast, precedence)
+                self.append_two_operand_tokens(operation, instr, tokens, settings, precedence)
                 if parens:
                     tokens.append_close_paren()
             elif instr.operation == HighLevelILOperation.HLIL_XOR:
@@ -588,7 +595,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                          OperatorPrecedence.BitwiseOrOperatorPrecedence])
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens("^", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens("^", instr, tokens, settings,
                                                OperatorPrecedence.BitwiseXorOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -640,7 +647,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                          OperatorPrecedence.BitwiseXorOperatorPrecedence])
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens("+", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens("+", instr, tokens, settings,
                                                OperatorPrecedence.AddOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -652,7 +659,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                          OperatorPrecedence.BitwiseXorOperatorPrecedence])
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens("-", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens("-", instr, tokens, settings,
                                                OperatorPrecedence.SubOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -665,7 +672,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                          OperatorPrecedence.BitwiseXorOperatorPrecedence])
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens("*", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens("*", instr, tokens, settings,
                                                OperatorPrecedence.MultiplyOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -678,7 +685,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                          OperatorPrecedence.BitwiseXorOperatorPrecedence])
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens("//", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens("//", instr, tokens, settings,
                                                OperatorPrecedence.DivideOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -691,7 +698,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                          OperatorPrecedence.BitwiseXorOperatorPrecedence])
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens("%", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens("%", instr, tokens, settings,
                                                OperatorPrecedence.DivideOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -703,7 +710,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                          OperatorPrecedence.BitwiseXorOperatorPrecedence])
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens("/", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens("/", instr, tokens, settings,
                                                OperatorPrecedence.DivideOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -711,7 +718,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 parens = precedence > OperatorPrecedence.ShiftOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens("<<", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens("<<", instr, tokens, settings,
                                                OperatorPrecedence.ShiftOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -719,7 +726,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 parens = precedence > OperatorPrecedence.ShiftOperatorPrecedence
                 if parens:
                     tokens.append_open_paren()
-                self.append_two_operand_tokens(">>", instr, tokens, settings, as_full_ast,
+                self.append_two_operand_tokens(">>", instr, tokens, settings,
                                                OperatorPrecedence.ShiftOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -879,7 +886,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                     tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, "not "))
                 else:
                     tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, "~"))
-                self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.src, tokens, settings,
                                            OperatorPrecedence.UnaryOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -888,7 +895,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                 if parens:
                     tokens.append_open_paren()
                 tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, "-"))
-                self.perform_get_expr_text(instr.src, tokens, settings, as_full_ast,
+                self.perform_get_expr_text(instr.src, tokens, settings,
                                            OperatorPrecedence.UnaryOperatorPrecedence)
                 if parens:
                     tokens.append_close_paren()
@@ -985,8 +992,7 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
                                                    f"# unimplemented {instr.operation.name}"))
 
     def append_two_operand_tokens(self, operation: str, instr: HighLevelILInstruction, tokens: HighLevelILTokenEmitter,
-                                  settings: Optional[DisassemblySettings], as_full_ast: bool,
-                                  precedence: OperatorPrecedence):
+                                  settings: Optional[DisassemblySettings], precedence: OperatorPrecedence):
         if precedence == OperatorPrecedence.SubOperatorPrecedence:
             # Treat left side of subtraction as same level as addition. This lets
             # (a - b) - c be represented as a - b - c, but a - (b - c) does not
@@ -1000,9 +1006,9 @@ class PseudoPythonFunction(LanguageRepresentationFunction):
         else:
             left_precedence = precedence
 
-        self.perform_get_expr_text(instr.left, tokens, settings, as_full_ast, left_precedence)
+        self.perform_get_expr_text(instr.left, tokens, settings, left_precedence)
         tokens.append(InstructionTextToken(InstructionTextTokenType.OperationToken, f" {operation} "))
-        self.perform_get_expr_text(instr.right, tokens, settings, as_full_ast, precedence)
+        self.perform_get_expr_text(instr.right, tokens, settings, precedence)
 
     def append_field_text_tokens(self, var: HighLevelILInstruction, offset: int, member_index: int, size: int,
                                  tokens: HighLevelILTokenEmitter):

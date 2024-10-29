@@ -31,13 +31,12 @@ LanguageRepresentationFunction::LanguageRepresentationFunction(BNLanguageReprese
 }
 
 
-vector<DisassemblyTextLine> LanguageRepresentationFunction::GetExprText(const HighLevelILInstruction& instr,
-	DisassemblySettings* settings, bool asFullAst, BNOperatorPrecedence precedence, bool statement)
+vector<DisassemblyTextLine> LanguageRepresentationFunction::GetExprText(
+	const HighLevelILInstruction& instr, DisassemblySettings* settings, BNOperatorPrecedence precedence, bool statement)
 {
 	size_t count = 0;
-	BNDisassemblyTextLine* lines = BNGetLanguageRepresentationFunctionExprText(m_object,
-		instr.function->GetObject(), instr.exprIndex, settings ? settings->GetObject() : nullptr,
-		asFullAst, precedence, statement, &count);
+	BNDisassemblyTextLine* lines = BNGetLanguageRepresentationFunctionExprText(m_object, instr.function->GetObject(),
+		instr.exprIndex, settings ? settings->GetObject() : nullptr, instr.ast, precedence, statement, &count);
 
 	vector<DisassemblyTextLine> result;
 	result.reserve(count);
@@ -58,11 +57,11 @@ vector<DisassemblyTextLine> LanguageRepresentationFunction::GetExprText(const Hi
 
 
 vector<DisassemblyTextLine> LanguageRepresentationFunction::GetLinearLines(
-	const HighLevelILInstruction& instr, DisassemblySettings* settings, bool asFullAst)
+	const HighLevelILInstruction& instr, DisassemblySettings* settings)
 {
 	size_t count = 0;
 	BNDisassemblyTextLine* lines = BNGetLanguageRepresentationFunctionLinearLines(m_object, instr.function->GetObject(),
-		instr.exprIndex, settings ? settings->GetObject() : nullptr, asFullAst, &count);
+		instr.exprIndex, settings ? settings->GetObject() : nullptr, instr.ast, &count);
 
 	vector<DisassemblyTextLine> result;
 	result.reserve(count);
@@ -167,10 +166,10 @@ void LanguageRepresentationFunction::GetExprTextCallback(void* ctxt, BNHighLevel
 {
 	LanguageRepresentationFunction* func = (LanguageRepresentationFunction*)ctxt;
 	Ref<HighLevelILFunction> ilObj = new HighLevelILFunction(BNNewHighLevelILFunctionReference(il));
-	HighLevelILInstruction instr = ilObj->GetExpr(exprIndex);
+	HighLevelILInstruction instr = ilObj->GetExpr(exprIndex, asFullAst);
 	Ref<HighLevelILTokenEmitter> tokenObj = new HighLevelILTokenEmitter(BNNewHighLevelILTokenEmitterReference(tokens));
 	Ref<DisassemblySettings> settingsObj = settings ? new DisassemblySettings(BNNewDisassemblySettingsReference(settings)) : nullptr;
-	func->GetExprText(instr, *tokenObj, settingsObj, asFullAst, precedence, statement);
+	func->GetExprText(instr, *tokenObj, settingsObj, precedence, statement);
 }
 
 
@@ -230,8 +229,8 @@ CoreLanguageRepresentationFunction::CoreLanguageRepresentationFunction(BNLanguag
 }
 
 
-void CoreLanguageRepresentationFunction::GetExprText(const HighLevelILInstruction&, HighLevelILTokenEmitter&,
-	DisassemblySettings*, bool, BNOperatorPrecedence, bool statement)
+void CoreLanguageRepresentationFunction::GetExprText(
+	const HighLevelILInstruction&, HighLevelILTokenEmitter&, DisassemblySettings*, BNOperatorPrecedence, bool)
 {
 }
 
