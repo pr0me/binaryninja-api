@@ -280,7 +280,7 @@ impl Workflow {
     ///
     /// * `name` - the name for the new [Workflow]
     #[must_use]
-    pub fn new_from_copy<S: BnStrCompatible>(name: S) -> Workflow {
+    pub fn new_from_copy<S: BnStrCompatible + Clone>(name: S) -> Workflow {
         Self::new_from_copy_with_root(name, "")
     }
 
@@ -289,21 +289,20 @@ impl Workflow {
     /// * `name` - the name for the new [Workflow]
     /// * `root_activity` - perform the clone operation with this activity as the root
     #[must_use]
-    pub fn new_from_copy_with_root<S: BnStrCompatible, A: IntoActivityName>(
+    pub fn new_from_copy_with_root<S: BnStrCompatible + Clone, A: IntoActivityName>(
         name: S,
         root_activity: A,
     ) -> Workflow {
-        let name = name.into_bytes_with_nul();
+        let raw_name = name.clone().into_bytes_with_nul();
         let activity = root_activity.activity_name();
         // I can't think of a single reason as to why we should let users pass a workflow handle into this.
-        // TODO: [Default] Workflow::Instance() called without specifying a workflow name. Defaulting to 'core.function.defaultAnalysis'.
-        // To prevent warning being emitted we default to `core.function.defaultAnalysis`.
-        let placeholder_workflow = Workflow::instance("core.function.defaultAnalysis");
+        // To prevent warning being emitted we default to the name.
+        let placeholder_workflow = Workflow::instance(name);
         unsafe {
             Self::from_raw(
                 NonNull::new(BNWorkflowClone(
                     placeholder_workflow.handle.as_ptr(),
-                    name.as_ref().as_ptr() as *const c_char,
+                    raw_name.as_ref().as_ptr() as *const c_char,
                     activity.as_ref().as_ptr() as *const c_char,
                 ))
                 .unwrap(),
