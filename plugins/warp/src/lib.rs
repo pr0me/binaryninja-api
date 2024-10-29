@@ -3,7 +3,9 @@ use binaryninja::basicblock::BasicBlock as BNBasicBlock;
 use binaryninja::binaryview::BinaryViewExt;
 use binaryninja::function::{Function as BNFunction, NativeBlock};
 use binaryninja::llil;
-use binaryninja::llil::{ExprInfo, FunctionMutability, NonSSA, NonSSAVariant, VisitorAction};
+use binaryninja::llil::{
+    ExprInfo, FunctionMutability, InstrInfo, NonSSA, NonSSAVariant, VisitorAction,
+};
 use binaryninja::rc::Ref as BNRef;
 use warp::signature::basic_block::{BasicBlock, BasicBlockGUID};
 use warp::signature::function::constraints::FunctionConstraints;
@@ -28,7 +30,6 @@ pub fn build_function<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
     Function {
         guid: cached_function_guid(func, llil),
         symbol: from_bn_symbol(&func.symbol()),
-        // TODO: Confidence should be derived from function type.
         ty: from_bn_type(&func.view(), bn_fn_ty, 255),
         constraints: FunctionConstraints {
             // NOTE: Adding adjacent only works if analysis is complete.
@@ -67,7 +68,6 @@ pub fn function_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
     func: &BNFunction,
     llil: &llil::Function<A, M, NonSSA<V>>,
 ) -> FunctionGUID {
-    // TODO: Sort the basic blocks.
     let basic_blocks = sorted_basic_blocks(func);
     let basic_block_guids = basic_blocks
         .iter()
@@ -84,31 +84,46 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
     let view = func.view();
     let arch = func.arch();
     let max_instr_len = arch.max_instr_len();
-    // TODO: Add all the hacks here to remove stuff like function prolog...
-    // TODO mov edi, edi on windows x86
-    // TODO: Ugh i really dislike the above and REALLY don't wanna do that.
-    // TODO: The above invalidates our "all function bytes" approach.
-    // TODO: Could we keep the bytes and just zero mask them? At least then we don't completely get rid of them.
+
+    // NOPs and useless moves are blacklisted to allow for hot-patched functions.
+    let is_blacklisted_instr = |info: InstrInfo<A, M, NonSSA<V>>| {
+        match info {
+            InstrInfo::Nop(_) => true,
+            InstrInfo::SetReg(op) => {
+                match op.source_expr().info() {
+                    ExprInfo::Reg(source_op) if op.dest_reg() == source_op.source_reg() => {
+                        // Setting a register to itself, this is a no op
+                        // i.e. mov edi, edi
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    };
 
     let basic_block_range = basic_block.raw_start()..basic_block.raw_end();
     let mut basic_block_bytes = Vec::with_capacity(basic_block_range.count());
     for instr_addr in basic_block.into_iter() {
         let mut instr_bytes = view.read_vec(instr_addr, max_instr_len);
         if let Some(instr_info) = arch.instruction_info(&instr_bytes, instr_addr) {
-            let instr_len = instr_info.len();
-            instr_bytes.truncate(instr_len);
+            instr_bytes.truncate(instr_info.len());
             if let Some(instr_llil) = llil.instruction_at(instr_addr) {
-                if instr_llil.visit_tree(&mut |_expr, expr_info| match expr_info {
-                    ExprInfo::ConstPtr(_) | ExprInfo::ExternPtr(_) => VisitorAction::Halt,
-                    _ => VisitorAction::Descend,
-                }) == VisitorAction::Halt
-                {
-                    // Found a variant instruction, mask off entire instruction.
-                    instr_bytes.fill(0);
+                // If instruction is blacklisted dont include the bytes.
+                if !is_blacklisted_instr(instr_llil.info()) {
+                    if instr_llil.visit_tree(&mut |_expr, expr_info| match expr_info {
+                        ExprInfo::ConstPtr(_) | ExprInfo::ExternPtr(_) => VisitorAction::Halt,
+                        _ => VisitorAction::Descend,
+                    }) == VisitorAction::Halt
+                    {
+                        // Found a variant instruction, mask off entire instruction.
+                        instr_bytes.fill(0);
+                    }
+                    // Add the instructions bytes to the basic blocks bytes
+                    basic_block_bytes.extend(instr_bytes);
                 }
             }
-            // Add the instructions bytes to the functions bytes
-            basic_block_bytes.extend(instr_bytes);
         }
     }
 
