@@ -2750,7 +2750,7 @@ private:
 		auto value = il->GetExprValue(tmp); // accept if Binja has resolved to a value
 		//if (value.state != ConstantValue) return false;
 		//uint64_t got_base = value.value;
-        //break;
+		//break;
 
 		// test instruction1
 		tmp = il->GetInstruction(1); // $t7 = $ra
@@ -2974,7 +2974,7 @@ public:
 		uint32_t inst = swap(dest32[0]);
 		uint64_t inst64 = swap64(dest64[0]);
 
- 		switch (info.nativeType)
+		switch (info.nativeType)
 		{
 		case R_MIPS_JUMP_SLOT:
 		case R_MIPS_COPY:
@@ -3001,8 +3001,8 @@ public:
 		}
 		case R_MIPS_HI16:
 		{
-			dest64[0] = swap64(inst64 & 0xffff0000ffffffff | (((target + 0x8000) << 16) & 0xffff00000000 ));
-		 	break;
+			dest64[0] = swap64((inst64 & 0xffff0000ffffffff) | (((target + 0x8000) << 16) & 0xffff00000000 ));
+			break;
 		}
 		case R_MIPS_LO16:
 		{
@@ -3012,12 +3012,12 @@ public:
 		}
 		case R_MIPS_26:
 		{
-		 	// ((A << 2) | (P & 0xf0000000) + S) >> 2
-		 	uint32_t A = (inst & ~0xfc000000) << 2;
-		 	uint32_t P = (uint32_t)addr;
-		 	uint32_t S = (uint32_t)target;
-		 	uint32_t realTarget = (A | (P & 0xf0000000)) + S;
-		 	dest32[0] = swap(((realTarget >> 2) & ~0xfc000000) | (inst & 0xfc000000));
+			// ((A << 2) | (P & 0xf0000000) + S) >> 2
+			uint32_t A = (inst & ~0xfc000000) << 2;
+			uint32_t P = (uint32_t)addr;
+			uint32_t S = (uint32_t)target;
+			uint32_t realTarget = (A | (P & 0xf0000000)) + S;
+			dest32[0] = swap(((realTarget >> 2) & ~0xfc000000) | (inst & 0xfc000000));
 			break;
 		}
 		case R_MIPS_GOT16:
@@ -3034,7 +3034,7 @@ public:
 		{
 			uint32_t originalValue = inst;
 			uint64_t displacement = target;
-			dest32[0] = swap((uint32_t)(originalValue + displacement));	
+			dest32[0] = swap((uint32_t)(originalValue + displacement));
 			break;
 		}
 		case (R_MIPS_64 << 8) | R_MIPS_REL32:
@@ -3068,59 +3068,59 @@ public:
 			result[i].size = 4;
 			result[i].pcRelative = false;
 			result[i].dataRelocation = true;
-    		switch (result[i].nativeType)
-    		{
-    		case R_MIPS_NONE:
-    		case R_MIPS_JALR: // Note: optimization hint that can safely be ignored TODO: link-time mutable opcode bytes
-    			result[i].type = IgnoredRelocation;
-    			break;
-    		case R_MIPS_COPY:
-    		case R_MIPS64_COPY:
-    			result[i].type = ELFCopyRelocationType;
-    			break;
-    		case R_MIPS_JUMP_SLOT:
-    			result[i].type = ELFJumpSlotRelocationType;
-    			break;
-    		case R_MIPS_HI16:
-    			result[i].dataRelocation = false;
-    			result[i].pcRelative = false;
-    			break;
-    		case R_MIPS_LO16:
-    			result[i].pcRelative = false;
-    			result[i].dataRelocation = false;
-    			break;
-    		case R_MIPS_26:
-    			result[i].pcRelative = true;
-    			result[i].dataRelocation = false;
-    			break;
-    		case R_MIPS_GOT16:
+			switch (result[i].nativeType)
+			{
+			case R_MIPS_NONE:
+			case R_MIPS_JALR: // Note: optimization hint that can safely be ignored TODO: link-time mutable opcode bytes
+				result[i].type = IgnoredRelocation;
+				break;
+			case R_MIPS_COPY:
+			case R_MIPS64_COPY:
+				result[i].type = ELFCopyRelocationType;
+				break;
+			case R_MIPS_JUMP_SLOT:
+				result[i].type = ELFJumpSlotRelocationType;
+				break;
+			case R_MIPS_HI16:
+				result[i].dataRelocation = false;
+				result[i].pcRelative = false;
+				break;
+			case R_MIPS_LO16:
+				result[i].pcRelative = false;
+				result[i].dataRelocation = false;
+				break;
+			case R_MIPS_26:
+				result[i].pcRelative = true;
+				result[i].dataRelocation = false;
+				break;
+			case R_MIPS_GOT16:
 			case R_MIPS_GPREL16:
-    		case R_MIPS_CALL16:
+			case R_MIPS_CALL16:
 			case R_MIPS_GPREL32:
-    		{
-    			// Note: GP addr not avaiable pre-view-finalization, however symbol may exist
-    			int32_t gpAddr;
-    			if (!GetGpAddr(view, gpAddr))
-    			{
-    				result[i].type = UnhandledRelocation;
-    				LogWarn("Unsupported relocation type: %s : Unable to locate _gp symbol.", GetRelocationString((ElfMipsRelocationType)result[i].nativeType));
-    			}
-    			break;
-    		}
-    		case R_MIPS_32:
-    		case R_MIPS_64:
-    			break;
+			{
+				// Note: GP addr not avaiable pre-view-finalization, however symbol may exist
+				int32_t gpAddr;
+				if (!GetGpAddr(view, gpAddr))
+				{
+					result[i].type = UnhandledRelocation;
+					LogWarn("Unsupported relocation type: %s : Unable to locate _gp symbol.", GetRelocationString((ElfMipsRelocationType)result[i].nativeType));
+				}
+				break;
+			}
+			case R_MIPS_32:
+			case R_MIPS_64:
+				break;
 			case (R_MIPS_64 << 8) | R_MIPS_REL32:
-    		case R_MIPS_REL32:
-                break;
+			case R_MIPS_REL32:
+				break;
 			case R_MIPS_HIGHER:
 			case R_MIPS_HIGHEST:
 				break;
-    		default:
-    			result[i].type = UnhandledRelocation;
-    			LogWarn("Unsupported relocation type: %llu (%s) @0x%llX", result[i].nativeType,
-    				GetRelocationString((ElfMipsRelocationType)result[i].nativeType), result[i].address);
-    		}
+			default:
+				result[i].type = UnhandledRelocation;
+				LogWarn("Unsupported relocation type: %llu (%s) @0x%llX", result[i].nativeType,
+					GetRelocationString((ElfMipsRelocationType)result[i].nativeType), result[i].address);
+			}
 		}
 
 		return true;
