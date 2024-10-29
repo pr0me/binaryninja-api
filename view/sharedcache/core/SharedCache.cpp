@@ -1333,6 +1333,12 @@ void SharedCache::ParseAndApplySlideInfoForFile(std::shared_ptr<MMappedFileAcces
 
 SharedCache::SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView) : m_dscView(dscView)
 {
+	if (dscView->GetTypeName() != VIEW_NAME)
+	{
+		// Unreachable?
+		m_logger->LogError("Attempted to create SharedCache object from non-Shared Cache view");
+		return;
+	}
 	sharedCacheReferences++;
 	INIT_SHAREDCACHE_API_OBJECT()
 	m_logger = LogRegistry::GetLogger("SharedCache", dscView->GetFile()->GetSessionId());
@@ -1381,6 +1387,8 @@ SharedCache::~SharedCache() {
 
 SharedCache* SharedCache::GetFromDSCView(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView)
 {
+	if (dscView->GetTypeName() != VIEW_NAME)
+		return nullptr;
 	try {
 		return new SharedCache(dscView);
 	}
