@@ -47,7 +47,7 @@ class BINARYNINJAUIAPI FeatureMap : public QWidget, public BinaryNinja::BinaryDa
 	BinaryViewRef m_data;
 	std::unique_ptr<NotificationsDispatcher> m_dispatcher = nullptr;
 
-	bool m_updatesPending = false;
+	std::atomic<bool> m_updatesPending = false;
 	QTimer* m_updateTimer = nullptr;
 	size_t m_imgWidth = 0;
 	size_t m_imgHeight = 0;

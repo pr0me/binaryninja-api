@@ -195,7 +195,7 @@ class BINARYNINJAUIAPI LinearView : public QAbstractScrollArea, public View, pub
 	int m_wheelDelta;
 	bool m_updatingScrollBar;
 
-	bool m_updatesRequired;
+	std::atomic<bool> m_updatesRequired;
 	bool m_updateBounds;
 
 	LinearViewCursorPosition m_cursorPos, m_selectionStartPos;
