@@ -110,10 +110,14 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
         if let Some(instr_info) = arch.instruction_info(&instr_bytes, instr_addr) {
             instr_bytes.truncate(instr_info.len());
             if let Some(instr_llil) = llil.instruction_at(instr_addr) {
-                // If instruction is blacklisted dont include the bytes.
+                // If instruction is blacklisted don't include the bytes.
                 if !is_blacklisted_instr(instr_llil.info()) {
                     if instr_llil.visit_tree(&mut |_expr, expr_info| match expr_info {
-                        ExprInfo::ConstPtr(_) | ExprInfo::ExternPtr(_) => VisitorAction::Halt,
+                        ExprInfo::ConstPtr(op) if view.segment_at(op.value()).is_some()  => {
+                            // Constant Pointer must be in a segment for it to be relocatable.
+                            VisitorAction::Halt
+                        },
+                        ExprInfo::ExternPtr(_) => VisitorAction::Halt,
                         _ => VisitorAction::Descend,
                     }) == VisitorAction::Halt
                     {
