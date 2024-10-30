@@ -1,3 +1,4 @@
+use std::collections::{HashMap};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -8,6 +9,8 @@ use rayon::prelude::*;
 
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use serde_json::json;
+use warp::signature::function::constraints::FunctionConstraint;
+use warp::signature::function::{Function, FunctionGUID};
 use warp::signature::Data;
 
 #[derive(Parser, Debug)]
@@ -74,7 +77,7 @@ fn data_from_view(view: &BinaryView) -> Data {
 
     let functions = view
         .functions()
-        .par_iter()
+        .iter()
         .filter(|f| !f.symbol().short_name().as_str().contains("sub_") || f.has_user_annotations())
         .filter_map(|f| {
             let llil = f.low_level_il().ok()?;
@@ -109,9 +112,7 @@ fn data_from_archive<R: Read>(mut archive: Archive<R>) -> Option<Data> {
     }
 
     // Create the data.
-    // TODO: into_par_iter will corrupt the heap frequently, you should basically always restrict
-    // TODO: With RAYON_NUM_THREADS (set to like... 1)
-    let entry_data = entry_files
+    let mut entry_data = entry_files
         .into_par_iter()
         .filter_map(|path| {
             log::debug!("Creating data for ENTRY {:?}...", path);
@@ -120,13 +121,53 @@ fn data_from_archive<R: Read>(mut archive: Archive<R>) -> Option<Data> {
         .collect::<Vec<_>>();
 
     // TODO: Cloning here is unnecessary
-    Some(Data {
-        functions: entry_data
-            .iter()
-            .flat_map(|d| d.functions.to_owned())
-            .collect(),
-        types: entry_data.iter().flat_map(|d| d.types.to_owned()).collect(),
-    })
+    // TODO: I dont think this drain does what we want...
+    let mut functions: Vec<_> = entry_data
+        .iter_mut()
+        .flat_map(|d| d.functions.drain(..))
+        .collect();
+    
+    functions = resolve_guids(functions);
+    
+    let types: Vec<_> = entry_data.into_iter().flat_map(|d| d.types).collect();
+
+    Some(Data { functions, types })
+}
+
+fn resolve_guids(functions: Vec<Function>) -> Vec<Function> {
+    let guid_map: HashMap<String, FunctionGUID> = functions
+        .iter()
+        .map(|f| (f.symbol.name.to_owned(), f.guid))
+        .collect();
+
+    let resolve_constraint = |mut constraint: FunctionConstraint| {
+        // If we don't have a guid for the constraint grab it from the symbol name
+        if constraint.guid.is_none() {
+            if let Some(symbol) = &constraint.symbol {
+                constraint.guid = guid_map.get(&symbol.name).copied();
+            }
+        }
+        constraint
+    };
+
+    functions
+        .into_iter()
+        .map(|mut f| {
+            f.constraints.call_sites = f
+                .constraints
+                .call_sites
+                .into_iter()
+                .map(resolve_constraint)
+                .collect();
+            f.constraints.adjacent = f
+                .constraints
+                .adjacent
+                .into_iter()
+                .map(resolve_constraint)
+                .collect();
+            f
+        })
+        .collect()
 }
 
 // TODO: Pass settings.
@@ -136,7 +177,7 @@ fn data_from_file(path: &Path) -> Option<Data> {
     let settings_json = json!({
         "analysis.linearSweep.autorun": true,
         "analysis.signatureMatcher.autorun": false,
-        "analysis.plugins.WARPMatcher": true,
+        "analysis.plugins.warp.matcher": false,
     });
 
     match path.extension() {
