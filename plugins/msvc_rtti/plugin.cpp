@@ -27,7 +27,7 @@ void RTTIAnalysis(Ref<AnalysisContext> analysisContext)
 	rttiBackgroundTask = new BackgroundTask("Scanning for RTTI...", false);
 	auto processor = MicrosoftRTTIProcessor(view);
 	processor.ProcessRTTI();
-	view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), true);
+	view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), false);
 	rttiBackgroundTask->Finish();
 }
 
@@ -40,7 +40,7 @@ void VFTAnalysis(Ref<AnalysisContext> analysisContext)
 	vftBackgroundTask = new BackgroundTask("Scanning for VFTs...", false);
 	auto processor = MicrosoftRTTIProcessor(view);
 	processor.ProcessVFT();
-	view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), true);
+	view->StoreMetadata(VIEW_METADATA_MSVC, processor.SerializedMetadata(), false);
 	vftBackgroundTask->Finish();
 }
 
