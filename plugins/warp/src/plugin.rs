@@ -1,17 +1,18 @@
 use log::LevelFilter;
 
-use crate::build_function;
+use crate::{build_function, cache};
 use crate::cache::{
     register_cache_destructor, ViewID, FUNCTION_CACHE, GUID_CACHE, MATCHED_FUNCTION_CACHE,
 };
 use crate::convert::{to_bn_symbol_at_address, to_bn_type};
-use crate::matcher::{PlatformID, PLAT_MATCHER_CACHE};
+use crate::matcher::{invalidate_function_matcher_cache, Matcher, PlatformID, PLAT_MATCHER_CACHE};
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::{Command, FunctionCommand};
 use binaryninja::function::Function;
 use binaryninja::rc::Ref;
 use binaryninja::tags::TagType;
 use warp::signature::function::Function as WarpFunction;
+use binaryninja::ObjectDestructor;
 
 mod apply;
 mod copy;
@@ -64,6 +65,30 @@ impl FunctionCommand for DebugFunction {
     }
 }
 
+struct DebugMatcher;
+
+impl FunctionCommand for DebugMatcher {
+    fn action(&self, _view: &BinaryView, function: &Function) {
+        let Ok(llil) = function.low_level_il() else {
+            log::error!("No LLIL for function 0x{:x}", function.start());
+            return;
+        };
+        let platform = function.platform();
+        // Build the matcher every time this is called to make sure we arent in a bad state.
+        let matcher = Matcher::from_platform(platform);
+        let func = build_function(function, &llil);
+        if let Some(possible_matches) = matcher.functions.get(&func.guid) {
+            log::info!("{:#?}", possible_matches.value());
+        } else {
+            log::error!("No possible matches found for the function 0x{:x}", function.start());
+        };
+    }
+
+    fn valid(&self, _view: &BinaryView, _function: &Function) -> bool {
+        true
+    }
+}
+
 struct DebugCache;
 
 impl Command for DebugCache {
@@ -99,6 +124,21 @@ impl Command for DebugCache {
     }
 }
 
+struct DebugInvalidateCache;
+
+impl Command for DebugInvalidateCache {
+    fn action(&self, view: &BinaryView) {
+        invalidate_function_matcher_cache();
+        let destructor = cache::CacheDestructor {};
+        destructor.destruct_view(view);
+        log::info!("Invalidated all WARP caches...");
+    }
+
+    fn valid(&self, _view: &BinaryView) -> bool {
+        true
+    }
+}
+
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn CorePluginInit() -> bool {
@@ -110,26 +150,45 @@ pub extern "C" fn CorePluginInit() -> bool {
     workflow::insert_workflow();
 
     binaryninja::command::register(
-        "WARP\\Apply Signature File Types",
-        "Load all types from a signature file and ignore functions",
-        types::LoadTypesCommand {},
+        "WARP\\Run Matcher",
+        "Run the matcher manually",
+        workflow::RunMatcher {},
     );
 
     binaryninja::command::register(
-        "WARP\\Debug Cache",
+        "WARP\\Debug\\Cache",
         "Debug cache sizes... because...",
         DebugCache {},
     );
 
+    binaryninja::command::register(
+        "WARP\\Debug\\Invalidate Caches",
+        "Invalidate all WARP caches",
+        DebugInvalidateCache {},
+    );
+
+
     binaryninja::command::register_for_function(
-        "WARP\\Debug Signature",
+        "WARP\\Debug\\Function Signature",
         "Print the entire signature for the function",
         DebugFunction {},
     );
 
     binaryninja::command::register_for_function(
-        "WARP\\Copy Pattern",
-        "Copy the computed pattern for the function",
+        "WARP\\Debug\\Function Matcher",
+        "Print all possible matches for the function",
+        DebugMatcher {},
+    );
+
+    binaryninja::command::register(
+        "WARP\\Debug\\Apply Signature File Types",
+        "Load all types from a signature file and ignore functions",
+        types::LoadTypesCommand {},
+    );
+
+    binaryninja::command::register_for_function(
+        "WARP\\Copy Function GUID",
+        "Copy the computed GUID for the function",
         copy::CopyFunctionGUID {},
     );
 
@@ -145,11 +204,11 @@ pub extern "C" fn CorePluginInit() -> bool {
         create::CreateSignatureFile {},
     );
 
-    binaryninja::command::register(
-        "WARP\\Apply Signature File",
-        "Applies a signature file to the current view",
-        apply::ApplySignatureFile {},
-    );
+    // binaryninja::command::register(
+    //     "WARP\\Apply Signature File",
+    //     "Applies a signature file to the current view",
+    //     apply::ApplySignatureFile {},
+    // );
 
     true
 }
