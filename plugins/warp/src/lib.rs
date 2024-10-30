@@ -137,12 +137,10 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
 #[cfg(test)]
 mod tests {
     use crate::cache::cached_function_guid;
-    use crate::convert::from_bn_type;
     use binaryninja::binaryview::BinaryViewExt;
     use binaryninja::headless::Session;
     use std::path::PathBuf;
     use std::sync::OnceLock;
-    use warp::r#type::guid::TypeGUID;
 
     static INIT: OnceLock<Session> = OnceLock::new();
 

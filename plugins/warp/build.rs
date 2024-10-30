@@ -1,6 +1,8 @@
+#![allow(unused_imports)]
 use std::path::PathBuf;
 use std::process::Command;
 
+#[cfg(test)]
 fn compile_rust(file: PathBuf) -> bool {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
     let rustc = std::env::var_os("RUSTC").unwrap();
@@ -16,23 +18,21 @@ fn compile_rust(file: PathBuf) -> bool {
 }
 
 fn main() {
-    let link_path = std::env::var_os("BINARYNINJADIR").expect("BINARYNINJADIR specified");
-    let out_dir = std::env::var_os("OUT_DIR").expect("OUT_DIR specified");
-    let out_dir_path = PathBuf::from(out_dir);
+    if let Some(link_path) = option_env!("BINARYNINJADIR") {
+        println!("cargo::rustc-link-lib=dylib=binaryninjacore");
+        println!("cargo::rustc-link-search={}", link_path);
 
-    println!("cargo::rustc-link-lib=dylib=binaryninjacore");
-    println!("cargo::rustc-link-search={}", link_path.to_str().unwrap());
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        println!(
-            "cargo::rustc-link-arg=-Wl,-rpath,{0},-L{0}",
-            link_path.to_string_lossy()
-        );
+        #[cfg(not(target_os = "windows"))]
+        {
+            println!("cargo::rustc-link-arg=-Wl,-rpath,{0},-L{0}", link_path);
+        }
     }
 
-    #[cfg(feature = "build_artifacts")]
+    #[cfg(test)]
     {
+        let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR specified");
+        let out_dir_path = PathBuf::from(out_dir);
+
         // Copy all binaries to OUT_DIR for unit tests.
         let bin_dir: PathBuf = "fixtures/bin".into();
         if let Ok(entries) = std::fs::read_dir(bin_dir) {
@@ -65,6 +65,6 @@ fn main() {
                     _ => {}
                 }
             }
-        }   
+        }
     }
 }
