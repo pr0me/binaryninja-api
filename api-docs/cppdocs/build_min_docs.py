@@ -5,9 +5,11 @@
 # This allows shipping a few thousand fewer files in updates including C++ documentation.
 #
 # Usage:
-# install doxygen 1.9.4 (or this script will not work. running minification on a different version can cause
-# 						 real issues.)
-# python3 build_min_docs.py
+# install doxygen 1.12.0
+#
+# make html
+# OR
+# make docset
 # =-=--
 
 __DOXYGEN_REQUIRED_VERSION__ = "1.12.0"
