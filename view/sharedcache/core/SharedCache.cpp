@@ -164,7 +164,14 @@ uint64_t readValidULEB128(DataBuffer& buffer, size_t& cursor)
 
 uint64_t SharedCache::FastGetBackingCacheCount(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView)
 {
-	auto baseFile = MMappedFileAccessor::Open(dscView->GetFile()->GetSessionId(), dscView->GetFile()->GetOriginalFilename())->lock();
+	std::shared_ptr<MMappedFileAccessor> baseFile;
+	try {
+		baseFile = MMappedFileAccessor::Open(dscView->GetFile()->GetSessionId(), dscView->GetFile()->GetOriginalFilename())->lock();
+	}
+	catch (...){
+		LogError("SharedCache preload: Failed to open file");
+		return 0;
+	}
 
 	dyld_cache_header header {};
 	size_t header_size = baseFile->ReadUInt32(16);
@@ -749,7 +756,7 @@ void SharedCache::PerformInitialLoad()
 					memcpy(segName, segment.segname, 16);
 					segName[16] = 0;
 					MemoryRegion sectionRegion;
-					sectionRegion.prettyName = std::string(segName);
+					sectionRegion.prettyName = imageHeader.value().identifierPrefix + "::" + std::string(segName);
 					sectionRegion.start = segment.vmaddr;
 					sectionRegion.size = segment.vmsize;
 					uint32_t flags = 0;
@@ -983,14 +990,21 @@ void SharedCache::DeserializeFromRawView()
 			m_baseFilePath = c.m_baseFilePath;
 			m_exportInfos = c.m_exportInfos;
 			m_symbolInfos = c.m_symbolInfos;
+			m_metadataValid = true;
 		}
 		else
 		{
 			LoadFromString(m_dscView->GetStringMetadata(SharedCacheMetadataTag));
 		}
+		if (!m_metadataValid)
+		{
+			m_logger->LogError("Failed to deserialize Shared Cache metadata");
+			m_viewState = DSCViewStateUnloaded;
+		}
 	}
 	else
 	{
+		m_metadataValid = true;
 		m_viewState = DSCViewStateUnloaded;
 		m_images.clear(); // fixme ??
 	}
@@ -1343,6 +1357,8 @@ SharedCache::SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView) : m_
 	INIT_SHAREDCACHE_API_OBJECT()
 	m_logger = LogRegistry::GetLogger("SharedCache", dscView->GetFile()->GetSessionId());
 	DeserializeFromRawView();
+	if (!m_metadataValid)
+		return;
 	if (m_viewState == DSCViewStateUnloaded)
 	{
 		if (m_viewState == DSCViewStateUnloaded)
@@ -2934,6 +2950,8 @@ bool SharedCache::SaveToDSCView()
 		c.m_exportInfos = m_exportInfos;
 		c.m_symbolInfos = m_symbolInfos;
 		viewStateCache[m_dscView->GetFile()->GetSessionId()] = c;
+
+		m_metadataValid = true;
 
 		return true;
 	}

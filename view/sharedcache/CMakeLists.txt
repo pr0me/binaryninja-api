@@ -30,6 +30,7 @@ endif()
 set(HARD_FAIL_MODE OFF CACHE BOOL "Enable hard fail mode")
 set(SLIDEINFO_DEBUG_TAGS OFF CACHE BOOL "Enable debug tags in slideinfo")
 set(VIEW_NAME "DSCViewAlpha" CACHE STRING "Name of the view")
+set(METADATA_VERSION 1 CACHE STRING "Version of the metadata")
 
 add_subdirectory(core)
 add_subdirectory(api)
@@ -62,27 +63,46 @@ target_include_directories(sharedcache PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMA
 
 target_link_libraries(sharedcache PUBLIC sharedcacheapi binaryninjaapi sharedcachecore sharedcacheworkflow)
 
+
+set(COMPILE_DEFS "")
+
 if (HARD_FAIL_MODE)
-    target_compile_definitions(sharedcache PRIVATE ABORT_FAILURES)
+    set(COMPILE_DEFS "${COMPILE_DEFS} ABORT_FAILURES;")
+endif()
+
+if (BN_REF_COUNT_DEBUG)
+    set(COMPILE_DEFS "${COMPILE_DEFS} BN_REF_COUNT_DEBUG;")
 endif()
 
 if (SLIDEINFO_DEBUG_TAGS)
-    target_compile_definitions(sharedcache PRIVATE SLIDEINFO_DEBUG_TAGS)
+    set(COMPILE_DEFS "${COMPILE_DEFS} SLIDEINFO_DEBUG_TAGS;")
 endif()
 
-target_compile_definitions(sharedcache PRIVATE VIEW_NAME="${VIEW_NAME}")
+if (METADATA_VERSION)
+    set(COMPILE_DEFS "${COMPILE_DEFS} METADATA_VERSION=${METADATA_VERSION};")
+else()
+    message(FATAL_ERROR "No metadata version provided. Fatal.")
+endif()
+
+if (VIEW_NAME)
+    set(COMPILE_DEFS "${COMPILE_DEFS} VIEW_NAME=\"${VIEW_NAME}\";")
+else()
+    message(FATAL_ERROR "No view name provided. Fatal.")
+endif()
+
+target_compile_definitions(sharedcache PRIVATE ${COMPILE_DEFS})
 
 if(NOT HEADLESS)
     add_subdirectory(ui)
 endif()
 
 message("
-▓█████▄    ██████   ▄████▄
-▒██▀ ██▌ ▒██    ▒  ▒██▀ ▀█    Shared Cache Plugin
-░██   █▌ ░ ▓██▄    ▒▓█    ▄
-░▓█▄  █▌   ▒   ██▒ ▒▓▓▄ ▄██▒  CMake Prefix Path: ${CMAKE_PREFIX_PATH}
-░▒████▓  ▒██████▒▒▒  ▓███▀ ░  Qt Version: ${QT_VERSION}
- ▒▒▓  ▒ ▒ ▒▓▒ ▒ ░░ ░▒ ▒  ░    Crash on Failure: ${HARD_FAIL_MODE}
- ░ ▒  ▒ ░ ░▒  ░ ░  ░  ▒       Slideinfo Debug Tags: ${SLIDEINFO_DEBUG_TAGS}
- ░ ░  ░ ░  ░  ░  ░            REFCOUNT_DEBUG: ${BN_REF_COUNT_DEBUG}
+▓█████▄    ██████   ▄████▄     Shared Cache Plugin
+▒██▀ ██▌ ▒██    ▒  ▒██▀ ▀█
+░██   █▌ ░ ▓██▄    ▒▓█    ▄    Metadata Version:      ${METADATA_VERSION}
+░▓█▄  █▌   ▒   ██▒ ▒▓▓▄ ▄██▒   CMake Prefix Path:     ${CMAKE_PREFIX_PATH}
+░▒████▓  ▒██████▒▒▒  ▓███▀ ░   Qt Version:            ${QT_VERSION}
+ ▒▒▓  ▒ ▒ ▒▓▒ ▒ ░░ ░▒ ▒  ░     Crash on Failure:      ${HARD_FAIL_MODE}
+ ░ ▒  ▒ ░ ░▒  ░ ░  ░  ▒        Slideinfo Debug Tags:  ${SLIDEINFO_DEBUG_TAGS}
+ ░ ░  ░ ░  ░  ░  ░             REFCOUNT_DEBUG:        ${BN_REF_COUNT_DEBUG}
 ")

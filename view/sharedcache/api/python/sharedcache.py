@@ -12,17 +12,15 @@ from .sharedcache_enums import *
 
 @dataclasses.dataclass
 class DSCMemoryMapping:
-	filePath: str
 	name: str
 	vmAddress: int
-	rawViewOffset: int
 	size: int
 
 	def __str__(self):
 		return repr(self)
 
 	def __repr__(self):
-		return f"<DSCMemoryMapping '{self.name}' {os.path.basename(self.filePath)} raw<{self.rawViewOffset:x}>: {self.vmAddress:x}+{self.size:x}>"
+		return f"<DSCMemoryMapping '{self.name}': {self.vmAddress:x}+{self.size:x}>"
 
 
 @dataclasses.dataclass
@@ -176,31 +174,32 @@ class SharedCache:
 		return result
 
 	@property
-	def loaded_images(self):
+	def loaded_regions(self):
+		"""
+		Get all loaded regions in the shared cache
+
+		The internal logic for loading images treats a region as 'loaded' whenever
+		that region has been mapped into memory, and, if it's located within an image, header information has been applied to that region.
+
+		Individual segments within an image can be loaded independently of the image itself.
+
+		Only once all regions of an image are loaded will the header processor refuse to run on that region.
+		:return:
+		"""
 		count = ctypes.c_ulonglong()
-		value = sccore.BNDSCViewGetLoadedImages(self.handle, count)
+		value = sccore.BNDSCViewGetLoadedRegions(self.handle, count)
 		if value is None:
 			return []
 
 		result = []
 		for i in range(count.value):
-			mappings = []
-			for j in range(value[i].mappingCount):
-				mapping = DSCMemoryMapping(
-					value[i].mappings[j].filePath,
-					value[i].mappings[j].name,
-					value[i].mappings[j].vmAddress,
-					value[i].mappings[j].rawViewOffset,
-					value[i].mappings[j].size
-				)
-				mappings.append(mapping)
-			result.append(LoadedRegion(
+			mapping = DSCMemoryMapping(
 				value[i].name,
-				value[i].headerAddress,
-				mappings
-			))
-
-		sccore.BNDSCViewFreeLoadedImages(value, count)
+				value[i].vmAddress,
+				value[i].size,
+			)
+			result.append(mapping)
+		sccore.BNDSCViewFreeLoadedRegions(value, count)
 		return result
 
 	def load_all_symbols_and_wait(self):
@@ -233,10 +232,6 @@ class SharedCache:
 
 		BNFreeStringList(value, count)
 		return result
-
-	@property
-	def image_count(self):
-		return sccore.BNDSCViewLoadedImageCount(self.handle)
 
 	@property
 	def state(self):

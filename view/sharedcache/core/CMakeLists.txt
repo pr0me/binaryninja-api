@@ -46,25 +46,36 @@ endfunction()
 get_recursive_include_dirs(binaryninjaapi INCLUDES)
 
 
-if (VIEW_NAME)
-    if (SLIDEINFO_DEBUG_TAGS)
-        if (BN_REF_COUNT_DEBUG)
-            target_compile_definitions(sharedcachecore PRIVATE VIEW_NAME="${VIEW_NAME}" SHAREDCACHE_LIBRARY SLIDEINFO_DEBUG_TAGS BN_REF_COUNT_DEBUG)
-        else()
-            target_compile_definitions(sharedcachecore PRIVATE VIEW_NAME="${VIEW_NAME}" SHAREDCACHE_LIBRARY SLIDEINFO_DEBUG_TAGS)
-        endif()
-    else()
-        if (BN_REF_COUNT_DEBUG)
-            target_compile_definitions(sharedcachecore PRIVATE VIEW_NAME="${VIEW_NAME}" SHAREDCACHE_LIBRARY BN_REF_COUNT_DEBUG)
-        else()
-            target_compile_definitions(sharedcachecore PRIVATE VIEW_NAME="${VIEW_NAME}" SHAREDCACHE_LIBRARY)
-        endif()
-    endif()
-    message(STATUS "VIEW_NAME: ${VIEW_NAME}")
-else()
-    error("VIEW_NAME must be defined")
+set(COMPILE_DEFS "")
+
+if (HARD_FAIL_MODE)
+    set(COMPILE_DEFS "${COMPILE_DEFS} ABORT_FAILURES;")
 endif()
 
+if (BN_REF_COUNT_DEBUG)
+    set(COMPILE_DEFS "${COMPILE_DEFS} BN_REF_COUNT_DEBUG;")
+endif()
+
+if (SLIDEINFO_DEBUG_TAGS)
+    set(COMPILE_DEFS "${COMPILE_DEFS} SLIDEINFO_DEBUG_TAGS;")
+endif()
+
+if (VIEW_NAME)
+    set(COMPILE_DEFS "${COMPILE_DEFS} VIEW_NAME=\"${VIEW_NAME}\";")
+else()
+    message(FATAL_ERROR "No view name provided. Fatal.")
+endif()
+
+if (METADATA_VERSION)
+    set(COMPILE_DEFS "${COMPILE_DEFS} METADATA_VERSION=${METADATA_VERSION};")
+else()
+    message(FATAL_ERROR "No metadata version provided. Fatal.")
+endif()
+
+target_compile_definitions(sharedcachecore PRIVATE ${COMPILE_DEFS})
+
+
+target_compile_definitions(sharedcachecore PRIVATE SHAREDCACHE_LIBRARY ${COMPILE_DEFS})
 
 target_include_directories(sharedcachecore PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDES})
 

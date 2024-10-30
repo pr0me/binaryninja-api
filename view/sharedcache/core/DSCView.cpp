@@ -629,6 +629,21 @@ bool DSCView::Init()
 		ss.str(data);
 		rapidjson::Document result(rapidjson::kObjectType);
 
+		if (result.HasMember("metadataVersion"))
+		{
+			if (result["metadataVersion"].GetInt() != METADATA_VERSION)
+			{
+				LogError("Shared cache metadata version mismatch: expected %d, got %d", METADATA_VERSION,
+					result["metadataVersion"].GetInt());
+				return false;
+			}
+		}
+		else
+		{
+			LogError("Shared cache metadata version not found");
+			return false;
+		}
+
 		result.Parse(data.c_str());
 		for (auto& imgV : result["regionsMappedIntoMemory"].GetArray())
 		{

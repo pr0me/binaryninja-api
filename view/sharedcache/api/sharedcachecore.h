@@ -119,7 +119,6 @@ extern "C"
 	SHAREDCACHE_FFI_API void BNFreeSharedCacheReference(BNSharedCache* cache);
 
 	SHAREDCACHE_FFI_API char** BNDSCViewGetInstallNames(BNSharedCache* cache, size_t* count);
-	SHAREDCACHE_FFI_API uint64_t BNDSCViewLoadedImageCount(BNSharedCache* cache);
 
 	SHAREDCACHE_FFI_API bool BNDSCViewLoadImageWithInstallName(BNSharedCache* cache, char* name);
 	SHAREDCACHE_FFI_API bool BNDSCViewLoadSectionAtAddress(BNSharedCache* cache, uint64_t name);

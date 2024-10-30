@@ -578,23 +578,6 @@ def BNDSCViewLoadSectionAtAddress(
 
 
 # -------------------------------------------------------
-# _BNDSCViewLoadedImageCount
-
-_BNDSCViewLoadedImageCount = core.BNDSCViewLoadedImageCount
-_BNDSCViewLoadedImageCount.restype = ctypes.c_ulonglong
-_BNDSCViewLoadedImageCount.argtypes = [
-		ctypes.POINTER(BNSharedCache),
-	]
-
-
-# noinspection PyPep8Naming
-def BNDSCViewLoadedImageCount(
-		cache: ctypes.POINTER(BNSharedCache)
-		) -> int:
-	return _BNDSCViewLoadedImageCount(cache)
-
-
-# -------------------------------------------------------
 # _BNFreeSharedCacheReference
 
 _BNFreeSharedCacheReference = core.BNFreeSharedCacheReference

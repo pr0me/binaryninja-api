@@ -61,6 +61,10 @@ DSCCacheBlocksView::DSCCacheBlocksView(QWidget* parent, BinaryViewRef data, Ref<
 								 ->withEasingCurve(QEasingCurve::InOutCirc)
 	->thenOnStart([this](QAbstractAnimation::Direction)
 	{
+		if (m_backingCaches.size() < m_backingCacheCount)
+		{
+			return;
+		}
 		uint64_t totalSize = 0;
 		uint64_t sumCountForAvg = 0;
 		for (size_t i = 0; i < m_backingCacheCount; i++)
@@ -116,6 +120,8 @@ DSCCacheBlocksView::DSCCacheBlocksView(QWidget* parent, BinaryViewRef data, Ref<
 	})
 	->thenOnEnd([this](QAbstractAnimation::Direction)
 	{
+		if (m_backingCaches.size() == 0)
+			return;
 		emit selectionChanged(m_backingCaches[0], true);
 	});
 

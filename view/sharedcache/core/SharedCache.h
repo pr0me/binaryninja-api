@@ -940,6 +940,8 @@ namespace SharedCacheCore {
 
 		void Store() override
 		{
+			m_activeContext.doc.AddMember("metadataVersion", METADATA_VERSION, m_activeContext.allocator);
+
 			MSS(m_viewState);
 			MSS_CAST(m_cacheFormat, uint8_t);
 			MSS(m_imageStarts);
@@ -1026,6 +1028,19 @@ namespace SharedCacheCore {
 		}
 		void Load() override
 		{
+			if (m_activeDeserContext.doc.HasMember("metadataVersion"))
+			{
+				if (m_activeDeserContext.doc["metadataVersion"].GetUint() != METADATA_VERSION)
+				{
+					m_logger->LogError("SharedCache metadata version mismatch");
+					return;
+				}
+			}
+			else
+			{
+				m_logger->LogError("SharedCache metadata version missing");
+				return;
+			}
 			m_viewState = MSL_CAST(m_viewState, uint8_t, DSCViewState);
 			m_cacheFormat = MSL_CAST(m_cacheFormat, uint8_t, SharedCacheFormat);
 			m_headers.clear();
@@ -1101,6 +1116,8 @@ namespace SharedCacheCore {
 				si.LoadFromValue(siV);
 				m_nonImageRegions.push_back(si);
 			}
+
+			m_metadataValid = true;
 		}
 
 	private:
@@ -1108,7 +1125,7 @@ namespace SharedCacheCore {
 		/* VIEW STATE BEGIN -- SERIALIZE ALL OF THIS AND STORE IT IN RAW VIEW */
 
 		// Updated as the view is loaded further, more images are added, etc
-		DSCViewState m_viewState;
+		DSCViewState m_viewState = DSCViewStateUnloaded;
 		std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>
 			m_exportInfos;
 		std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>
@@ -1116,6 +1133,8 @@ namespace SharedCacheCore {
 		// ---
 
 		// Serialized once by PerformInitialLoad and available after m_viewState == Loaded
+		bool m_metadataValid = false;
+
 		std::string m_baseFilePath;
 		SharedCacheFormat m_cacheFormat;
 
@@ -1171,7 +1190,10 @@ namespace SharedCacheCore {
 
 		void FindSymbolAtAddrAndApplyToAddr(uint64_t symbolLocation, uint64_t targetLocation, bool triggerReanalysis);
 
-		std::vector<BackingCache> BackingCaches() const { return m_backingCaches; }
+		std::vector<BackingCache> BackingCaches() const {
+
+			return m_backingCaches;
+		}
 
 		DSCViewState State() const { return m_viewState; }
 
