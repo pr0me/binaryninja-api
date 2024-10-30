@@ -37,7 +37,12 @@ pub fn from_bn_symbol(raw_symbol: &BNSymbol) -> Symbol {
     let symbol_name = raw_symbol.raw_name().to_string();
     match raw_symbol.sym_type() {
         BNSymbolType::ImportAddress => {
-            todo!()
+            Symbol::new(
+                symbol_name,
+                SymbolClass::Function,
+                // TODO: External = symbolic i guess
+                SymbolModifiers::External,
+            )
         }
         BNSymbolType::Data => {
             Symbol::new(
@@ -48,10 +53,16 @@ pub fn from_bn_symbol(raw_symbol: &BNSymbol) -> Symbol {
             )
         }
         BNSymbolType::Symbolic => {
-            todo!()
+            Symbol::new(
+                symbol_name,
+                SymbolClass::Function,
+                // TODO: External = symbolic i guess
+                SymbolModifiers::External,
+            )
         }
         BNSymbolType::LocalLabel => {
-            todo!()
+            // TODO: This is a placeholder for another symbol.
+            Symbol::new(symbol_name, SymbolClass::Data, SymbolModifiers::External)
         }
         BNSymbolType::External => Symbol::new(
             symbol_name,
