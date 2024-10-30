@@ -15,7 +15,7 @@ const MATCHER_ACTIVITY_CONFIG: &str = r#"{
     "description": "This analysis step applies WARP info to matched functions...",
     "eligibility": {
         "auto": {},
-        "runOnce": false
+        "runOnce": true
     }
 }"#;
 
