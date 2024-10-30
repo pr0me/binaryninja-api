@@ -13,7 +13,8 @@ pub fn guid_benchmark(c: &mut Criterion) {
 
     c.bench_function("function guid", |b| {
         b.iter(|| {
-            function_guid(&first_function, &vec![]);
+            let llil = first_function.low_level_il().unwrap();
+            function_guid(&first_function, &llil);
         })
     });
 }

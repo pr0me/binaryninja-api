@@ -32,7 +32,10 @@ pub fn function_benchmark(c: &mut Criterion) {
         b.iter(|| {
             functions
                 .par_iter()
-                .map_with(cache.clone(), |par_cache, func| par_cache.function(&func))
+                .map_with(cache.clone(), |par_cache, func| {
+                    let llil = func.low_level_il().ok()?;
+                    Some(par_cache.function(func.as_ref(), llil.as_ref()))
+                })
                 .collect::<Vec<_>>()
         })
     });
