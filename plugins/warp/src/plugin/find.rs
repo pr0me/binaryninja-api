@@ -27,11 +27,10 @@ impl Command for FindFunctionFromGUID {
         thread::spawn(move || {
             let background_task = binaryninja::backgroundtask::BackgroundTask::new(
                 format!("Searching functions for GUID... {}", searched_guid),
-                true,
+                false,
             )
             .unwrap();
 
-            // TODO: While background_task has not finished.
             let matched = funcs
                 .par_iter()
                 .filter_map(|func| {
@@ -43,8 +42,12 @@ impl Command for FindFunctionFromGUID {
                 .filter(|(_func, guid)| guid.eq(&searched_guid))
                 .collect::<Vec<_>>();
 
-            for (func, _) in matched {
-                log::info!("Match found at function... 0x{:0x}", func.start());
+            if matched.is_empty() {
+                log::info!("No matches found for GUID... {}", searched_guid);
+            } else {
+                for (func, _) in matched {
+                    log::info!("Match found at function... 0x{:0x}", func.start());
+                }   
             }
 
             background_task.finish();
