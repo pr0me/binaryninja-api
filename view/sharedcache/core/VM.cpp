@@ -38,6 +38,7 @@
 #include <memory>
 #include <cstring>
 #include <stdio.h>
+#include <filesystem>
 #include <binaryninjaapi.h>
 
 #ifdef _MSC_VER
@@ -59,6 +60,60 @@ void VMShutdown()
 	fileAccessorReferenceHolder.clear();
 	fileAccessors.clear();
 }
+
+
+std::string ResolveFilePath(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView, const std::string& path)
+{
+	auto dscProjectFile = dscView->GetFile()->GetProjectFile();
+
+	// If we're not in a project, just return the path we were given
+	if (!dscProjectFile)
+	{
+		return path;
+	}
+
+	// TODO: do we need to support looking in subfolders?
+	// Replace project file path on disk with project file name for resolution
+	std::string projectFilePathOnDisk = dscProjectFile->GetPathOnDisk();
+	std::string cleanPath = path;
+	cleanPath.replace(cleanPath.find(projectFilePathOnDisk), projectFilePathOnDisk.size(), dscProjectFile->GetName());
+
+	size_t lastSlashPos = cleanPath.find_last_of("/\\");
+	std::string fileName;
+
+	if (lastSlashPos != std::string::npos) {
+		fileName = cleanPath.substr(lastSlashPos + 1);
+	} else {
+		fileName = cleanPath;
+	}
+
+	auto project = dscProjectFile->GetProject();
+	auto dscProjectFolder = dscProjectFile->GetFolder();
+	for (const auto& file : project->GetFiles())
+	{
+		auto fileFolder = file->GetFolder();
+		bool isSibling = false;
+		if (!dscProjectFolder && !fileFolder)
+		{
+			// Both top-level
+			isSibling = true;
+		}
+		else if (dscProjectFolder && fileFolder)
+		{
+			// Have same parent folder
+			isSibling = dscProjectFolder->GetId() == fileFolder->GetId();
+		}
+
+		if (isSibling && file->GetName() == fileName)
+		{
+			return file->GetPathOnDisk();
+		}
+	}
+
+	// If we couldn't find a sibling filename, just return the path we were given
+	return path;
+}
+
 
 void MMAP::Map()
 {
@@ -143,14 +198,14 @@ void MMAP::Unmap()
 }
 
 
-std::shared_ptr<SelfAllocatingWeakPtr<MMappedFileAccessor>> MMappedFileAccessor::Open(const uint64_t sessionID, const std::string &path, std::function<void(std::shared_ptr<MMappedFileAccessor>)> postAllocationRoutine)
+std::shared_ptr<SelfAllocatingWeakPtr<MMappedFileAccessor>> MMappedFileAccessor::Open(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView, const uint64_t sessionID, const std::string &path, std::function<void(std::shared_ptr<MMappedFileAccessor>)> postAllocationRoutine)
 {
 	std::scoped_lock<std::mutex> lock(fileAccessorsMutex);
 	if (fileAccessors.count(path) == 0)
 	{
 		auto fileAcccessor = std::shared_ptr<SelfAllocatingWeakPtr<MMappedFileAccessor>>(new SelfAllocatingWeakPtr<MMappedFileAccessor>(
 			// Allocator logic for the SelfAllocatingWeakPtr
-			[path=path, sessionID=sessionID](){
+			[path=path, sessionID=sessionID, dscView](){
 				std::unique_lock<std::mutex> _lock(fileAccessorDequeMutex);
 
 				// Iterate through held references and start removing them until we can get a file pointer
@@ -165,7 +220,7 @@ std::shared_ptr<SelfAllocatingWeakPtr<MMappedFileAccessor>> MMappedFileAccessor:
 
 				mmapCount++;
 				_lock.unlock();
-				auto accessor = std::shared_ptr<MMappedFileAccessor>(new MMappedFileAccessor(path), [](MMappedFileAccessor* accessor){
+				auto accessor = std::shared_ptr<MMappedFileAccessor>(new MMappedFileAccessor(ResolveFilePath(dscView, path)), [](MMappedFileAccessor* accessor){
 					// worker thread or we can deadlock on exit here.
 					BinaryNinja::WorkerEnqueue([accessor](){
 						fileAccessorSemaphore.release();
@@ -428,7 +483,7 @@ VM::~VM()
 }
 
 
-void VM::MapPages(uint64_t sessionID, size_t vm_address, size_t fileoff, size_t size, std::string filePath, std::function<void(std::shared_ptr<MMappedFileAccessor>)> postAllocationRoutine)
+void VM::MapPages(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView, uint64_t sessionID, size_t vm_address, size_t fileoff, size_t size, std::string filePath, std::function<void(std::shared_ptr<MMappedFileAccessor>)> postAllocationRoutine)
 {
 	// The mappings provided for shared caches will always be page aligned.
 	// We can use this to our advantage and gain considerable performance via page tables.
@@ -454,7 +509,7 @@ void VM::MapPages(uint64_t sessionID, size_t vm_address, size_t fileoff, size_t 
 				throw MappingCollisionException();
 			}
 		}
-		m_map.insert_or_assign(page, PageMapping(filePath, MMappedFileAccessor::Open(sessionID, filePath, postAllocationRoutine), i + fileoff));
+		m_map.insert_or_assign(page, PageMapping(filePath, MMappedFileAccessor::Open(dscView, sessionID, filePath, postAllocationRoutine), i + fileoff));
 	}
 }
 

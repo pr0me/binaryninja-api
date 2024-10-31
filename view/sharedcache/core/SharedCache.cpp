@@ -166,7 +166,7 @@ uint64_t SharedCache::FastGetBackingCacheCount(BinaryNinja::Ref<BinaryNinja::Bin
 {
 	std::shared_ptr<MMappedFileAccessor> baseFile;
 	try {
-		baseFile = MMappedFileAccessor::Open(dscView->GetFile()->GetSessionId(), dscView->GetFile()->GetOriginalFilename())->lock();
+		baseFile = MMappedFileAccessor::Open(dscView, dscView->GetFile()->GetSessionId(), dscView->GetFile()->GetOriginalFilename())->lock();
 	}
 	catch (...){
 		LogError("SharedCache preload: Failed to open file");
@@ -188,7 +188,7 @@ uint64_t SharedCache::FastGetBackingCacheCount(BinaryNinja::Ref<BinaryNinja::Bin
 	{
 		if (header.cacheType != 2)
 		{
-			if (std::filesystem::exists(baseFile->Path() + ".01"))
+			if (std::filesystem::exists(ResolveFilePath(dscView, baseFile->Path() + ".01")))
 				cacheFormat = LargeCacheFormat;
 			else
 				cacheFormat = SplitCacheFormat;
@@ -229,7 +229,7 @@ void SharedCache::PerformInitialLoad()
 {
 	m_logger->LogInfo("Performing initial load of Shared Cache");
 	auto path = m_dscView->GetFile()->GetOriginalFilename();
-	auto baseFile = MMappedFileAccessor::Open(m_dscView->GetFile()->GetSessionId(), path)->lock();
+	auto baseFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), path)->lock();
 
     progressMutex.lock();
 	progressMap[m_dscView->GetFile()->GetSessionId()] = LoadProgressLoadingCaches;
@@ -259,7 +259,7 @@ void SharedCache::PerformInitialLoad()
 	{
 		if (primaryCacheHeader.cacheType != 2)
 		{
-			if (std::filesystem::exists(baseFile->Path() + ".01"))
+			if (std::filesystem::exists(ResolveFilePath(m_dscView, baseFile->Path() + ".01")))
 				m_cacheFormat = LargeCacheFormat;
 			else
 				m_cacheFormat = SplitCacheFormat;
@@ -394,7 +394,7 @@ void SharedCache::PerformInitialLoad()
 				subCachePath = mainFileName + entry.fileExtension;
 			else
 				subCachePath = mainFileName + "." + entry.fileExtension;
-			auto subCacheFile = MMappedFileAccessor::Open(m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
+			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
 			dyld_cache_header subCacheHeader {};
 			uint64_t headerSize = subCacheFile->ReadUInt32(16);
@@ -485,7 +485,7 @@ void SharedCache::PerformInitialLoad()
 		for (size_t i = 1; i <= subCacheCount; i++)
 		{
 			auto subCachePath = mainFileName + "." + std::to_string(i);
-			auto subCacheFile = MMappedFileAccessor::Open(m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
+			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
 			dyld_cache_header subCacheHeader {};
 			uint64_t headerSize = subCacheFile->ReadUInt32(16);
@@ -534,7 +534,7 @@ void SharedCache::PerformInitialLoad()
 		// Load .symbols subcache
 
 		auto subCachePath = mainFileName + ".symbols";
-		auto subCacheFile = MMappedFileAccessor::Open(m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
+		auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
 		dyld_cache_header subCacheHeader {};
 		uint64_t headerSize = subCacheFile->ReadUInt32(16);
@@ -624,7 +624,7 @@ void SharedCache::PerformInitialLoad()
 			else
 				subCachePath = mainFileName + "." + entry.fileExtension;
 
-			auto subCacheFile = MMappedFileAccessor::Open(m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
+			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
 			dyld_cache_header subCacheHeader {};
 			uint64_t headerSize = subCacheFile->ReadUInt32(16);
@@ -688,7 +688,7 @@ void SharedCache::PerformInitialLoad()
 		try
 		{
 			auto subCachePath = mainFileName + ".symbols";
-			auto subCacheFile = MMappedFileAccessor::Open(m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
+			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 			dyld_cache_header subCacheHeader {};
 			uint64_t headerSize = subCacheFile->ReadUInt32(16);
 			if (subCacheFile->ReadUInt32(16) > sizeof(dyld_cache_header))
@@ -957,7 +957,7 @@ std::shared_ptr<VM> SharedCache::GetVMMap(bool mapPages)
 		{
 			for (const auto& mapping : cache.mappings)
 			{
-				vm->MapPages(m_dscView->GetFile()->GetSessionId(), mapping.second.first, mapping.first, mapping.second.second, cache.path,
+				vm->MapPages(m_dscView, m_dscView->GetFile()->GetSessionId(), mapping.second.first, mapping.first, mapping.second.second, cache.path,
 					[this, vm=vm](std::shared_ptr<MMappedFileAccessor> mmap){
 						ParseAndApplySlideInfoForFile(mmap);
 					});
@@ -2786,11 +2786,11 @@ std::vector<std::pair<std::string, Ref<Symbol>>> SharedCache::LoadAllSymbolsAndW
 		auto header = HeaderForAddress(img.headerLocation);
 		std::shared_ptr<MMappedFileAccessor> mapping;
 		try {
-			mapping = MMappedFileAccessor::Open(m_dscView->GetFile()->GetSessionId(), header->exportTriePath)->lock();
+			mapping = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), header->exportTriePath)->lock();
 		}
 		catch (...)
 		{
-			m_logger->LogWarn("Serious Error: Failed to open export trie for %s", header->installName.c_str());
+			m_logger->LogWarn("Serious Error: Failed to open export trie %s for %s", header->exportTriePath.c_str(), header->installName.c_str());
 			continue;
 		}
 		auto exportList = SharedCache::ParseExportTrie(mapping, *header);
@@ -2862,7 +2862,7 @@ void SharedCache::FindSymbolAtAddrAndApplyToAddr(uint64_t symbolLocation, uint64
 	{
 		std::shared_ptr<MMappedFileAccessor> mapping;
 		try {
-			mapping = MMappedFileAccessor::Open(m_dscView->GetFile()->GetSessionId(), header->exportTriePath)->lock();
+			mapping = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), header->exportTriePath)->lock();
 		}
 		catch (...)
 		{

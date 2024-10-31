@@ -9,6 +9,8 @@
 
 void VMShutdown();
 
+std::string ResolveFilePath(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView, const std::string& path);
+
 class counting_semaphore {
 public:
 	explicit counting_semaphore(int count = 0) : count_(count) {}
@@ -121,7 +123,7 @@ public:
 	MMappedFileAccessor(const std::string &path);
 	~MMappedFileAccessor();
 
-	static std::shared_ptr<SelfAllocatingWeakPtr<MMappedFileAccessor>> Open(const uint64_t sessionID, const std::string &path, std::function<void(std::shared_ptr<MMappedFileAccessor>)> postAllocationRoutine = nullptr);
+	static std::shared_ptr<SelfAllocatingWeakPtr<MMappedFileAccessor>> Open(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView, const uint64_t sessionID, const std::string &path, std::function<void(std::shared_ptr<MMappedFileAccessor>)> postAllocationRoutine = nullptr);
 
 	static void CloseAll(const uint64_t sessionID);
 
@@ -226,7 +228,7 @@ public:
 
     ~VM();
 
-    void MapPages(uint64_t sessionID, size_t vm_address, size_t fileoff, size_t size, std::string filePath, std::function<void(std::shared_ptr<MMappedFileAccessor>)> postAllocationRoutine);
+    void MapPages(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView, uint64_t sessionID, size_t vm_address, size_t fileoff, size_t size, std::string filePath, std::function<void(std::shared_ptr<MMappedFileAccessor>)> postAllocationRoutine);
 
     bool AddressIsMapped(uint64_t address);
 
