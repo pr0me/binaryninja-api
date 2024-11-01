@@ -2073,7 +2073,7 @@ class MemoryMap:
 		>>> segments = Segment.serialize(image_base=base, start=base, length=0x1000, data_offset=0, data_length=0x1000, flags=SegmentFlag.SegmentReadable|SegmentFlag.SegmentExecutable)
 		>>> segments = Segment.serialize(image_base=base, start=rom_base, length=0x1000, flags=SegmentFlag.SegmentReadable, segments=segments)
 		>>> view = load(bytes.fromhex('5054ebfe'), options={'loader.imageBase': base, 'loader.platform': 'x86', 'loader.segments': segments})
-		>>> print(view.memory_map)
+		>>> view.memory_map
 			<region: 0x10000 - 0x10004>
 				size: 0x4
 				objects:
@@ -2090,7 +2090,7 @@ class MemoryMap:
 					'origin<Mapped>@0xbfff1000' | Unmapped | <---> | FILL<0x0>
 		>>> view.memory_map.add_memory_region("rom", rom_base, b'\x90' * 4096, SegmentFlag.SegmentReadable | SegmentFlag.SegmentExecutable)
 		True
-		>>> print(view.memory_map)
+		>>> view.memory_map
 			<region: 0x10000 - 0x10004>
 				size: 0x4
 				objects:
@@ -2112,7 +2112,7 @@ class MemoryMap:
 		True
 		>>> view.read(rom_base, 16)
 		b'\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\x90\x90\x90\x90\x90\x90\x90\x90'
-		>>> print(view.memory_map)
+		>>> view.memory_map
 			<region: 0x10000 - 0x10004>
 				size: 0x4
 				objects:
@@ -2138,10 +2138,23 @@ class MemoryMap:
 	"""
 
 	def __repr__(self):
-		return pprint.pformat(self.description())
+		return self.__str__()
 
 	def __str__(self):
 		description = self.description()
+		return self.format_description(description)
+
+	def __len__(self):
+		mm_json = self.description()
+		if 'MemoryMap' in mm_json:
+			return len(mm_json['MemoryMap'])
+		else:
+			return 0
+
+	def __init__(self, handle: 'BinaryView'):
+		self.handle = handle
+
+	def format_description(self, description: dict) -> str:
 		formatted_description = ""
 		for entry in description['MemoryMap']:
 			formatted_description += f"<region: {hex(entry['address'])} - {hex(entry['address'] + entry['length'])}>\n"
@@ -2166,18 +2179,15 @@ class MemoryMap:
 
 		return formatted_description
 
-	def __init__(self, handle: 'BinaryView'):
-		self.handle = handle
-
-	def __len__(self):
-		mm_json = self.description()
-		if 'MemoryMap' in mm_json:
-			return len(mm_json['MemoryMap'])
-		else:
-			return 0
-
-	def description(self):
+	def description(self, base: bool = False) -> dict:
+		if base:
+			return json.loads(core.BNGetBaseMemoryMapDescription(self.handle))
 		return json.loads(core.BNGetMemoryMapDescription(self.handle))
+
+	@property
+	def base(self):
+		"""Formatted string of the base memory map, consisting of unresolved auto and user segments (read-only)."""
+		return self.format_description(self.description(base=True))
 
 	def add_memory_region(self, name: str, start: int, source: Union['os.PathLike', str, bytes, bytearray, 'BinaryView', 'databuffer.DataBuffer', 'fileaccessor.FileAccessor'], flags: SegmentFlag = 0) -> bool:
 		"""
@@ -3266,7 +3276,7 @@ class BinaryView:
 
 	@property
 	def segments(self) -> List['Segment']:
-		"""List of segments (read-only)"""
+		"""List of resolved segments (read-only)"""
 		count = ctypes.c_ulonglong(0)
 		segment_list = core.BNGetSegments(self.handle, count)
 		assert segment_list is not None, "core.BNGetSegments returned None"
@@ -9074,12 +9084,12 @@ to a the type "tagRECT" found in the typelibrary "winX64common"
 		segment_arr = (core.BNSegmentInfo * len(segments))(*segments)
 		core.BNAddAutoSegments(self.handle, segment_arr, len(segments))
 
-	def remove_auto_segment(self, start: int, length: int) -> None:
+	def remove_auto_segment(self, start: int, length: int = 0) -> None:
 		"""
-		``remove_auto_segment`` removes an automatically generated segment from the current segment mapping.
+		``remove_auto_segment`` Removes an automatically generated segment from the current segment mapping. This method removes the most recently added 'auto' segment that either matches the specified start address or contains it.
 
 		:param int start: virtual address of the start of the segment
-		:param int length: length of the segment
+		:param int length: length of the segment (unused)
 		:rtype: None
 
 		.. warning:: This action is not persistent across saving of a BNDB and must be re-applied each time a BNDB is loaded.
@@ -9100,7 +9110,14 @@ to a the type "tagRECT" found in the typelibrary "winX64common"
 		"""
 		core.BNAddUserSegment(self.handle, start, length, data_offset, data_length, flags)
 
-	def remove_user_segment(self, start: int, length: int) -> None:
+	def remove_user_segment(self, start: int, length: int = 0) -> None:
+		"""
+		``remove_user_segment`` Removes a user-defined segment from the current segment mapping. This method removes the most recently added 'user' segment that either matches the specified start address or contains it.
+
+		:param int start: virtual address of the start of the segment
+		:param int length: length of the segment (unused)
+		:rtype: None
+		"""
 		core.BNRemoveUserSegment(self.handle, start, length)
 
 	def get_segment_at(self, addr: int) -> Optional[Segment]:
