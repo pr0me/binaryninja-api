@@ -120,10 +120,6 @@ void SharedCacheWorkflow::FixupStubs(Ref<AnalysisContext> ctx)
 		const auto bv = func->GetView();
 
 		auto workflowState = GetGlobalWorkflowState(bv);
-		Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(bv);
-
-		if (!cache)
-			return;
 
 		auto funcStart = func->GetStart();
 		auto sectionExists = !bv->GetSectionsAt(funcStart).empty();
@@ -202,6 +198,14 @@ void SharedCacheWorkflow::FixupStubs(Ref<AnalysisContext> ctx)
 								auto def = mssa->GetSSAVarDefinition(dest.GetSourceSSAVariable());
 								auto defInstr = mssa->GetInstruction(def);
 								auto targetOffset = defInstr.GetSourceExpr().GetSourceExpr().GetConstant();
+
+								if (bv->IsValidOffset(targetOffset))
+									return;
+
+								Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(bv);
+
+								if (!cache)
+									return;
 								if (!cache->GetImageNameForAddress(targetOffset).empty())
 								{
 									cache->LoadImageContainingAddress(targetOffset);
@@ -236,6 +240,14 @@ void SharedCacheWorkflow::FixupStubs(Ref<AnalysisContext> ctx)
 							std::unique_lock<std::mutex> lock(workflowState->imageLoadMutex);
 							auto dest = instr.GetDestExpr<MLIL_JUMP>();
 							auto targetOffset = dest.GetConstant();
+							if (bv->IsValidOffset(targetOffset))
+								return;
+
+							Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(bv);
+
+							if (!cache)
+								return;
+
 							if (!cache->GetImageNameForAddress(targetOffset).empty())
 							{
 								cache->LoadImageContainingAddress(targetOffset);
@@ -338,24 +350,28 @@ void SharedCacheWorkflow::FixupStubs(Ref<AnalysisContext> ctx)
 									auto def = mssa->GetSSAVarDefinition(dest.GetSourceSSAVariable());
 									auto defInstr = mssa->GetInstruction(def);
 									auto targetOffset = defInstr.GetSourceExpr().GetSourceExpr().GetConstant();
-									auto sharedCache = SharedCacheAPI::SharedCache(bv);
-									if (!bv->IsValidOffset(targetOffset))
+
+									if (bv->IsValidOffset(targetOffset))
+										return;
+
+									Ref<SharedCacheAPI::SharedCache> cache = new SharedCacheAPI::SharedCache(bv);
+
+									if (!cache)
+										return;
+
+									if (!cache->GetImageNameForAddress(targetOffset).empty())
 									{
-										if (!sharedCache.GetImageNameForAddress(targetOffset).empty())
+										cache->LoadImageContainingAddress(targetOffset);
+									}
+									else
+									{
+										cache->LoadSectionAtAddress(targetOffset);
+									}
+									for (const auto &sectFunc : bv->GetAnalysisFunctionList())
+									{
+										if (section->GetStart() <= sectFunc->GetStart() && sectFunc->GetStart() < section->GetEnd())
 										{
-											sharedCache.LoadImageContainingAddress(targetOffset);
-										}
-										else
-										{
-											sharedCache.LoadSectionAtAddress(targetOffset);
-										}
-										for (const auto& sectFunc : bv->GetAnalysisFunctionList())
-										{
-											if (section->GetStart() <= sectFunc->GetStart()
-												&& sectFunc->GetStart() < section->GetEnd())
-											{
-												func->Reanalyze();
-											}
+											func->Reanalyze();
 										}
 									}
 								}
