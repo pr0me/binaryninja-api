@@ -165,6 +165,20 @@ The Recent files list can be cleared via using the Command Palette (`[CTRL] + P`
 
 Hotkeys (macOS: `[CMD] + 0` - `[CMD] + 9`, Windows/Linux: `[CTRL] + 0` - `[CTRL + 9]`) can also be used to quickly open a file. The hotkey for a given entry will be shown on the right.
 
+### Plugins
+
+The status of currently installed plugins will be displayed in the bottom right.
+
+![plugin status ><](../img/plugin-status-widget.png "Plugin Status Widget"){ width="400" }
+
+Pressing each of the icons will navigate you to the the Plugin Manager with the corresponding filter:
+
+- Green Circle: `@installed`
+- Error Symbol: `@failed_to_load`
+- Update Icon: `@update_available`
+
+Pressing the gear or using the hotkeys (macOS: `[CMD+SHIFT] + M` , Windows/Linux: `[CTRL+SHIFT] + M`) will open the plugin manager with no filters so you can browse available plugins.
+
 ### Commercial/Ultimate Features
 
 ![new tab](../img/newtab-projects.png "New Tab Projects Version"){ width="700" }
