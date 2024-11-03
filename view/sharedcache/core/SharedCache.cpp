@@ -373,8 +373,9 @@ void SharedCache::PerformInitialLoad()
 				m_imageStarts["dyld_shared_cache_branch_islands_" + std::to_string(i)] = baseFile->ReadULong(primaryCacheHeader.branchPoolsOffset + (i * m_dscView->GetAddressSize()));
 			}
 		}
-
-		auto mainFileName = baseFile->Path();
+		std::string mainFileName = base_name(path);
+		if (auto projectFile = m_dscView->GetFile()->GetProjectFile())
+			mainFileName = projectFile->GetName();
 		auto subCacheCount = primaryCacheHeader.subCacheArrayCount;
 
 		dyld_subcache_entry2 _entry {};
@@ -390,10 +391,17 @@ void SharedCache::PerformInitialLoad()
 		for (const auto& entry : subCacheEntries)
 		{
 			std::string subCachePath;
+			std::string subCacheFilename;
 			if (std::string(entry.fileExtension).find('.') != std::string::npos)
-				subCachePath = mainFileName + entry.fileExtension;
+			{
+				subCachePath = path + entry.fileExtension;
+				subCacheFilename = mainFileName + entry.fileExtension;
+			}
 			else
-				subCachePath = mainFileName + "." + entry.fileExtension;
+			{
+				subCachePath = path + "." + entry.fileExtension;
+				subCacheFilename = mainFileName + "." + entry.fileExtension;
+			}
 			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
 			dyld_cache_header subCacheHeader {};
@@ -431,7 +439,7 @@ void SharedCache::PerformInitialLoad()
 				MemoryRegion stubIslandRegion;
 				stubIslandRegion.start = address;
 				stubIslandRegion.size = size;
-				stubIslandRegion.prettyName = pathBasename + "::_stubs";
+				stubIslandRegion.prettyName = subCacheFilename + "::_stubs";
 				stubIslandRegion.flags = (BNSegmentFlag)(BNSegmentFlag::SegmentReadable | BNSegmentFlag::SegmentExecutable);
 				m_stubIslandRegions.push_back(stubIslandRegion);
 			}
@@ -477,14 +485,17 @@ void SharedCache::PerformInitialLoad()
 			}
 		}
 
-		auto mainFileName = baseFile->Path();
+		std::string mainFileName = base_name(path);
+		if (auto projectFile = m_dscView->GetFile()->GetProjectFile())
+			mainFileName = projectFile->GetName();
 		auto subCacheCount = primaryCacheHeader.subCacheArrayCount;
 
 		baseFile.reset();
 
 		for (size_t i = 1; i <= subCacheCount; i++)
 		{
-			auto subCachePath = mainFileName + "." + std::to_string(i);
+			auto subCachePath = path + "." + std::to_string(i);
+			auto subCacheFilename = mainFileName + "." + std::to_string(i);
 			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
 			dyld_cache_header subCacheHeader {};
@@ -525,7 +536,7 @@ void SharedCache::PerformInitialLoad()
 				MemoryRegion stubIslandRegion;
 				stubIslandRegion.start = address;
 				stubIslandRegion.size = size;
-				stubIslandRegion.prettyName = pathBasename + "::_stubs";
+				stubIslandRegion.prettyName = subCacheFilename + "::_stubs";
 				stubIslandRegion.flags = (BNSegmentFlag)(BNSegmentFlag::SegmentReadable | BNSegmentFlag::SegmentExecutable);
 				m_stubIslandRegions.push_back(stubIslandRegion);
 			}
@@ -533,7 +544,7 @@ void SharedCache::PerformInitialLoad()
 
 		// Load .symbols subcache
 
-		auto subCachePath = mainFileName + ".symbols";
+		auto subCachePath = path + ".symbols";
 		auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
 		dyld_cache_header subCacheHeader {};
@@ -601,7 +612,9 @@ void SharedCache::PerformInitialLoad()
 			}
 		}
 
-		auto mainFileName = baseFile->Path();
+		std::string mainFileName = base_name(path);
+		if (auto projectFile = m_dscView->GetFile()->GetProjectFile())
+			mainFileName = projectFile->GetName();
 		auto subCacheCount = primaryCacheHeader.subCacheArrayCount;
 
 		dyld_subcache_entry2 _entry {};
@@ -619,10 +632,17 @@ void SharedCache::PerformInitialLoad()
 		for (const auto& entry : subCacheEntries)
 		{
 			std::string subCachePath;
+			std::string subCacheFilename;
 			if (std::string(entry.fileExtension).find('.') != std::string::npos)
-				subCachePath = mainFileName + entry.fileExtension;
+			{
+				subCachePath = path + entry.fileExtension;
+				subCacheFilename = mainFileName + entry.fileExtension;
+			}
 			else
-				subCachePath = mainFileName + "." + entry.fileExtension;
+			{
+				subCachePath = path + "." + entry.fileExtension;
+				subCacheFilename = mainFileName + "." + entry.fileExtension;
+			}
 
 			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
@@ -661,7 +681,7 @@ void SharedCache::PerformInitialLoad()
 					MemoryRegion dyldDataRegion;
 					dyldDataRegion.start = address;
 					dyldDataRegion.size = size;
-					dyldDataRegion.prettyName = pathBasename + "::_data" + std::to_string(j);
+					dyldDataRegion.prettyName = subCacheFilename + "::_data" + std::to_string(j);
 					dyldDataRegion.flags = (BNSegmentFlag)(BNSegmentFlag::SegmentReadable);
 					m_dyldDataRegions.push_back(dyldDataRegion);
 				}
@@ -678,7 +698,7 @@ void SharedCache::PerformInitialLoad()
 				MemoryRegion stubIslandRegion;
 				stubIslandRegion.start = address;
 				stubIslandRegion.size = size;
-				stubIslandRegion.prettyName = pathBasename + "::_stubs";
+				stubIslandRegion.prettyName = subCacheFilename + "::_stubs";
 				stubIslandRegion.flags = (BNSegmentFlag)(BNSegmentFlag::SegmentReadable | BNSegmentFlag::SegmentExecutable);
 				m_stubIslandRegions.push_back(stubIslandRegion);
 			}
@@ -687,7 +707,7 @@ void SharedCache::PerformInitialLoad()
 		// Load .symbols subcache
 		try
 		{
-			auto subCachePath = mainFileName + ".symbols";
+			auto subCachePath = path + ".symbols";
 			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 			dyld_cache_header subCacheHeader {};
 			uint64_t headerSize = subCacheFile->ReadUInt32(16);
