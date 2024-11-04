@@ -109,8 +109,7 @@ class SharedCache:
 		self.handle = sccore.BNGetSharedCache(view.handle)
 
 	def load_image_with_install_name(self, installName):
-		str = BNAllocString(installName.encode('utf-8'))
-		return sccore.BNDSCViewLoadImageWithInstallName(self.handle, str)
+		return sccore.BNDSCViewLoadImageWithInstallName(self.handle, installName)
 
 	def load_section_at_address(self, addr):
 		return sccore.BNDSCViewLoadSectionAtAddress(self.handle, addr)

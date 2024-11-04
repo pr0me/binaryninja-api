@@ -3014,7 +3014,7 @@ extern "C"
 	bool BNDSCViewLoadImageWithInstallName(BNSharedCache* cache, char* name)
 	{
 		std::string imageName = std::string(name);
-		BNFreeString(name);
+		// FIXME !!!!!!!! BNFreeString(name);
 
 		if (cache->object)
 			return cache->object->LoadImageWithInstallName(imageName);
