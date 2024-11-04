@@ -1,7 +1,7 @@
 use binaryninja::architecture::Architecture as BNArchitecture;
 use binaryninja::backgroundtask::BackgroundTask;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
-use binaryninja::function::{Function as BNFunction, FunctionUpdateType};
+use binaryninja::function::Function as BNFunction;
 use binaryninja::platform::Platform;
 use binaryninja::rc::Guard;
 use binaryninja::rc::Ref as BNRef;
@@ -239,9 +239,6 @@ impl Matcher {
                     self.add_type_to_view(&view, &arch, &in_member.ty);
                 }
             }
-            // Also mark this for updates.
-            // TODO: Does this do anything?
-            function.mark_updates_required(FunctionUpdateType::UserFunctionUpdate);
         };
 
         if let Some(matched_function) = cached_function_match(function, || {

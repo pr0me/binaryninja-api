@@ -8,7 +8,7 @@ use crate::convert::{to_bn_symbol_at_address, to_bn_type};
 use crate::matcher::{invalidate_function_matcher_cache, Matcher, PlatformID, PLAT_MATCHER_CACHE};
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::{Command, FunctionCommand};
-use binaryninja::function::Function;
+use binaryninja::function::{Function, FunctionUpdateType};
 use binaryninja::rc::Ref;
 use binaryninja::tags::TagType;
 use warp::signature::function::Function as WarpFunction;
@@ -35,12 +35,12 @@ fn get_warp_tag_type(view: &BinaryView) -> Ref<TagType> {
 // TODO: Rename to markup_function or something.
 pub fn on_matched_function(function: &Function, matched: &WarpFunction) {
     let view = function.view();
-    view.define_auto_symbol(&to_bn_symbol_at_address(
+    view.define_user_symbol(&to_bn_symbol_at_address(
         &view,
         &matched.symbol,
         function.symbol().address(),
     ));
-    function.set_auto_type(&to_bn_type(&function.arch(), &matched.ty));
+    function.set_user_type(&to_bn_type(&function.arch(), &matched.ty));
     // TODO: Add metadata. (both binja metadata and warp metadata)
     function.add_tag(
         &get_warp_tag_type(&view),
@@ -49,6 +49,8 @@ pub fn on_matched_function(function: &Function, matched: &WarpFunction) {
         true,
         None,
     );
+    // Seems to be the only way to get the analysis update to work correctly.
+    function.mark_updates_required(FunctionUpdateType::FullAutoFunctionUpdate);
 }
 
 struct DebugFunction;

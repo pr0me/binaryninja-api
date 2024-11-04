@@ -63,6 +63,8 @@ pub fn insert_workflow() {
             .for_each(|function| cached_function_matcher(&function));
         log::info!("Function matching took {:?}", start.elapsed());
         background_task.finish();
+        // Now we want to trigger re-analysis.
+        view.update_analysis();
     };
 
     let guid_activity = |ctx: &AnalysisContext| {
