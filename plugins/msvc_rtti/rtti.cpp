@@ -74,7 +74,7 @@ CompleteObjectLocator::CompleteObjectLocator(BinaryView *view, uint64_t address)
 std::optional<CompleteObjectLocator> ReadCompleteObjectorLocator(BinaryView *view, uint64_t address)
 {
     auto coLocator = CompleteObjectLocator(view, address);
-    uint64_t startAddr = view->GetStart();
+    uint64_t startAddr = view->GetOriginalImageBase();
     uint64_t endAddr = view->GetEnd();
 
     if (coLocator.signature > 1)
@@ -422,7 +422,7 @@ std::optional<ClassInfo> MicrosoftRTTIProcessor::ProcessRTTI(uint64_t coLocatorA
     if (!coLocator.has_value())
         return std::nullopt;
 
-    auto startAddr = m_view->GetStart();
+    auto startAddr = m_view->GetOriginalImageBase();
     auto resolveAddr = [&](const uint64_t relAddr) {
         return coLocator->signature == COL_SIG_REV1 ? startAddr + relAddr : relAddr;
     };
@@ -631,7 +631,7 @@ MicrosoftRTTIProcessor::MicrosoftRTTIProcessor(const Ref<BinaryView> &view, bool
 void MicrosoftRTTIProcessor::ProcessRTTI()
 {
     auto start_time = std::chrono::high_resolution_clock::now();
-    uint64_t startAddr = m_view->GetStart();
+    uint64_t startAddr = m_view->GetOriginalImageBase();
     uint64_t endAddr = m_view->GetEnd();
     BinaryReader optReader = BinaryReader(m_view);
     auto addrSize = m_view->GetAddressSize();
