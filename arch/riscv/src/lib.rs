@@ -1184,11 +1184,28 @@ impl<D: 'static + RiscVDisassembler + Send + Sync> architecture::Architecture fo
             Op::SraW(r) => simple_r!(r, |rs1, rs2| il.sx(max_width, il.asr(4, rs1, rs2))),
 
             Op::Mul(r) => simple_r!(r, |rs1, rs2| il.mul(max_width, rs1, rs2)),
-            /*
-            Op::MulH(r) =>
-            Op::MulHU(r) =>
-            Op::MulHSU(r) =>
-            */
+            Op::MulH(r) => simple_r!(r, |rs1, rs2| {
+                let extended_width = max_width * 2;
+                let extended_rs1 = il.sx(extended_width, rs1);
+                let extended_rs2 = il.sx(extended_width, rs2);
+                let mul_expr = il.mul(extended_width, extended_rs1, extended_rs2);
+                il.asr(max_width, mul_expr, il.const_int(1, 8 * (max_width as u64)))
+            }),
+            Op::MulHU(r) => simple_r!(r, |rs1, rs2| {
+                let extended_width = max_width * 2;
+                let extended_rs1 = il.zx(extended_width, rs1);
+                let extended_rs2 = il.zx(extended_width, rs2);
+                let mul_expr = il.mul(extended_width, extended_rs1, extended_rs2);
+                il.lsr(max_width, mul_expr, il.const_int(1, 8 * (max_width as u64)))
+            }),
+            Op::MulHSU(r) => simple_r!(r, |rs1, rs2| {
+                let extended_width = max_width * 2;
+                let extended_rs1 = il.sx(extended_width, rs1);
+                let extended_rs2 = il.zx(extended_width, rs2);
+                let mul_expr = il.mul(extended_width, extended_rs1, extended_rs2);
+                il.asr(max_width, mul_expr, il.const_int(1, 8 * (max_width as u64)))
+            }),
+
             Op::Div(r) => simple_r!(r, |rs1, rs2| il.divs(max_width, rs1, rs2)),
             Op::DivU(r) => simple_r!(r, |rs1, rs2| il.divu(max_width, rs1, rs2)),
             Op::Rem(r) => simple_r!(r, |rs1, rs2| il.mods(max_width, rs1, rs2)),
