@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -9,6 +9,7 @@ use rayon::prelude::*;
 
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use serde_json::json;
+use walkdir::WalkDir;
 use warp::signature::function::constraints::FunctionConstraint;
 use warp::signature::function::{Function, FunctionGUID};
 use warp::signature::Data;
@@ -17,8 +18,10 @@ use warp::signature::Data;
 #[command(version, about, long_about = None)]
 struct Args {
     /// Path of the binary/BNDB to generate signatures of
+    ///
+    /// If you pass a directory all files inside will be used
     #[arg(index = 1)]
-    binary: PathBuf,
+    path: PathBuf,
 
     /// The signature output file
     #[arg(index = 2)]
@@ -41,7 +44,7 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     // If no output file was given, just prepend binary with extension sbin
-    let output_file = args.output.unwrap_or(args.binary.with_extension("sbin"));
+    let output_file = args.output.unwrap_or(args.path.with_extension("sbin"));
 
     if output_file.exists() && !args.overwrite.unwrap_or(false) {
         log::info!("Output file already exists, skipping... {:?}", output_file);
@@ -51,9 +54,9 @@ fn main() {
     log::debug!("Starting Binary Ninja session...");
     let _headless_session = binaryninja::headless::Session::new();
 
-    log::info!("Creating functions for {:?}...", args.binary);
+    log::info!("Creating functions for {:?}...", args.path);
     let start = std::time::Instant::now();
-    let data = data_from_file(&args.binary).expect("Failed to read data");
+    let data = data_from_file(&args.path).expect("Failed to read data");
     log::info!("Functions created in {:?}", start.elapsed());
 
     // TODO: Add a way to override the symbol type to make it a different function symbol.
@@ -68,7 +71,7 @@ fn main() {
             output_file
         );
     } else {
-        log::warn!("No functions found for binary {:?}...", args.binary);
+        log::warn!("No functions found for binary {:?}...", args.path);
     }
 }
 
@@ -112,7 +115,7 @@ fn data_from_archive<R: Read>(mut archive: Archive<R>) -> Option<Data> {
     }
 
     // Create the data.
-    let mut entry_data = entry_files
+    let entry_data = entry_files
         .into_par_iter()
         .filter_map(|path| {
             log::debug!("Creating data for ENTRY {:?}...", path);
@@ -120,21 +123,33 @@ fn data_from_archive<R: Read>(mut archive: Archive<R>) -> Option<Data> {
         })
         .collect::<Vec<_>>();
 
-    // TODO: Cloning here is unnecessary
-    // TODO: I dont think this drain does what we want...
-    let mut functions: Vec<_> = entry_data
-        .iter_mut()
-        .flat_map(|d| d.functions.drain(..))
-        .collect();
-    
-    functions = resolve_guids(functions);
-    
-    let types: Vec<_> = entry_data.into_iter().flat_map(|d| d.types).collect();
-
-    Some(Data { functions, types })
+    let mut archive_data = Data::merge(&entry_data);
+    // Archives can resolve like this, its assumed that the symbols are weak.
+    resolve_guids(&mut archive_data.functions);
+    Some(archive_data)
 }
 
-fn resolve_guids(functions: Vec<Function>) -> Vec<Function> {
+fn data_from_directory(dir: PathBuf) -> Option<Data> {
+    let unmerged_data = WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| {
+            let path = e.ok()?.into_path();
+            if path.is_file() {
+                log::info!("Creating data for FILE {:?}...", path);
+                data_from_file(&path)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if !unmerged_data.is_empty() {
+        Some(Data::merge(&unmerged_data))
+    } else {
+        None
+    }
+}
+
+fn resolve_guids(functions: &mut [Function]) {
     let guid_map: HashMap<String, FunctionGUID> = functions
         .iter()
         .map(|f| (f.symbol.name.to_owned(), f.guid))
@@ -150,24 +165,22 @@ fn resolve_guids(functions: Vec<Function>) -> Vec<Function> {
         constraint
     };
 
-    functions
-        .into_iter()
-        .map(|mut f| {
-            f.constraints.call_sites = f
-                .constraints
-                .call_sites
-                .into_iter()
-                .map(resolve_constraint)
-                .collect();
-            f.constraints.adjacent = f
-                .constraints
-                .adjacent
-                .into_iter()
-                .map(resolve_constraint)
-                .collect();
-            f
-        })
-        .collect()
+    functions.iter_mut().for_each(|f| {
+        f.constraints.call_sites = f
+            .constraints
+            .call_sites
+            .iter()
+            .cloned()
+            .map(resolve_constraint)
+            .collect();
+        f.constraints.adjacent = f
+            .constraints
+            .adjacent
+            .iter()
+            .cloned()
+            .map(resolve_constraint)
+            .collect();
+    });
 }
 
 // TODO: Pass settings.
@@ -175,9 +188,11 @@ fn data_from_file(path: &Path) -> Option<Data> {
     // TODO: Add external debug info files.
     // TODO: Support IDB's through debug info
     let settings_json = json!({
-        "analysis.linearSweep.autorun": true,
+        "analysis.linearSweep.autorun": false,
         "analysis.signatureMatcher.autorun": false,
-        "analysis.plugins.warp.matcher": false,
+        "analysis.warp.matcher": false,
+        "plugin.msvc.rttiAnalysis": false,
+        "plugin.msvc.vftAnalysis": false,
     });
 
     match path.extension() {
@@ -186,6 +201,11 @@ fn data_from_file(path: &Path) -> Option<Data> {
             let archive = Archive::new(archive_file);
             data_from_archive(archive)
         }
+        Some(ext) if ext == "sbin" => {
+            let contents = std::fs::read(path).ok()?;
+            Data::from_bytes(&contents)
+        }
+        _ if path.is_dir() => data_from_directory(path.into()),
         _ => {
             let path_str = path.to_str().unwrap();
             let view =
