@@ -624,7 +624,7 @@ pub trait ObjectDestructor: 'static + Sync + Sized {
     {
         ffi_wrap!("ObjectDestructor::destruct_view", {
             let view_type = &*(ctxt as *mut Self);
-            let view = BinaryView::from_raw(view);
+            let view = BinaryView { handle: view };
             view_type.destruct_view(&view);
         })
     }
@@ -642,7 +642,7 @@ pub trait ObjectDestructor: 'static + Sync + Sized {
     {
         ffi_wrap!("ObjectDestructor::destruct_function", {
             let view_type = &*(ctxt as *mut Self);
-            let func = Function::from_raw(func);
+            let func = Function { handle: func };
             view_type.destruct_function(&func);
         })
     }
