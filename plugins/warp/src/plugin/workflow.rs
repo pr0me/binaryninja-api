@@ -2,15 +2,15 @@ use crate::cache::cached_function_guid;
 use crate::matcher::cached_function_matcher;
 use binaryninja::backgroundtask::BackgroundTask;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
+use binaryninja::command::Command;
 use binaryninja::llil;
 use binaryninja::workflow::{Activity, AnalysisContext, Workflow};
 use std::time::Instant;
-use binaryninja::command::Command;
 
-const MATCHER_ACTIVITY_NAME: &str = "analysis.plugins.warp.matcher";
+pub const MATCHER_ACTIVITY_NAME: &str = "analysis.warp.matcher";
 // NOTE: runOnce is off because previously matched functions need info applied.
 const MATCHER_ACTIVITY_CONFIG: &str = r#"{
-    "name": "analysis.plugins.warp.matcher",
+    "name": "analysis.warp.matcher",
     "title" : "WARP Matcher",
     "description": "This analysis step applies WARP info to matched functions...",
     "eligibility": {
@@ -19,9 +19,9 @@ const MATCHER_ACTIVITY_CONFIG: &str = r#"{
     }
 }"#;
 
-const GUID_ACTIVITY_NAME: &str = "analysis.plugins.warp.guid";
+pub const GUID_ACTIVITY_NAME: &str = "analysis.warp.guid";
 const GUID_ACTIVITY_CONFIG: &str = r#"{
-    "name": "analysis.plugins.warp.guid",
+    "name": "analysis.warp.guid",
     "title" : "WARP GUID Generator",
     "description": "This analysis step generates the GUID for all analyzed functions...",
     "eligibility": {
@@ -44,7 +44,7 @@ impl Command for RunMatcher {
                 .iter()
                 .for_each(|function| cached_function_matcher(&function));
             log::info!("Function matching took {:?}", start.elapsed());
-            background_task.finish();  
+            background_task.finish();
         });
     }
 
