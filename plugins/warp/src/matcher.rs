@@ -22,7 +22,8 @@ use crate::cache::{cached_call_site_constraints, cached_function_match, try_cach
 use crate::convert::to_bn_type;
 use crate::plugin::on_matched_function;
 
-pub const TRIVIAL_FUNCTION_DELTA_THRESHOLD: u64 = 8;
+// TODO: Make this configurable.
+pub const TRIVIAL_FUNCTION_DELTA_THRESHOLD: u64 = 20;
 
 pub static PLAT_MATCHER_CACHE: OnceLock<DashMap<PlatformID, Matcher>> = OnceLock::new();
 
