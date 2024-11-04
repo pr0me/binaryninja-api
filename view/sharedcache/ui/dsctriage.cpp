@@ -17,7 +17,7 @@
 #define QSETTINGS_KEY_SELECTED_TAB "DSCTriage-SelectedTab"
 #define QSETTINGS_KEY_TAB_LAYOUT "DSCTriage-TabLayout"
 #define QSETTINGS_KEY_IMAGELOAD_TAB_LAYOUT "DSCTriage-ImageLoadTabLayout"
-#define QSETTINGS_KEY_ALPHA_POPUP_SEEN "DSCTriage-AlphaPopupSeen"
+#define QSETTINGS_KEY_ALPHA_POPUP_SEEN "DSCTriage-AlphaPopupSeenV2"
 
 
 DSCCacheBlocksView::DSCCacheBlocksView(QWidget* parent, BinaryViewRef data, Ref<SharedCacheAPI::SharedCache> cache)
@@ -639,51 +639,6 @@ DSCTriageView::DSCTriageView(QWidget* parent, BinaryViewRef data) : QWidget(pare
 
 	QWidget* defaultWidget = nullptr;
 
-	// check for alpha popup qsetting
-	QSettings settings;
-	if (!(settings.contains(QSETTINGS_KEY_ALPHA_POPUP_SEEN) && settings.value(QSETTINGS_KEY_ALPHA_POPUP_SEEN).toBool()))
-	{
-
-		QTextBrowser *tb = new QTextBrowser(this);
-		{
-			tb->setOpenExternalLinks(true);
-			auto alphaHtml =
-				R"(
-<br>
-<h1>Shared Cache Alpha</h1>
-
-<p> This is the alpha release of the sharedcache viewer! We are hard at work improving this and adding features, but we wanted
-to make it available for users to play with as soon as possible. </p>
-
-<h2> Supported Platforms </h2>
-<ul>
-	<li> iOS 11-17 (full) </li>
-	<li> iOS 18 (partial, Objective-C optimization parsing is not implemented yet.) </li>
-	<li> macOS x86/arm64e (partial) </li>
-</ul>
-
-<p> iOS parsing should work well for now. macOS parsing should be usable, but is still a work in progress. </p>
-
-<h2> Getting the latest version of the plugin </h2>
-
-<p> We frequently release "dev" builds which will contain the latest version of the SharedCache plugin (and many other things).
-
-You can find instructions on how to install these builds <a href="https://docs.binary.ninja/guide/index.html#development-branch">here</a>. </p>
-
-<h3> Reading / building the source </h3>
-<p>You can read the source and find instructions for building it <a href="https://github.com/Vector35/binaryninja-api/tree/dev/view/sharedcache">here</a>.
-
-Contributions are always welcome! </p>
-)";
-			tb->setHtml(alphaHtml);
-
-			m_triageTabs->addTab(tb, "Shared Cache Alpha");
-
-		}
-		settings.setValue(QSETTINGS_KEY_ALPHA_POPUP_SEEN, true);
-		defaultWidget = tb;
-	}
-
 	m_bottomRegionCollection = new DockableTabCollection();
 	m_bottomRegionTabs = new SplitTabWidget(m_bottomRegionCollection);
 	m_bottomRegionTabs->setTabStyle(new GlobalAreaTabStyle());
@@ -774,8 +729,7 @@ Contributions are always welcome! </p>
 		loadImageTable->setSelectionMode(QAbstractItemView::SingleSelection);
 
 		m_triageTabs->addTab(loadImageWidget, "Images");
-		if (!defaultWidget)
-			defaultWidget = loadImageWidget;
+		defaultWidget = loadImageWidget;
 		m_triageTabs->setCanCloseTab(loadImageWidget, false);
 	} // loadImageTable
 
@@ -856,6 +810,54 @@ Contributions are always welcome! </p>
 
 		// m_triageTabs->addTab(loadedRegionsWidget, "Loaded Regions");
 	} // loadedRegions
+
+
+
+	// check for alpha popup qsetting
+	QSettings settings;
+
+	QTextBrowser *tb = new QTextBrowser(this);
+	{
+		tb->setOpenExternalLinks(true);
+		auto alphaHtml =
+			R"(
+<br>
+<h1>Shared Cache Alpha</h1>
+
+<p> This is an experimental alpha release of the sharedcache view! We are hard at work improving this and adding features, but we wanted
+to make it available for users to experiment with as soon as possible. </p>
+
+<h2> Platforms </h2>
+<ul>
+	<li> iOS 11-17 (full) </li>
+	<li> iOS 18 (partial, Objective-C optimization parsing is not implemented yet.) May have issues. </li>
+	<li> macOS x86/arm64e (partial, may have issues) </li>
+</ul>
+
+<p> iOS parsing should work fairly well for now. macOS parsing should be usable, but both are still a work in progress. </p>
+
+<h2> Getting the latest version of the plugin </h2>
+
+<p> We frequently release "dev" builds which will contain the latest version of the SharedCache plugin (and many other things).
+
+You can find instructions on how to install these builds <a href="https://docs.binary.ninja/guide/index.html#development-branch">here</a>. </p>
+
+<h3> Reading / building the source </h3>
+<p>You can read the source and find instructions for building it <a href="https://github.com/Vector35/binaryninja-api/tree/dev/view/sharedcache">here</a>.
+
+Contributions are always welcome! </p>
+)";
+		tb->setHtml(alphaHtml);
+
+		m_triageTabs->addTab(tb, "Shared Cache Alpha");
+
+	}
+	if (!(settings.contains(QSETTINGS_KEY_ALPHA_POPUP_SEEN) && settings.value(QSETTINGS_KEY_ALPHA_POPUP_SEEN).toBool()))
+	{
+		LogAlert("dyld_shared_cache support is highly experimental! We do not expect it to work on all versions yet! See the 'alpha' tab in the Triage view for more information. ");
+		settings.setValue(QSETTINGS_KEY_ALPHA_POPUP_SEEN, true);
+		defaultWidget = tb;
+	}
 
 	containerWidget->addWidget(m_bottomRegionTabs);
 

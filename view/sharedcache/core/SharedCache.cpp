@@ -12,29 +12,15 @@
  * This has to recreate _all_ of the Mach-O View logic, but slightly differently, as everything is spicy and weird and
  * 		different enough that it's not worth trying to make a shared base class.
  *
- * Essentially:
- * 1. Make an API call through this class' FFI wrapper like SharedCache::GetAvailableImages(BinaryView* view)
- * 2. That hops into core and makes a `new SharedCache(view)` core object (every time, yes) that holds a bv member
- * variable
- * 3. Deserializes information from that BinaryView.
- * 4. Does this api call require reading the original cache? Then map VM pages
- * 5. Do your stuff, save any changes to the BinaryView's metadata
- * 6. Unmap VM pages (freeing file pointers, making sure this SharedCache object doesnt leak, etc)
- * 7. Return
+ * The SharedCache api object is a 'Controller' that serializes its own state in view metadata.
  *
- * Since we do everything properly (mmaped files, etc) this is not actually that slow. It can handle being done for
- * 		several context menu items without visual lag.
+ * It is multithreading capable (multiple SharedCache objects can exist and do things on different threads, it will manage)
+ *
+ * View state is saved to BinaryView any time it changes, however due to json deser speed we must also cache it on heap.
+ *	This cache is 'load bearing' and controllers on other threads may serialize it back to view after making changes, so it
+ *	must be kept up to date.
  *
  *
- * 	Strategy notes:
- *
- * 	While it is probably faster to map a file and read out metadata direct from disk,
- * 		this results in an extreme amount of duplicate code.
- *
- * 	So, we try to pre-load a ton of metadata out of the cache and store it on the view, for developer sanity reasons.
- *
- * 	For performance reasons related to serdes speeds we cache this view metadata deserialized, per application lifetime.
- * 	We could probably clear this when the file is closed?
  *
  * */
 
