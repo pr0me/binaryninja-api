@@ -814,6 +814,14 @@ Ref<Settings> DSCViewType::GetLoadSettingsForData(BinaryView* data)
 		"description" : "Processes CoreFoundation strings, applying string values from encoded metadata"
 		})");
 
+	settings->RegisterSetting("loader.dsc.autoLoadLibSystem",
+		R"({
+		"title" : "Auto-Load libSystem",
+		"type" : "boolean",
+		"default" : true,
+		"description" : "Whether to automatically load libsystem_c.dylib. This image contains frequently used noreturn symbols, and not loading it will result in frequently incorrect control flows."
+		})");
+
 	settings->RegisterSetting("loader.dsc.processObjC",
 		R"({
 		"title" : "Process Objective-C Metadata",

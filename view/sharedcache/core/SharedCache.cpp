@@ -1392,18 +1392,26 @@ SharedCache::SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView) : m_
 				m_logger->LogError("Failed to perform initial load of Shared Cache");
 			}
 
-			for (const auto& [_, header] : m_headers)
+			auto settings = m_dscView->GetLoadSettings(VIEW_NAME);
+			bool autoLoadLibsystem = true;
+			if (settings && settings->Contains("loader.dsc.autoLoadLibSystem"))
 			{
-				if (header.installName.find("libsystem_c.dylib") != std::string::npos)
+				autoLoadLibsystem = settings->Get<bool>("loader.dsc.autoLoadLibSystem", m_dscView);
+			}
+			if (autoLoadLibsystem)
+			{
+				for (const auto& [_, header] : m_headers)
 				{
-					lock.unlock();
-					m_logger->LogInfo("Loading core libsystem_c.dylib library");
-					LoadImageWithInstallName(header.installName);
-					lock.lock();
-					break ;
+					if (header.installName.find("libsystem_c.dylib") != std::string::npos)
+					{
+						lock.unlock();
+						m_logger->LogInfo("Loading core libsystem_c.dylib library");
+						LoadImageWithInstallName(header.installName);
+						lock.lock();
+						break;
+					}
 				}
 			}
-
 			m_viewState = DSCViewStateLoaded;
 			SaveToDSCView();
 		}
