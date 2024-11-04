@@ -76,6 +76,7 @@ impl Matcher {
         let user_dir = binaryninja::user_directory().unwrap();
         let root_user_sig_dir = user_dir.join("signatures");
         let plat_user_sig_dir = root_user_sig_dir.join(&platform_name);
+        // If the dir has not been created, create it.
         let user_data = get_data_from_dir(&plat_user_sig_dir);
 
         data.extend(user_data);

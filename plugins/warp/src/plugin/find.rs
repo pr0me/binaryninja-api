@@ -47,7 +47,7 @@ impl Command for FindFunctionFromGUID {
             } else {
                 for (func, _) in matched {
                     log::info!("Match found at function... 0x{:0x}", func.start());
-                }   
+                }
             }
 
             background_task.finish();

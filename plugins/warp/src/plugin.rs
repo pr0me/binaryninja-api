@@ -1,20 +1,19 @@
 use log::LevelFilter;
 
-use crate::{build_function, cache};
 use crate::cache::{
     register_cache_destructor, ViewID, FUNCTION_CACHE, GUID_CACHE, MATCHED_FUNCTION_CACHE,
 };
 use crate::convert::{to_bn_symbol_at_address, to_bn_type};
 use crate::matcher::{invalidate_function_matcher_cache, Matcher, PlatformID, PLAT_MATCHER_CACHE};
+use crate::{build_function, cache};
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::{Command, FunctionCommand};
 use binaryninja::function::{Function, FunctionUpdateType};
 use binaryninja::rc::Ref;
 use binaryninja::tags::TagType;
-use warp::signature::function::Function as WarpFunction;
 use binaryninja::ObjectDestructor;
+use warp::signature::function::Function as WarpFunction;
 
-mod apply;
 mod copy;
 mod create;
 mod find;
@@ -82,7 +81,10 @@ impl FunctionCommand for DebugMatcher {
         if let Some(possible_matches) = matcher.functions.get(&func.guid) {
             log::info!("{:#?}", possible_matches.value());
         } else {
-            log::error!("No possible matches found for the function 0x{:x}", function.start());
+            log::error!(
+                "No possible matches found for the function 0x{:x}",
+                function.start()
+            );
         };
     }
 
@@ -169,7 +171,6 @@ pub extern "C" fn CorePluginInit() -> bool {
         DebugInvalidateCache {},
     );
 
-
     binaryninja::command::register_for_function(
         "WARP\\Debug\\Function Signature",
         "Print the entire signature for the function",
@@ -205,12 +206,6 @@ pub extern "C" fn CorePluginInit() -> bool {
         "Generates a signature file containing all binary view functions",
         create::CreateSignatureFile {},
     );
-
-    // binaryninja::command::register(
-    //     "WARP\\Apply Signature File",
-    //     "Applies a signature file to the current view",
-    //     apply::ApplySignatureFile {},
-    // );
 
     true
 }
