@@ -1616,7 +1616,7 @@ bool SharedCache::LoadSectionAtAddress(uint64_t address)
 				m_dscView->GetParentView()->AddAutoSegment(rawViewEnd, dyldData.size, rawViewEnd, dyldData.size,
 					SegmentReadable);
 				m_dscView->AddUserSegment(dyldData.start, dyldData.size, rawViewEnd, dyldData.size, SegmentReadable);
-				m_dscView->AddUserSection(name, dyldData.start, dyldData.size, ReadOnlyCodeSectionSemantics);
+				m_dscView->AddUserSection(name, dyldData.start, dyldData.size, ReadOnlyDataSectionSemantics);
 				m_dscView->WriteBuffer(dyldData.start, *buff);
 
 				dyldData.loaded = true;
