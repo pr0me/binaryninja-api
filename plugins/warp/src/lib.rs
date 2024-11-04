@@ -1,10 +1,12 @@
-use binaryninja::architecture::Architecture;
+use binaryninja::architecture::{
+    Architecture, ImplicitRegisterExtend, Register as BNRegister, RegisterInfo,
+};
 use binaryninja::basicblock::BasicBlock as BNBasicBlock;
 use binaryninja::binaryview::BinaryViewExt;
 use binaryninja::function::{Function as BNFunction, NativeBlock};
 use binaryninja::llil;
 use binaryninja::llil::{
-    ExprInfo, FunctionMutability, InstrInfo, NonSSA, NonSSAVariant, VisitorAction,
+    ExprInfo, FunctionMutability, InstrInfo, NonSSA, NonSSAVariant, Register, VisitorAction,
 };
 use binaryninja::rc::Ref as BNRef;
 use warp::signature::basic_block::{BasicBlock, BasicBlockGUID};
@@ -85,16 +87,25 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
     let arch = func.arch();
     let max_instr_len = arch.max_instr_len();
 
-    // NOPs and useless moves are blacklisted to allow for hot-patched functions.
+    // NOPs and useless moves are blacklisted to allow for hot-patchable functions.
     let is_blacklisted_instr = |info: InstrInfo<A, M, NonSSA<V>>| {
         match info {
             InstrInfo::Nop(_) => true,
             InstrInfo::SetReg(op) => {
                 match op.source_expr().info() {
                     ExprInfo::Reg(source_op) if op.dest_reg() == source_op.source_reg() => {
-                        // Setting a register to itself, this is a no op
-                        // i.e. mov edi, edi
-                        true
+                        match op.dest_reg() {
+                            Register::ArchReg(r) => {
+                                // If this register has no implicit extend then we can safely assume it's a NOP.
+                                // Ex. on x86_64 we don't want to remove `mov edi, edi` as it will zero the upper 32 bits.
+                                // Ex. on x86 we do want to remove `mov edi, edi` as it will not have a side effect like above.
+                                matches!(
+                                    r.info().implicit_extend(),
+                                    ImplicitRegisterExtend::NoExtend
+                                )
+                            }
+                            Register::Temp(_) => false,
+                        }
                     }
                     _ => false,
                 }
@@ -113,10 +124,10 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
                 // If instruction is blacklisted don't include the bytes.
                 if !is_blacklisted_instr(instr_llil.info()) {
                     if instr_llil.visit_tree(&mut |_expr, expr_info| match expr_info {
-                        ExprInfo::ConstPtr(op) if view.segment_at(op.value()).is_some()  => {
+                        ExprInfo::ConstPtr(op) if view.segment_at(op.value()).is_some() => {
                             // Constant Pointer must be in a segment for it to be relocatable.
                             VisitorAction::Halt
-                        },
+                        }
                         ExprInfo::ExternPtr(_) => VisitorAction::Halt,
                         _ => VisitorAction::Descend,
                     }) == VisitorAction::Halt
