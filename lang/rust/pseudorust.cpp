@@ -37,6 +37,7 @@ void PseudoRustFunction::BeginLines(const HighLevelILInstruction& instr, HighLev
 	if (instr.exprIndex == m_highLevelIL->GetRootExpr().exprIndex)
 	{
 		// At top level, add braces around the entire function
+		tokens.PrependCollapseIndicator();
 		tokens.AppendOpenBrace();
 		tokens.NewLine();
 		tokens.IncreaseIndent();
@@ -51,6 +52,7 @@ void PseudoRustFunction::EndLines(const HighLevelILInstruction& instr, HighLevel
 		// At top level, add braces around the entire function
 		tokens.NewLine();
 		tokens.DecreaseIndent();
+		tokens.PrependCollapseIndicator();
 		tokens.AppendCloseBrace();
 	}
 }
