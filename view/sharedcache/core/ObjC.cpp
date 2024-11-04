@@ -889,6 +889,11 @@ void DSCObjCProcessor::ReadIvarList(VMReader* reader, ClassBase& cls, std::strin
 	head.count = reader->Read32();
 	auto addressSize = m_data->GetAddressSize();
 	DefineObjCSymbol(DataSymbol, m_typeNames.ivarList, "ivar_list_" + name, start, true);
+	if (head.count > 0x1000)
+	{
+		m_logger->LogError("Ivar list at 0x%llx has an invalid count of 0x%llx", start, head.count);
+		return;
+	}
 	for (unsigned i = 0; i < head.count; i++)
 	{
 		try
