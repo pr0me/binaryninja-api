@@ -73,7 +73,7 @@ class DataRenderer:
 				DataRenderer.__init__(self)
 			def perform_is_valid_for_data(self, ctxt, view, addr, type, context):
 				return DataRenderer.is_type_of_struct_name(type, "BAR", context)
-			def perform_get_lines_for_data(self, ctxt, view, addr, type, prefix, width, context):
+			def perform_get_lines_for_data(self, ctxt, view, addr, type, prefix, width, context, language):
 				prefix.append(InstructionTextToken(InstructionTextTokenType.TextToken, "I'm in ur BAR"))
 				return [DisassemblyTextLine(prefix, addr)]
 			def __del__(self):
@@ -130,7 +130,7 @@ class DataRenderer:
 			log_error(traceback.format_exc())
 			return False
 
-	def _get_lines_for_data(self, ctxt, view, addr, type, prefix, prefixCount, width, count, typeCtx, ctxCount):
+	def _get_lines_for_data(self, ctxt, view, addr, type, prefix, prefixCount, width, count, typeCtx, ctxCount, language):
 		try:
 			file_metadata = filemetadata.FileMetadata(handle=core.BNGetFileForView(view))
 			view = binaryview.BinaryView(file_metadata=file_metadata, handle=core.BNNewViewReference(view))
@@ -143,7 +143,7 @@ class DataRenderer:
 				    TypeContext(types.Type.create(core.BNNewTypeReference(typeCtx[i].type)), typeCtx[i].offset)
 				)
 
-			result = self.perform_get_lines_for_data(ctxt, view, addr, type, prefixTokens, width, pycontext)
+			result = self.perform_get_lines_for_data(ctxt, view, addr, type, prefixTokens, width, pycontext, language)
 
 			count[0] = len(result)
 			self.line_buf = (core.BNDisassemblyTextLine * len(result))()
@@ -185,7 +185,7 @@ class DataRenderer:
 	def perform_is_valid_for_data(self, ctxt, view, addr, type, context):
 		return False
 
-	def perform_get_lines_for_data(self, ctxt, view, addr, type, prefix, width, context):
+	def perform_get_lines_for_data(self, ctxt, view, addr, type, prefix, width, context, language):
 		return []
 
 	def __del__(self):
