@@ -143,7 +143,9 @@ class DataRenderer:
 				    TypeContext(types.Type.create(core.BNNewTypeReference(typeCtx[i].type)), typeCtx[i].offset)
 				)
 
-			result = self.perform_get_lines_for_data(ctxt, view, addr, type, prefixTokens, width, pycontext, language)
+			result = self.perform_get_lines_for_data_with_language(
+				ctxt, view, addr, type, prefixTokens, width, pycontext, language
+			)
 
 			count[0] = len(result)
 			self.line_buf = (core.BNDisassemblyTextLine * len(result))()
@@ -185,8 +187,11 @@ class DataRenderer:
 	def perform_is_valid_for_data(self, ctxt, view, addr, type, context):
 		return False
 
-	def perform_get_lines_for_data(self, ctxt, view, addr, type, prefix, width, context, language):
+	def perform_get_lines_for_data(self, ctxt, view, addr, type, prefix, width, context):
 		return []
+
+	def perform_get_lines_for_data_with_language(self, ctxt, view, addr, type, prefix, width, context, language):
+		return self.perform_get_lines_for_data(ctxt, view, addr, type, prefix, width, context)
 
 	def __del__(self):
 		pass
