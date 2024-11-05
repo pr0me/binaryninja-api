@@ -25,6 +25,8 @@ DSCCacheBlocksView::DSCCacheBlocksView(QWidget* parent, BinaryViewRef data, Ref<
 {
 	setMouseTracking(true);
 	m_backingCacheCount = SharedCacheAPI::SharedCache::FastGetBackingCacheCount(data);
+	if (m_backingCacheCount == 0)
+		return;
 	m_blockLuminance.resize(m_backingCacheCount, 128);
 	m_blockSizeRatios.resize(m_backingCacheCount, 1);
 	m_currentProgress = m_cache->GetLoadProgress(data);
