@@ -64,7 +64,8 @@ CompleteObjectLocator::CompleteObjectLocator(BinaryView *view, uint64_t address)
     if (signature == COL_SIG_REV1)
     {
         pSelf = static_cast<int32_t>(reader.Read32());
-    } else
+    }
+    else
     {
         pSelf = 0;
     }
@@ -655,7 +656,8 @@ void MicrosoftRTTIProcessor::ProcessRTTI()
                     if (auto classInfo = ProcessRTTI(coLocatorAddr))
                         m_classInfo[coLocatorAddr] = classInfo.value();
                 }
-            } else if (sigVal == COL_SIG_REV0)
+            }
+            else if (sigVal == COL_SIG_REV0)
             {
                 // Check ?AV
                 optReader.SeekRelative(8);
@@ -687,7 +689,8 @@ void MicrosoftRTTIProcessor::ProcessRTTI()
         {
             m_logger->LogDebug("Attempting to find VirtualFunctionTables in segment %llx", segment->GetStart());
             scan(segment);
-        } else if (checkWritableRData && rdataSection && rdataSection->GetStart() == segment->GetStart())
+        }
+        else if (checkWritableRData && rdataSection && rdataSection->GetStart() == segment->GetStart())
         {
             m_logger->LogDebug("Attempting to find VirtualFunctionTables in writable rdata segment %llx",
                                segment->GetStart());
@@ -742,7 +745,8 @@ void MicrosoftRTTIProcessor::ProcessVFT()
             {
                 m_logger->LogDebug("Attempting to find VirtualFunctionTables in segment %llx", segment->GetStart());
                 scan(segment);
-            } else if (checkWritableRData && rdataSection && rdataSection->GetStart() == segment->GetStart())
+            }
+            else if (checkWritableRData && rdataSection && rdataSection->GetStart() == segment->GetStart())
             {
                 m_logger->LogDebug("Attempting to find VirtualFunctionTables in writable rdata segment %llx",
                                    segment->GetStart());
