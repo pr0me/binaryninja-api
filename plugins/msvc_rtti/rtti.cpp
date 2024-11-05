@@ -75,7 +75,10 @@ std::optional<CompleteObjectLocator> ReadCompleteObjectorLocator(BinaryView *vie
 {
     auto coLocator = CompleteObjectLocator(view, address);
     uint64_t startAddr = view->GetOriginalImageBase();
-    uint64_t endAddr = view->GetEnd();
+
+    auto outsideSection = [&](uint64_t addr) {
+        return view->GetSectionsAt(addr).empty();
+    };
 
     if (coLocator.signature > 1)
         return std::nullopt;
@@ -86,18 +89,19 @@ std::optional<CompleteObjectLocator> ReadCompleteObjectorLocator(BinaryView *vie
             return std::nullopt;
 
         // Relative addrs
-        if (coLocator.pTypeDescriptor + startAddr > endAddr)
+        if (outsideSection(coLocator.pTypeDescriptor + startAddr))
             return std::nullopt;
 
-        if (coLocator.pClassHeirarchyDescriptor + startAddr > endAddr)
+        if (outsideSection(coLocator.pClassHeirarchyDescriptor + startAddr))
             return std::nullopt;
-    } else
+    }
+    else
     {
         // Absolute addrs
-        if (coLocator.pTypeDescriptor < startAddr || coLocator.pTypeDescriptor > endAddr)
+        if (outsideSection(coLocator.pTypeDescriptor))
             return std::nullopt;
 
-        if (coLocator.pClassHeirarchyDescriptor < startAddr || coLocator.pClassHeirarchyDescriptor > endAddr)
+        if (outsideSection(coLocator.pClassHeirarchyDescriptor))
             return std::nullopt;
     }
 
