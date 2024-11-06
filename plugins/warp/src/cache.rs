@@ -296,10 +296,7 @@ impl GUIDCache {
                 self.cache.insert(function_id, function_guid);
                 function_guid
             }
-            TryResult::Locked => {
-                log::warn!("Failed to acquire function guid cache");
-                function_guid(function, llil)
-            }
+            TryResult::Locked => function_guid(function, llil),
         }
     }
 
