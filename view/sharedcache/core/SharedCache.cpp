@@ -155,7 +155,7 @@ uint64_t SharedCache::FastGetBackingCacheCount(BinaryNinja::Ref<BinaryNinja::Bin
 		baseFile = MMappedFileAccessor::Open(dscView, dscView->GetFile()->GetSessionId(), dscView->GetFile()->GetOriginalFilename())->lock();
 	}
 	catch (...){
-		LogError("SharedCache preload: Failed to open file");
+		LogError("SharedCache preload: Failed to open file %s", dscView->GetFile()->GetOriginalFilename().c_str());
 		return 0;
 	}
 
@@ -261,7 +261,7 @@ void SharedCache::PerformInitialLoad()
 		dyld_cache_mapping_info mapping {};
 		BackingCache cache;
 		cache.isPrimary = true;
-		cache.path = baseFile->Path();
+		cache.path = path;
 
 		for (size_t i = 0; i < primaryCacheHeader.mappingCount; i++)
 		{
@@ -329,7 +329,7 @@ void SharedCache::PerformInitialLoad()
 
 		BackingCache cache;
 		cache.isPrimary = true;
-		cache.path = baseFile->Path();
+		cache.path = path;
 
 		for (size_t i = 0; i < primaryCacheHeader.mappingCount; i++)
 		{
@@ -440,7 +440,7 @@ void SharedCache::PerformInitialLoad()
 											 // briefly.
 		BackingCache cache;
 		cache.isPrimary = true;
-		cache.path = baseFile->Path();
+		cache.path = path;
 
 		for (size_t i = 0; i < primaryCacheHeader.mappingCount; i++)
 		{
@@ -566,7 +566,7 @@ void SharedCache::PerformInitialLoad()
 
 		BackingCache cache;
 		cache.isPrimary = true;
-		cache.path = baseFile->Path();
+		cache.path = path;
 
 		for (size_t i = 0; i < primaryCacheHeader.mappingCount; i++)
 		{

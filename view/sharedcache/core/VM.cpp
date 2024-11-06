@@ -110,6 +110,11 @@ std::string ResolveFilePath(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView, c
 		}
 	}
 
+	if (dscView->GetFile()->GetProjectFile())
+	{
+		BinaryNinja::LogError("Failed to resolve file path for %s", path.c_str());
+	}
+
 	// If we couldn't find a sibling filename, just return the path we were given
 	return path;
 }
