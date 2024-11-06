@@ -130,18 +130,26 @@ fn data_from_archive<R: Read>(mut archive: Archive<R>) -> Option<Data> {
 }
 
 fn data_from_directory(dir: PathBuf) -> Option<Data> {
-    let unmerged_data = WalkDir::new(dir)
+    let files = WalkDir::new(dir)
         .into_iter()
         .filter_map(|e| {
             let path = e.ok()?.into_path();
             if path.is_file() {
-                log::info!("Creating data for FILE {:?}...", path);
-                data_from_file(&path)
+                Some(path)
             } else {
                 None
             }
         })
         .collect::<Vec<_>>();
+
+    let unmerged_data = files
+        .into_par_iter()
+        .filter_map(|path| {
+            log::debug!("Creating data for FILE {:?}...", path);
+            data_from_file(&path)
+        })
+        .collect::<Vec<_>>();
+
     if !unmerged_data.is_empty() {
         Some(Data::merge(&unmerged_data))
     } else {
