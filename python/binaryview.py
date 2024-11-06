@@ -4663,10 +4663,10 @@ class BinaryView:
 		"""
 		``update_analysis`` asynchronously starts the analysis process and returns immediately.
 
-		Call ``update_analysis`` after making changes that could affect the analysis results,
-		such as adding or modifying functions. This ensures that the analysis is updated to
-		reflect the latest changes. The analysis runs in the background, allowing other operations
-		to continue.
+		**Usage**:
+		Call ``update_analysis`` after making changes that could affect the analysis results, such as adding or modifying
+		functions. This ensures that the analysis is updated to reflect the latest changes. The analysis runs in the background,
+		allowing other operations to continue.
 
 		:rtype: None
 		"""
@@ -4674,8 +4674,21 @@ class BinaryView:
 
 	def update_analysis_and_wait(self) -> None:
 		"""
-		``update_analysis_and_wait`` blocking call to update the analysis, this call returns when the analysis is
-		complete. An analysis update **must** be run after changes are made which could change analysis results such as adding functions.
+		``update_analysis_and_wait`` starts the analysis process and blocks until it is complete. This method should be
+		used when it is necessary to ensure that analysis results are fully updated before proceeding with further operations.
+		If an update is already in progress, this method chains a new update request to ensure that the update processes
+		all pending changes before the call was made.
+
+		**Usage**:
+		Call ``update_analysis_and_wait`` after making changes that could affect the analysis results, such as adding or modifying
+		functions, to ensure that the analysis reflects the latest changes. Unlike ``update_analysis``, this method waits for the
+		analysis to finish before returning.
+
+		**Thread Restrictions**:
+		- **Worker Threads**: This function cannot be called from a worker thread. If called from a worker thread, an error will be
+		logged, and the function will return immediately.
+		- **UI Threads**: This function cannot be called from a UI thread. If called from a UI thread, an error will be logged, and
+		the function will return immediately.
 
 		:rtype: None
 		"""
