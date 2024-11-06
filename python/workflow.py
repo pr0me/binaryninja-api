@@ -715,6 +715,13 @@ class WorkflowMachine:
 		else:
 			return json.loads(core.BNPostWorkflowRequestForBinaryView(self.handle, request))
 
+	def delay(self, duration):
+		request = json.dumps({"command": "delay", "duration": duration})
+		if self.is_function_machine:
+			return json.loads(core.BNPostWorkflowRequestForFunction(self.handle, request))
+		else:
+			return json.loads(core.BNPostWorkflowRequestForBinaryView(self.handle, request))
+
 	def request(self, request):
 		if self.is_function_machine:
 			return json.loads(core.BNPostWorkflowRequestForFunction(self.handle, request))
