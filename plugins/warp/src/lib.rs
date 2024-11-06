@@ -129,6 +129,14 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
                             VisitorAction::Halt
                         }
                         ExprInfo::ExternPtr(_) => VisitorAction::Halt,
+                        ExprInfo::Const(op)
+                            if !view.functions_at(op.value()).is_empty()
+                                || view.data_variable_at_address(op.value()).is_some() =>
+                        {
+                            // Constant Pointer promotion for Constants that would be promoted at MLIL.
+                            // If the value backs a symbol than we are eagerly masking for the sake of simplicity.
+                            VisitorAction::Halt
+                        }
                         _ => VisitorAction::Descend,
                     }) == VisitorAction::Halt
                     {
