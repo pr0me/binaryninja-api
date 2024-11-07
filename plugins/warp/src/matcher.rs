@@ -1,5 +1,4 @@
 use binaryninja::architecture::Architecture as BNArchitecture;
-use binaryninja::backgroundtask::BackgroundTask;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::function::Function as BNFunction;
 use binaryninja::platform::Platform;
@@ -82,13 +81,13 @@ impl Matcher {
     }
 
     pub fn from_data(data: Data) -> Self {
-        let functions = data
-            .functions
-            .into_iter()
-            .fold(DashMap::new(), |map, func| {
-                map.entry(func.guid).or_insert_with(Vec::new).push(func);
+        let functions = data.functions.into_iter().fold(
+            DashMap::new(),
+            |map: DashMap<FunctionGUID, Vec<_>>, func| {
+                map.entry(func.guid).or_default().push(func);
                 map
-            });
+            },
+        );
         let types = data
             .types
             .iter()
@@ -109,9 +108,9 @@ impl Matcher {
     }
 
     pub fn extend_with_matcher(&mut self, matcher: Matcher) {
-        self.functions.extend(matcher.functions.into_iter());
-        self.types.extend(matcher.types.into_iter());
-        self.named_types.extend(matcher.named_types.into_iter());
+        self.functions.extend(matcher.functions);
+        self.types.extend(matcher.types);
+        self.named_types.extend(matcher.named_types);
     }
 
     pub fn add_type_to_view<A: BNArchitecture>(&self, view: &BinaryView, arch: &A, ty: &Type) {
@@ -368,7 +367,7 @@ impl MatcherSettings {
         );
     }
 
-    pub fn from_view(view: &BinaryView) -> Self {
+    pub fn from_view(_view: &BinaryView) -> Self {
         let mut settings = MatcherSettings::default();
         let bn_settings = binaryninja::settings::Settings::new("");
         if bn_settings.contains(Self::TRIVIAL_FUNCTION_LEN_SETTING) {

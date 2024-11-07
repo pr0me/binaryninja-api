@@ -36,7 +36,7 @@ impl Command for FindFunctionFromGUID {
             let matched = funcs
                 .par_iter()
                 .filter(|func| {
-                    try_cached_function_guid(&func).is_some_and(|guid| guid == searched_guid)
+                    try_cached_function_guid(func).is_some_and(|guid| guid == searched_guid)
                 })
                 .collect::<Vec<BNGuard<BNFunction>>>();
 
