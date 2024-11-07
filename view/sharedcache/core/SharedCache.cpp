@@ -155,7 +155,7 @@ uint64_t SharedCache::FastGetBackingCacheCount(BinaryNinja::Ref<BinaryNinja::Bin
 		baseFile = MMappedFileAccessor::Open(dscView, dscView->GetFile()->GetSessionId(), dscView->GetFile()->GetOriginalFilename())->lock();
 	}
 	catch (...){
-		LogError("SharedCache preload: Failed to open file %s", dscView->GetFile()->GetOriginalFilename().c_str());
+		LogError("Shared Cache preload: Failed to open file %s", dscView->GetFile()->GetOriginalFilename().c_str());
 		return 0;
 	}
 

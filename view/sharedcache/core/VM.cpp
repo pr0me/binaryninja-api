@@ -301,7 +301,7 @@ void MMappedFileAccessor::InitialVMSetup()
 #endif
 		}
 	}
-	BinaryNinja::LogInfo("SharedCache processing initialized with a max file pointer limit of 0x%llx", maxFPLimit);
+	BinaryNinja::LogInfo("Shared Cache processing initialized with a max file pointer limit of 0x%llx", maxFPLimit);
 	fileAccessorSemaphore.set_count(maxFPLimit);
 }
 

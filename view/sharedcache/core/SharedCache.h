@@ -1032,13 +1032,13 @@ namespace SharedCacheCore {
 			{
 				if (m_activeDeserContext.doc["metadataVersion"].GetUint() != METADATA_VERSION)
 				{
-					m_logger->LogError("SharedCache metadata version mismatch");
+					m_logger->LogError("Shared Cache metadata version mismatch");
 					return;
 				}
 			}
 			else
 			{
-				m_logger->LogError("SharedCache metadata version missing");
+				m_logger->LogError("Shared Cache metadata version missing");
 				return;
 			}
 			m_viewState = MSL_CAST(m_viewState, uint8_t, DSCViewState);
