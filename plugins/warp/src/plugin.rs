@@ -17,6 +17,7 @@ use warp::signature::function::Function as WarpFunction;
 mod copy;
 mod create;
 mod find;
+mod load;
 mod types;
 mod workflow;
 
@@ -188,6 +189,11 @@ pub extern "C" fn CorePluginInit() -> bool {
         "Load all types from a signature file and ignore functions",
         types::LoadTypes {},
     );
+
+    binaryninja::command::register(
+        "WARP\\Load Signature File",
+        "Load file into the matcher, this does NOT kick off matcher analysis",
+        load::LoadSignatureFile {},
     );
 
     binaryninja::command::register_for_function(

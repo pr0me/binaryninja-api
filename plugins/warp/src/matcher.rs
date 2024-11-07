@@ -22,9 +22,6 @@ use crate::cache::{cached_call_site_constraints, cached_function_match, try_cach
 use crate::convert::to_bn_type;
 use crate::plugin::on_matched_function;
 
-// TODO: Make this configurable.
-pub const TRIVIAL_FUNCTION_DELTA_THRESHOLD: u64 = 20;
-
 pub static PLAT_MATCHER_CACHE: OnceLock<DashMap<PlatformID, Matcher>> = OnceLock::new();
 
 pub fn cached_function_matcher(function: &BNFunction) {
@@ -47,7 +44,11 @@ pub fn invalidate_function_matcher_cache() {
     matcher_cache.clear();
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct Matcher {
+    // TODO: Storing the settings here means that they are effectively global.
+    // TODO: If we want scoped or view settings they must be moved out.
+    pub settings: MatcherSettings,
     pub functions: DashMap<FunctionGUID, Vec<Function>>,
     pub types: DashMap<TypeGUID, Type>,
     pub named_types: DashMap<String, Type>,
@@ -57,11 +58,6 @@ impl Matcher {
     /// Create a matcher from the platforms signature subdirectory.
     pub fn from_platform(platform: BNRef<Platform>) -> Self {
         let platform_name = platform.name().to_string();
-        let task = BackgroundTask::new(
-            format!("Getting platform matcher data... {}", platform_name),
-            false,
-        )
-        .unwrap();
         // Get core signatures for the given platform
         let install_dir = binaryninja::install_directory().unwrap();
         let core_dir = install_dir.parent().unwrap();
@@ -80,66 +76,42 @@ impl Matcher {
         let user_data = get_data_from_dir(&plat_user_sig_dir);
 
         data.extend(user_data);
-
-        // TODO: If a user signature has the same name as a core signature, remove the core signature.
-
-        task.set_progress_text("Gathering matcher functions...");
-
-        // Get functions for comprehensive matching.
-        let functions = data
-            .iter()
-            .flat_map(|(_, data)| {
-                data.functions.iter().fold(DashMap::new(), |map, func| {
-                    #[allow(clippy::unwrap_or_default)]
-                    map.entry(func.guid)
-                        .or_insert_with(Vec::new)
-                        .push(func.clone());
-                    map
-                })
-            })
-            .map(|(guid, mut funcs)| {
-                funcs.sort_by_key(|f| f.symbol.name.to_owned());
-                funcs.dedup_by_key(|f| f.symbol.name.to_owned());
-                (guid, funcs)
-            })
-            .collect();
-
-        task.set_progress_text("Gathering matcher types...");
-
-        let types = data
-            .iter()
-            .flat_map(|(_, data)| {
-                data.types.iter().fold(DashMap::new(), |map, comp_ty| {
-                    map.insert(comp_ty.guid, comp_ty.ty.clone());
-                    map
-                })
-            })
-            .collect();
-
-        task.set_progress_text("Gathering matcher named types...");
-
-        // TODO: We store a duplicate lookup for named references.
-        let named_types = data
-            .iter()
-            .flat_map(|(_, data)| {
-                data.types.iter().fold(DashMap::new(), |map, comp_ty| {
-                    if let Some(ty_name) = &comp_ty.ty.name {
-                        map.insert(ty_name.to_owned(), comp_ty.ty.clone());
-                    }
-                    map
-                })
-            })
-            .collect();
-
-        task.finish();
-
+        let merged_data = Data::merge(&data.values().cloned().collect::<Vec<_>>());
         log::debug!("Loaded signatures: {:?}", data.keys());
+        Matcher::from_data(merged_data)
+    }
+
+    pub fn from_data(data: Data) -> Self {
+        let functions = data
+            .functions
+            .into_iter()
+            .fold(DashMap::new(), |map, func| {
+                map.entry(func.guid).or_insert_with(Vec::new).push(func);
+                map
+            });
+        let types = data
+            .types
+            .iter()
+            .map(|ty| (ty.guid, ty.ty.clone()))
+            .collect();
+        let named_types = data
+            .types
+            .into_iter()
+            .filter_map(|ty| ty.ty.name.to_owned().map(|name| (name, ty.ty)))
+            .collect();
 
         Self {
+            settings: Default::default(),
             functions,
             types,
             named_types,
         }
+    }
+
+    pub fn extend_with_matcher(&mut self, matcher: Matcher) {
+        self.functions.extend(matcher.functions.into_iter());
+        self.types.extend(matcher.types.into_iter());
+        self.named_types.extend(matcher.named_types.into_iter());
     }
 
     pub fn add_type_to_view<A: BNArchitecture>(&self, view: &BinaryView, arch: &A, ty: &Type) {
@@ -246,7 +218,7 @@ impl Matcher {
             // We have yet to match on this function.
             // TODO: Expand this check to be less broad.
             let function_delta = function.highest_address() - function.lowest_address();
-            let is_function_trivial = { function_delta < TRIVIAL_FUNCTION_DELTA_THRESHOLD };
+            let is_function_trivial = { function_delta < self.settings.trivial_function_len };
             let warp_func_guid = try_cached_function_guid(function)?;
             match self.functions.get(&warp_func_guid) {
                 Some(matched) if matched.len() == 1 && !is_function_trivial => {
@@ -369,6 +341,50 @@ fn get_data_from_dir(dir: &PathBuf) -> HashMap<PathBuf, Data> {
         .filter(|e| e.file_type().is_file())
         .filter_map(|e| Some((e.clone().into_path(), data_from_entry(e)?)))
         .collect()
+}
+
+#[derive(Debug, Clone)]
+pub struct MatcherSettings {
+    /// Any function under this length will be required to constrain.
+    ///
+    /// This is set to [MatcherSettings::DEFAULT_TRIVIAL_FUNCTION_LEN] by default.
+    pub trivial_function_len: u64,
+}
+
+impl MatcherSettings {
+    pub const TRIVIAL_FUNCTION_LEN_DEFAULT: u64 = 20;
+    pub const TRIVIAL_FUNCTION_LEN_SETTING: &'static str = "analysis.warp.trivial_function_len";
+
+    /// Populates the [MatcherSettings] to the current Binary Ninja settings instance.
+    ///
+    /// Call this once when you initialize so that the settings exist.
+    pub fn write_settings(&self) {
+        let bn_settings = binaryninja::settings::Settings::new("");
+        bn_settings.set_integer(
+            Self::TRIVIAL_FUNCTION_LEN_SETTING,
+            self.trivial_function_len,
+            None,
+            None,
+        );
+    }
+
+    pub fn from_view(view: &BinaryView) -> Self {
+        let mut settings = MatcherSettings::default();
+        let bn_settings = binaryninja::settings::Settings::new("");
+        if bn_settings.contains(Self::TRIVIAL_FUNCTION_LEN_SETTING) {
+            settings.trivial_function_len =
+                bn_settings.get_integer(Self::TRIVIAL_FUNCTION_LEN_SETTING, None, None);
+        }
+        settings
+    }
+}
+
+impl Default for MatcherSettings {
+    fn default() -> Self {
+        Self {
+            trivial_function_len: MatcherSettings::TRIVIAL_FUNCTION_LEN_DEFAULT,
+        }
+    }
 }
 
 /// A unique platform ID, used for caching.
