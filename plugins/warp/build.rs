@@ -2,7 +2,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-#[cfg(test)]
+#[cfg(feature = "test")]
 fn compile_rust(file: PathBuf) -> bool {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
     let rustc = std::env::var_os("RUSTC").unwrap();
@@ -28,7 +28,7 @@ fn main() {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "test")]
     {
         let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR specified");
         let out_dir_path = PathBuf::from(out_dir);

@@ -186,7 +186,8 @@ pub extern "C" fn CorePluginInit() -> bool {
     binaryninja::command::register(
         "WARP\\Debug\\Apply Signature File Types",
         "Load all types from a signature file and ignore functions",
-        types::LoadTypesCommand {},
+        types::LoadTypes {},
+    );
     );
 
     binaryninja::command::register_for_function(
