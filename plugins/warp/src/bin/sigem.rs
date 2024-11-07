@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -8,11 +8,15 @@ use clap::{arg, Parser};
 use rayon::prelude::*;
 
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
+use binaryninja::function::Function as BNFunction;
+use binaryninja::rc::Guard as BNGuard;
 use serde_json::json;
 use walkdir::WalkDir;
+use warp::r#type::ComputedType;
 use warp::signature::function::constraints::FunctionConstraint;
 use warp::signature::function::{Function, FunctionGUID};
 use warp::signature::Data;
+use warp_ninja::convert::from_bn_type;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -77,18 +81,23 @@ fn main() {
 
 fn data_from_view(view: &BinaryView) -> Data {
     let mut data = Data::default();
+    let is_function_named = |f: &BNGuard<BNFunction>| {
+        !f.symbol().short_name().as_str().contains("sub_") || f.has_user_annotations()
+    };
 
-    let functions = view
+    data.functions = view
         .functions()
         .iter()
-        .filter(|f| !f.symbol().short_name().as_str().contains("sub_") || f.has_user_annotations())
+        .filter(is_function_named)
         .filter_map(|f| {
             let llil = f.low_level_il().ok()?;
             Some(warp_ninja::cache::cached_function(&f, &llil))
         })
         .collect::<Vec<_>>();
-
-    data.functions = functions;
+    data.types.extend(view.types().iter().map(|ty| {
+        let ref_ty = ty.type_object().to_owned();
+        ComputedType::new(from_bn_type(&view, &ref_ty, u8::MAX))
+    }));
     data
 }
 
@@ -96,17 +105,21 @@ fn data_from_archive<R: Read>(mut archive: Archive<R>) -> Option<Data> {
     // TODO: I feel like this is a hack...
     let temp_dir = tempdir::TempDir::new("tmp_archive").ok()?;
     // Iterate through the entries in the ar file and make a temp dir with them
-    let mut entry_files = Vec::new();
+    let mut entry_files: HashSet<PathBuf> = HashSet::new();
     while let Some(entry) = archive.next_entry() {
         match entry {
             Ok(mut entry) => {
                 let name = String::from_utf8_lossy(entry.header().identifier()).to_string();
                 // Write entry data to a temp directory
-                let output_path = temp_dir.path().join(name);
-                let mut output_file =
-                    File::create(&output_path).expect("Failed to create entry file");
-                std::io::copy(&mut entry, &mut output_file).expect("Failed to read entry data");
-                entry_files.push(output_path);
+                let output_path = temp_dir.path().join(&name);
+                if !entry_files.contains(&output_path) {
+                    let mut output_file =
+                        File::create(&output_path).expect("Failed to create entry file");
+                    std::io::copy(&mut entry, &mut output_file).expect("Failed to read entry data");
+                    entry_files.insert(output_path);
+                } else {
+                    log::debug!("Skipping already inserted entry: {}", name);
+                }
             }
             Err(e) => {
                 log::error!("Failed to read archive entry: {}", e);
@@ -198,7 +211,9 @@ fn data_from_file(path: &Path) -> Option<Data> {
     let settings_json = json!({
         "analysis.linearSweep.autorun": false,
         "analysis.signatureMatcher.autorun": false,
+        // We don't need these
         "analysis.warp.matcher": false,
+        "analysis.warp.guid": false,
         "plugin.msvc.rttiAnalysis": false,
         "plugin.msvc.vftAnalysis": false,
     });
@@ -218,7 +233,9 @@ fn data_from_file(path: &Path) -> Option<Data> {
             let path_str = path.to_str().unwrap();
             let view =
                 binaryninja::load_with_options(path_str, true, Some(settings_json.to_string()))?;
-            Some(data_from_view(&view))
+            let data = data_from_view(&view);
+            view.file().close();
+            Some(data)
         }
     }
 }
@@ -226,6 +243,8 @@ fn data_from_file(path: &Path) -> Option<Data> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use warp::r#type::guid::TypeGUID;
+    use warp_ninja::convert::from_bn_type;
 
     #[test]
     fn test_data_from_file() {
@@ -239,6 +258,58 @@ mod tests {
             if path.is_file() {
                 let result = data_from_file(&path);
                 assert!(result.is_some());
+            }
+        }
+    }
+
+    #[test]
+    fn check_for_leaks() {
+        let session = binaryninja::headless::Session::new();
+        let out_dir = env!("OUT_DIR").parse::<PathBuf>().unwrap();
+        for entry in std::fs::read_dir(out_dir).expect("Failed to read OUT_DIR") {
+            let entry = entry.expect("Failed to read directory entry");
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(inital_bv) = session.load(path.to_str().unwrap()) {
+                    let result = data_from_file(&path);
+                    assert!(result.is_some());
+                    // Hold on to a reference to the core to prevent view getting dropped in worker thread.
+                    let core_ref = inital_bv
+                        .functions()
+                        .iter()
+                        .next()
+                        .map(|f| f.unresolved_stack_adjustment_graph());
+                    // Drop the file and view.
+                    inital_bv.file().close();
+                    std::mem::drop(inital_bv);
+                    let initial_memory_info = binaryninja::memory_info();
+                    if let Some(second_bv) = session.load(path.to_str().unwrap()) {
+                        let result = data_from_file(&path);
+                        assert!(result.is_some());
+                        // Hold on to a reference to the core to prevent view getting dropped in worker thread.
+                        let core_ref = second_bv
+                            .functions()
+                            .iter()
+                            .next()
+                            .map(|f| f.unresolved_stack_adjustment_graph());
+                        // Drop the file and view.
+                        second_bv.file().close();
+                        std::mem::drop(second_bv);
+                        let final_memory_info = binaryninja::memory_info();
+                        for info in initial_memory_info {
+                            let initial_count = info.1;
+                            if let Some(&final_count) = final_memory_info.get(&info.0) {
+                                assert!(
+                                    final_count <= initial_count,
+                                    "{}: final objects {} vs initial objects {}",
+                                    info.0,
+                                    final_count,
+                                    initial_count
+                                );
+                            }
+                        }
+                    }
+                }
             }
         }
     }
