@@ -32,7 +32,7 @@ pub fn build_function<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
     Function {
         guid: cached_function_guid(func, llil),
         symbol: from_bn_symbol(&func.symbol()),
-        ty: from_bn_type(&func.view(), bn_fn_ty, 255),
+        ty: from_bn_type(&func.view(), &bn_fn_ty, 255),
         constraints: FunctionConstraints {
             // NOTE: Adding adjacent only works if analysis is complete.
             adjacent: cached_adjacency_constraints(func),

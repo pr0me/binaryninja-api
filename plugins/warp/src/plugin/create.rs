@@ -38,7 +38,7 @@ impl Command for CreateSignatureFile {
                 }));
             data.types.extend(view.types().iter().map(|ty| {
                 let ref_ty = ty.type_object().to_owned();
-                ComputedType::new(from_bn_type(&view, ref_ty, u8::MAX))
+                ComputedType::new(from_bn_type(&view, &ref_ty, u8::MAX))
             }));
 
             // And type generation :3
