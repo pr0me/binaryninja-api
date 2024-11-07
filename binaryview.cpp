@@ -4726,8 +4726,25 @@ bool BinaryView::GetAddressInput(uint64_t& result, const string& prompt, const s
 }
 
 
-void BinaryView::AddAutoSegment(
-    uint64_t start, uint64_t length, uint64_t dataOffset, uint64_t dataLength, uint32_t flags)
+void BinaryView::BeginBulkAddSegments()
+{
+	BNBeginBulkAddSegments(m_object);
+}
+
+
+void BinaryView::EndBulkAddSegments()
+{
+	BNEndBulkAddSegments(m_object);
+}
+
+
+void BinaryView::CancelBulkAddSegments()
+{
+	BNCancelBulkAddSegments(m_object);
+}
+
+
+void BinaryView::AddAutoSegment(uint64_t start, uint64_t length, uint64_t dataOffset, uint64_t dataLength, uint32_t flags)
 {
 	BNAddAutoSegment(m_object, start, length, dataOffset, dataLength, flags);
 }
@@ -4745,10 +4762,15 @@ void BinaryView::RemoveAutoSegment(uint64_t start, uint64_t length)
 }
 
 
-void BinaryView::AddUserSegment(
-    uint64_t start, uint64_t length, uint64_t dataOffset, uint64_t dataLength, uint32_t flags)
+void BinaryView::AddUserSegment(uint64_t start, uint64_t length, uint64_t dataOffset, uint64_t dataLength, uint32_t flags)
 {
 	BNAddUserSegment(m_object, start, length, dataOffset, dataLength, flags);
+}
+
+
+void BinaryView::AddUserSegments(const vector<BNSegmentInfo>& segments)
+{
+	BNAddUserSegments(m_object, segments.data(), segments.size());
 }
 
 

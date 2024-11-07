@@ -6488,6 +6488,44 @@ namespace BinaryNinja {
 		*/
 		MemoryMap* GetMemoryMap() { return m_memoryMap.get(); }
 
+		/*! Begin a bulk segment addition operation.
+
+			This function prepares the `BinaryView` for bulk addition of both auto and user-defined segments.
+			During the bulk operation, segments can be added using `AddAutoSegment`, `AddAutoSegments`,
+			`AddUserSegment`, or `AddUserSegments` without immediately triggering the MemoryMap update process.
+			The queued segments will not take effect until `EndBulkAddSegments` is called.
+
+			\sa EndBulkAddSegments
+			\sa CancelBulkAddSegments
+		*/
+		void BeginBulkAddSegments();
+
+		/*! Finalize and apply all queued segments (auto and user) added during a bulk segment addition operation.
+
+			This function commits all segments that were queued since the last call to `BeginBulkAddSegments`.
+			The MemoryMap update process is executed at this point, applying all changes in one batch for
+			improved performance.
+
+			\note This function must be called after `BeginBulkAddSegments` to apply the queued segments.
+
+			\sa BeginBulkAddSegments
+			\sa CancelBulkAddSegments
+		*/
+		void EndBulkAddSegments();
+
+		/*! Cancel a bulk segment addition operation.
+
+			This function discards all auto and user segments that were queued since the last call to
+			`BeginBulkAddSegments` without applying them. It allows you to abandon the changes in case
+			they are no longer needed.
+
+			\note If no bulk operation is in progress, calling this function has no effect.
+
+			\sa BeginBulkAddSegments
+			\sa EndBulkAddSegments
+		*/
+		void CancelBulkAddSegments();
+
 		/*! Add an analysis segment that specifies how data from the raw file is mapped into a virtual address space
 
 			Note that the segment added may have different size attributes than requested
@@ -6526,6 +6564,12 @@ namespace BinaryNinja {
 			\param flags Segment r/w/x flags
 		*/
 		void AddUserSegment(uint64_t start, uint64_t length, uint64_t dataOffset, uint64_t dataLength, uint32_t flags);
+
+		/*! Creates user-defined segments that specify how data from the raw file is mapped into a virtual address space
+
+			\param segments Segments to add to the BinaryView
+		*/
+		void AddUserSegments(const std::vector<BNSegmentInfo>& segments);
 
 		/*! Removes a user-defined segment from th current segment mapping
 

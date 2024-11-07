@@ -9080,6 +9080,45 @@ to a the type "tagRECT" found in the typelibrary "winX64common"
 			return None
 		return value.value
 
+	def begin_bulk_add_segments(self) -> None:
+		"""
+		``begin_bulk_add_segments`` Begins a bulk segment addition operation.
+
+		This function prepares the `BinaryView` for bulk addition of both auto and user-defined segments.
+		During the bulk operation, segments can be added using `add_auto_segment` or similar functions
+		without immediately triggering the MemoryMap update process. The queued segments will not take
+		effect until `end_bulk_add_segments` is called.
+		"""
+		core.BNBeginBulkAddSegments(self.handle)
+
+
+	def end_bulk_add_segments(self) -> None:
+		"""
+		``end_bulk_add_segments`` Finalizes and applies all queued segments (auto and user)
+		added during a bulk segment addition operation.
+
+		This function commits all segments that were queued since the last call to `begin_bulk_add_segments`.
+		The MemoryMap update process is executed at this point, applying all changes in one batch for
+		improved performance.
+
+		Note: This function must be called after `begin_bulk_add_segments` to apply the queued segments.
+		"""
+		core.BNEndBulkAddSegments(self.handle)
+
+
+	def cancel_bulk_add_segments(self) -> None:
+		"""
+		``cancel_bulk_add_segments`` Cancels a bulk segment addition operation.
+
+		This function discards all auto and user segments that were queued since the last call to
+		`begin_bulk_add_segments` without applying them. It allows you to abandon the changes in case
+		they are no longer needed.
+
+		Note: If no bulk operation is in progress, calling this function has no effect.
+		"""
+		core.BNCancelBulkAddSegments(self.handle)
+
+
 	def add_auto_segment(self, start: int, length: int, data_offset: int, data_length: int, flags: SegmentFlag) -> None:
 		"""
 		``add_auto_segment`` Adds an analysis segment that specifies how data from the raw file is mapped into a virtual address space
@@ -9092,10 +9131,11 @@ to a the type "tagRECT" found in the typelibrary "winX64common"
 		"""
 		``add_auto_segments`` Adds analysis segments that specify how data from the raw file is mapped into a virtual address space
 
-		Note that the segments added may have different size attributes than requested
+		:param List[core.BNSegmentInfo] segments: list of segments to add
+		:rtype: None
 		"""
-		segment_arr = (core.BNSegmentInfo * len(segments))(*segments)
-		core.BNAddAutoSegments(self.handle, segment_arr, len(segments))
+		segment_list = (core.BNSegmentInfo * len(segments))(*segments)
+		core.BNAddAutoSegments(self.handle, segment_list, len(segments))
 
 	def remove_auto_segment(self, start: int, length: int = 0) -> None:
 		"""
@@ -9122,6 +9162,16 @@ to a the type "tagRECT" found in the typelibrary "winX64common"
 		:rtype: None
 		"""
 		core.BNAddUserSegment(self.handle, start, length, data_offset, data_length, flags)
+
+	def add_user_segments(self, segments: List[core.BNSegmentInfo]) -> None:
+		"""
+		``add_user_segments`` Adds user-defined segments that specify how data from the raw file is mapped into a virtual address space
+
+		:param List[core.BNSegmentInfo] segments: list of segments to add
+		:rtype: None
+		"""
+		segment_list = (core.BNSegmentInfo * len(segments))(*segments)
+		core.BNAddUserSegments(self.handle, segment_list, len(segments))
 
 	def remove_user_segment(self, start: int, length: int = 0) -> None:
 		"""
