@@ -22,7 +22,7 @@
 
     \ingroup taglist
 */
-class BINARYNINJAUIAPI TagListModel : public QAbstractItemModel, public BinaryNinja::BinaryDataNotification
+class BINARYNINJAUIAPI TagListModel : public QAbstractItemModel
 {
 	Q_OBJECT
 
@@ -72,9 +72,6 @@ class BINARYNINJAUIAPI TagListModel : public QAbstractItemModel, public BinaryNi
 	virtual bool setData(const QModelIndex& i, const QVariant& value, int role = Qt::EditRole) override;
 	virtual Qt::ItemFlags flags(const QModelIndex& i) const override;
 	virtual void sort(int column, Qt::SortOrder order) override;
-
-	virtual void OnTagAdded(BinaryNinja::BinaryView*, const BinaryNinja::TagReference&) override;
-	virtual void OnTagRemoved(BinaryNinja::BinaryView*, const BinaryNinja::TagReference&) override;
 
 	bool setModelData(const std::vector<std::pair<TagTypeRef, std::vector<BinaryNinja::TagReference>>>& refs,
 	    QItemSelectionModel* selectionModel, int sortColumn, Qt::SortOrder sortOrder, bool& selectionUpdated);
