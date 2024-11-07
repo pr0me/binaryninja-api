@@ -842,9 +842,51 @@ pub trait BinaryViewExt: BinaryViewBase {
         }
     }
 
+    /// Adds a segment to the view.
+    /// 
+    /// NOTE: Consider using [BinaryViewExt::begin_bulk_add_segments] and [BinaryViewExt::end_bulk_add_segments] 
+    /// if you plan on adding a number of segments all at once, to avoid unnecessary MemoryMap updates.
     fn add_segment(&self, segment: SegmentBuilder) {
         segment.create(self.as_ref());
     }
+    
+    /// Start adding segments in bulk. Useful for adding large numbers of segments.
+    /// 
+    /// After calling this any call to [BinaryViewExt::add_segment] will be uncommited until a call to 
+    /// [BinaryViewExt::end_bulk_add_segments] 
+    /// 
+    /// If you wish to discard the uncommited segments you can call [BinaryViewExt::cancel_bulk_add_segments].
+    /// 
+    /// NOTE: This **must** be paired with a later call to [BinaryViewExt::end_bulk_add_segments] or 
+    /// [BinaryViewExt::cancel_bulk_add_segments], otherwise segments added after this call will stay uncommited.
+    fn begin_bulk_add_segments(&self) {
+        unsafe {
+            BNBeginBulkAddSegments(self.as_ref().handle)
+        }
+    }
+
+    /// Commit all auto and user segments that have been added since the call to [Self::begin_bulk_add_segments].
+    /// 
+    /// NOTE: This **must** be paired with a prior call to [Self::begin_bulk_add_segments], otherwise this
+    /// does nothing and segments are added individually.
+    fn end_bulk_add_segments(&self) {
+        unsafe {
+            BNEndBulkAddSegments(self.as_ref().handle)
+        }
+    }
+
+    /// Flushes the auto and user segments that have yet to be committed.
+    /// 
+    /// This is to be used in conjunction with [Self::begin_bulk_add_segments]
+    /// and [Self::end_bulk_add_segments], where the latter will commit the segments
+    /// which have been added since [Self::begin_bulk_add_segments], this function
+    /// will discard them so that they do not get added to the view.
+    fn cancel_bulk_add_segments(&self) {
+        unsafe {
+            BNCancelBulkAddSegments(self.as_ref().handle)
+        }
+    }
+
 
     fn add_section<S: BnStrCompatible>(&self, section: SectionBuilder<S>) {
         section.create(self.as_ref());
