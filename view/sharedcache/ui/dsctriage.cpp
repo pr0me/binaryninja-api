@@ -813,7 +813,8 @@ DSCTriageView::DSCTriageView(QWidget* parent, BinaryViewRef data) : QWidget(pare
 		// m_triageTabs->addTab(loadedRegionsWidget, "Loaded Regions");
 	} // loadedRegions
 
-
+	m_triageTabs->addTab(cacheInfoWidget, "Cache Info");
+	m_triageTabs->setCanCloseTab(cacheInfoWidget, false);
 
 	// check for alpha popup qsetting
 	QSettings settings;
@@ -823,35 +824,32 @@ DSCTriageView::DSCTriageView(QWidget* parent, BinaryViewRef data) : QWidget(pare
 		tb->setOpenExternalLinks(true);
 		auto alphaHtml =
 			R"(
-<br>
 <h1>Shared Cache Alpha</h1>
 
-<p> This is an experimental alpha release of the sharedcache view! We are hard at work improving this and adding features, but we wanted
+<p> This is an experimental alpha release of the Shared Cache view! We are hard at work improving this and adding features, but we wanted
 to make it available for users to experiment with as soon as possible. </p>
 
 <h2> Platforms </h2>
-<ul>
-	<li> iOS 11-17 (full) </li>
-	<li> iOS 18 (partial, Objective-C optimization parsing is not implemented yet.) May have issues. </li>
-	<li> macOS x86/arm64e (partial, may have issues) </li>
-</ul>
+<dl>
+	<dt> iOS 11-17 </dt><dd> Full Support </dd>
+	<dt> iOS 18 </dt><dd> Partial support, may experience issues -- specifically, Objective-C optimization parsing is not implemented </dd>
+	<dt> macOS x86/arm64e </dt><dd> Partial support, may experience issues </dd>
+</dl>
 
 <p> iOS parsing should work fairly well for now. macOS parsing should be usable, but both are still a work in progress. </p>
-
 <h2> Getting the latest version of the plugin </h2>
-
-<p> We frequently release "dev" builds which will contain the latest version of the SharedCache plugin (and many other things).
-
-You can find instructions on how to install these builds <a href="https://docs.binary.ninja/guide/index.html#development-branch">here</a>. </p>
+<p> We frequently release "dev" builds which will contain the latest version of the Shared Cache plugin (and many other things). </p>
+<p> You can find instructions on how to install these builds <a href="https://docs.binary.ninja/guide/index.html#development-branch">here</a>. </p>
 
 <h3> Reading / building the source </h3>
-<p>You can read the source and find instructions for building it <a href="https://github.com/Vector35/binaryninja-api/tree/dev/view/sharedcache">here</a>.
-
-Contributions are always welcome! </p>
+<p> Like most of our platforms, architectures, debug information parsing, and the entire API and documentation, this plugin is open source. </p>
+<p> You can read the source and find instructions for building it <a href="https://github.com/Vector35/binaryninja-api/tree/dev/view/sharedcache">here</a>. </p>
+<p> Contributions are always welcome! </p>
 )";
 		tb->setHtml(alphaHtml);
 
 		m_triageTabs->addTab(tb, "Shared Cache Alpha");
+		m_triageTabs->setCanCloseTab(tb, false);
 
 	}
 	if (!(settings.contains(QSETTINGS_KEY_ALPHA_POPUP_SEEN) && settings.value(QSETTINGS_KEY_ALPHA_POPUP_SEEN).toBool()))
@@ -862,9 +860,6 @@ Contributions are always welcome! </p>
 	}
 
 	containerWidget->addWidget(m_bottomRegionTabs);
-
-	m_triageTabs->addTab(cacheInfoWidget, "Cache Info");
-	m_triageTabs->setCanCloseTab(cacheInfoWidget, false);
 
 	m_layout = new QVBoxLayout(this);
 	m_layout->addWidget(cacheBlocksView);
