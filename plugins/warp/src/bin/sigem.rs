@@ -19,22 +19,30 @@ use warp::signature::Data;
 use warp_ninja::convert::from_bn_type;
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(about, long_about)]
+/// A simple CLI utility to generate WARP signature files headlessly using Binary Ninja.
+///
+/// NOTE: This requires a headless compatible Binary Ninja, make sure it's in your path.
 struct Args {
-    /// Path of the binary/BNDB to generate signatures of
-    ///
-    /// If you pass a directory all files inside will be used
-    #[arg(index = 1)]
+    /// Path to create signatures from, this can be:
+    /// - A binary (that can be opened with Binary Ninja)
+    /// - A directory (all files will be merged)
+    /// - An archive (with ext: a, lib, rlib)
+    /// - A BNDB
+    /// - A Signature file (sbin)
+    #[arg(index = 1, verbatim_doc_comment)]
     path: PathBuf,
 
     /// The signature output file
+    ///
+    /// NOTE: If not specified the output will be the input path with the sbin extension
+    /// as an example `mylib.a` will output `mylib.sbin`.
     #[arg(index = 2)]
     output: Option<PathBuf>,
 
     /// Should we overwrite output file
     ///
     /// NOTE: If the file exists we will exit early to prevent wasted effort.
-    /// NOTE: If the file is created while we are running it will still be overwritten.
     #[arg(short, long)]
     overwrite: Option<bool>,
 
@@ -60,7 +68,8 @@ fn main() {
 
     log::info!("Creating functions for {:?}...", args.path);
     let start = std::time::Instant::now();
-    let data = data_from_file(&args.path).expect("Failed to read data");
+    let data = data_from_file(&args.path)
+        .expect("Failed to read data, check your license and Binary Ninja version!");
     log::info!("Functions created in {:?}", start.elapsed());
 
     // TODO: Add a way to override the symbol type to make it a different function symbol.
@@ -214,8 +223,6 @@ fn data_from_file(path: &Path) -> Option<Data> {
         // We don't need these
         "analysis.warp.matcher": false,
         "analysis.warp.guid": false,
-        "plugin.msvc.rttiAnalysis": false,
-        "plugin.msvc.vftAnalysis": false,
     });
 
     match path.extension() {
