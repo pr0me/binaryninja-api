@@ -8,7 +8,6 @@ use binaryninja::workflow::{Activity, AnalysisContext, Workflow};
 use std::time::Instant;
 
 pub const MATCHER_ACTIVITY_NAME: &str = "analysis.warp.matcher";
-// NOTE: runOnce is off because previously matched functions need info applied.
 const MATCHER_ACTIVITY_CONFIG: &str = r#"{
     "name": "analysis.warp.matcher",
     "title" : "WARP Matcher",
@@ -35,9 +34,9 @@ pub struct RunMatcher;
 impl Command for RunMatcher {
     fn action(&self, view: &BinaryView) {
         let view = view.to_owned();
-        log::info!("Re-running matcher for {:?}", view);
         // TODO: Check to see if the GUID cache is empty and ask the user if they want to regenerate the guids.
         std::thread::spawn(move || {
+            let undo_id = view.file().begin_undo_actions(true);
             let background_task = BackgroundTask::new("Matching on functions...", false).unwrap();
             let start = Instant::now();
             view.functions()
@@ -45,6 +44,9 @@ impl Command for RunMatcher {
                 .for_each(|function| cached_function_matcher(&function));
             log::info!("Function matching took {:?}", start.elapsed());
             background_task.finish();
+            view.file().commit_undo_actions(undo_id);
+            // Now we want to trigger re-analysis.
+            view.update_analysis();
         });
     }
 
@@ -56,6 +58,7 @@ impl Command for RunMatcher {
 pub fn insert_workflow() {
     let matcher_activity = |ctx: &AnalysisContext| {
         let view = ctx.view();
+        let undo_id = view.file().begin_undo_actions(true);
         let background_task = BackgroundTask::new("Matching on functions...", false).unwrap();
         let start = Instant::now();
         view.functions()
@@ -63,6 +66,7 @@ pub fn insert_workflow() {
             .for_each(|function| cached_function_matcher(&function));
         log::info!("Function matching took {:?}", start.elapsed());
         background_task.finish();
+        view.file().commit_undo_actions(undo_id);
         // Now we want to trigger re-analysis.
         view.update_analysis();
     };
