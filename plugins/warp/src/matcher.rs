@@ -5,9 +5,10 @@ use binaryninja::platform::Platform;
 use binaryninja::rc::Guard;
 use binaryninja::rc::Ref as BNRef;
 use dashmap::DashMap;
+use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::hash::{DefaultHasher, Hasher};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use walkdir::{DirEntry, WalkDir};
@@ -17,7 +18,7 @@ use warp::r#type::Type;
 use warp::signature::function::{Function, FunctionGUID};
 use warp::signature::Data;
 
-use crate::cache::{cached_call_site_constraints, cached_function_match, try_cached_function_guid};
+use crate::cache::{cached_adjacency_constraints, cached_call_site_constraints, cached_function_match, try_cached_function_guid};
 use crate::convert::to_bn_type;
 use crate::plugin::on_matched_function;
 
@@ -100,7 +101,8 @@ impl Matcher {
             .collect();
 
         Self {
-            settings: Default::default(),
+            // NOTE: Settings will be retrieved from global state every time this is called.
+            settings: MatcherSettings::global(),
             functions,
             types,
             named_types,
@@ -187,6 +189,7 @@ impl Matcher {
                     }
 
                     // All nested types _should_ be added now, we can add this type.
+                    // TODO: Do we want to make unnamed types visible? I think we should, but some people might be opposed.
                     let ty_name = ty.name.to_owned().unwrap_or_else(|| ty_id_str.clone());
                     view.define_auto_type_with_id(ty_name, ty_id_str, &to_bn_type(arch, ty));
                 }
@@ -198,7 +201,7 @@ impl Matcher {
 
     pub fn match_function(&self, function: &BNFunction) {
         // Call this the first time you matched on the function.
-        let on_new_match = |matched: &Function| {
+        let resolve_new_types = |matched: &Function| {
             // We also want to resolve the types here.
             if let TypeClass::Function(c) = matched.ty.class.as_ref() {
                 // Recursively go through the function type and resolve referrers
@@ -215,18 +218,22 @@ impl Matcher {
 
         if let Some(matched_function) = cached_function_match(function, || {
             // We have yet to match on this function.
-            // TODO: Expand this check to be less broad.
-            let function_delta = function.highest_address() - function.lowest_address();
-            let is_function_trivial = { function_delta < self.settings.trivial_function_len };
+            let function_len = function.highest_address() - function.lowest_address();
+            let is_function_trivial = { function_len < self.settings.trivial_function_len };
+            let is_function_allowed = {
+                function_len > self.settings.minimum_function_len
+                    && function_len < self.settings.maximum_function_len.unwrap_or(u64::MAX)
+            };
             let warp_func_guid = try_cached_function_guid(function)?;
             match self.functions.get(&warp_func_guid) {
+                _ if !is_function_allowed => None,
                 Some(matched) if matched.len() == 1 && !is_function_trivial => {
-                    on_new_match(&matched[0]);
+                    resolve_new_types(&matched[0]);
                     Some(matched[0].to_owned())
                 }
                 Some(matched) => {
                     let matched_on = self.match_function_from_constraints(function, &matched)?;
-                    on_new_match(matched_on);
+                    resolve_new_types(matched_on);
                     Some(matched_on.to_owned())
                 }
                 None => None,
@@ -241,89 +248,89 @@ impl Matcher {
         function: &BNFunction,
         matched_functions: &'a [Function],
     ) -> Option<&'a Function> {
-        // TODO: To prevent invoking adjacent constraint function analysis, we must call call_site constraints specifically.
         let call_sites = cached_call_site_constraints(function);
+        let adjacent = cached_adjacency_constraints(function);
 
-        // NOTE: We are only matching with call_sites for now, as adjacency requires we run after all analysis has completed.
-        if call_sites.is_empty() {
-            return None;
-        }
-
-        // Check call site guids
-        let mut highest_guid_count = 0;
-        let mut matched_guid_func = None;
-        let call_site_guids = call_sites
-            .iter()
-            .filter_map(|c| c.guid)
-            .collect::<HashSet<_>>();
-        for matched in matched_functions {
-            let matched_call_site_guids = matched
-                .constraints
-                .call_sites
-                .iter()
-                .filter_map(|c| c.guid)
-                .collect::<HashSet<_>>();
-            let common_guid_count = call_site_guids
-                .intersection(&matched_call_site_guids)
-                .count();
-            match common_guid_count.cmp(&highest_guid_count) {
-                Ordering::Equal => {
-                    // Multiple matches with same count, don't match on ONE of them.
-                    matched_guid_func = None;
+        // "common" being the intersection between the observed and matched.
+        fn find_highest_common_count<'a, F, T>(
+            observed_items: &HashSet<T>,
+            matched_functions: &'a [Function],
+            extract_items: F,
+        ) -> (usize, Option<&'a Function>)
+        where
+            F: Fn(&Function) -> HashSet<T>,
+            T: Hash + Eq,
+        {
+            let mut highest_count = 0;
+            let mut matched_func = None;
+            for matched in matched_functions {
+                let matched_items = extract_items(matched);
+                let common_count = observed_items.intersection(&matched_items).count();
+                match common_count.cmp(&highest_count) {
+                    Ordering::Equal => matched_func = None,
+                    Ordering::Greater => {
+                        highest_count = common_count;
+                        matched_func = Some(matched);
+                    }
+                    Ordering::Less => {}
                 }
-                Ordering::Greater => {
-                    highest_guid_count = common_guid_count;
-                    matched_guid_func = Some(matched);
-                }
-                Ordering::Less => {}
             }
+            (highest_count, matched_func)
         }
 
-        // Check call site symbol names
-        let mut highest_symbol_count = 0;
-        let mut matched_symbol_func = None;
-        let call_site_symbol_names = call_sites
+        let call_site_guids: HashSet<_> = call_sites.iter().filter_map(|c| c.guid).collect();
+        let call_site_symbol_names: HashSet<_> = call_sites
             .into_iter()
-            .filter_map(|c| Some(c.symbol?.name))
-            .collect::<HashSet<_>>();
-        for matched in matched_functions {
-            let matched_call_site_symbol_names = matched
-                .constraints
-                .call_sites
-                .iter()
-                .filter_map(|c| Some(c.symbol.to_owned()?.name))
-                .collect::<HashSet<_>>();
-            let common_symbol_count = call_site_symbol_names
-                .intersection(&matched_call_site_symbol_names)
-                .count();
-            match common_symbol_count.cmp(&highest_symbol_count) {
-                Ordering::Equal => {
-                    // Multiple matches with same count, don't match on ONE of them.
-                    matched_symbol_func = None;
-                }
-                Ordering::Greater => {
-                    highest_symbol_count = common_symbol_count;
-                    matched_symbol_func = Some(matched);
-                }
-                Ordering::Less => {}
-            }
-        }
+            .filter_map(|c| c.symbol.map(|s| s.name))
+            .collect();
+        let adjacent_guids: HashSet<_> = adjacent.iter().filter_map(|c| c.guid).collect();
+        let adjacent_symbol_names: HashSet<_> = adjacent
+            .into_iter()
+            .filter_map(|c| c.symbol.map(|s| s.name))
+            .collect();
+        
+        // Ordered from the lowest confidence to the highest confidence constraint.
+        let checked_constraints = [
+            find_highest_common_count(&adjacent_symbol_names, matched_functions, |matched| {
+                matched
+                    .constraints
+                    .adjacent
+                    .iter()
+                    .filter_map(|c| c.symbol.to_owned().map(|s| s.name))
+                    .collect()
+            }),
+            find_highest_common_count(&adjacent_guids, matched_functions, |matched| {
+                matched
+                    .constraints
+                    .adjacent
+                    .iter()
+                    .filter_map(|c| c.guid)
+                    .collect()
+            }),
+            find_highest_common_count(&call_site_symbol_names, matched_functions, |matched| {
+                matched
+                    .constraints
+                    .call_sites
+                    .iter()
+                    .filter_map(|c| c.symbol.to_owned().map(|s| s.name))
+                    .collect()
+            }),
+            find_highest_common_count(&call_site_guids, matched_functions, |matched| {
+                matched
+                    .constraints
+                    .call_sites
+                    .iter()
+                    .filter_map(|c| c.guid)
+                    .collect()
+            }),
+        ];
 
-        match highest_guid_count.cmp(&highest_symbol_count) {
-            Ordering::Less => matched_symbol_func,
-            Ordering::Greater => matched_guid_func,
-            Ordering::Equal => {
-                // If the two highest our the same we can use it.
-                let ty_is_same = matched_guid_func?.ty == matched_symbol_func?.ty;
-                let sym_is_same = matched_guid_func?.symbol == matched_symbol_func?.symbol;
-                if ty_is_same && sym_is_same {
-                    matched_guid_func
-                } else {
-                    // We matched equally on two different functions
-                    None
-                }
-            }
-        }
+        // If there is a tie, the last one wins, which should be call_site guid.
+        checked_constraints
+            .into_iter()
+            .max_by_key(|&(count, _)| count)
+            .filter(|&(count, _)| count >= self.settings.minimum_matched_constraints)
+            .and_then(|(_, func)| func)
     }
 }
 
@@ -348,31 +355,110 @@ pub struct MatcherSettings {
     ///
     /// This is set to [MatcherSettings::DEFAULT_TRIVIAL_FUNCTION_LEN] by default.
     pub trivial_function_len: u64,
+    /// Any function under this length will not match.
+    ///
+    /// This is set to [MatcherSettings::MINIMUM_FUNCTION_LEN_DEFAULT] by default.
+    pub minimum_function_len: u64,
+    /// Any function above this length will not match.
+    ///
+    /// This is set to [MatcherSettings::MAXIMUM_FUNCTION_LEN_DEFAULT] by default.
+    pub maximum_function_len: Option<u64>,
+    /// For a successful constrained function match the number of matches must be above this.
+    ///
+    /// This is set to [MatcherSettings::DEFAULT_TRIVIAL_FUNCTION_LEN] by default.
+    pub minimum_matched_constraints: usize,
 }
 
 impl MatcherSettings {
     pub const TRIVIAL_FUNCTION_LEN_DEFAULT: u64 = 20;
-    pub const TRIVIAL_FUNCTION_LEN_SETTING: &'static str = "analysis.warp.trivial_function_len";
+    pub const TRIVIAL_FUNCTION_LEN_SETTING: &'static str = "analysis.warp.trivialFunctionLength";
+    pub const MINIMUM_FUNCTION_LEN_DEFAULT: u64 = 0;
+    pub const MINIMUM_FUNCTION_LEN_SETTING: &'static str = "analysis.warp.minimumFunctionLength";
+    pub const MAXIMUM_FUNCTION_LEN_DEFAULT: u64 = 0;
+    pub const MAXIMUM_FUNCTION_LEN_SETTING: &'static str = "analysis.warp.maximumFunctionLength";
+    pub const MINIMUM_MATCHED_CONSTRAINTS_DEFAULT: usize = 1;
+    pub const MINIMUM_MATCHED_CONSTRAINTS_SETTING: &'static str =
+        "analysis.warp.minimumMatchedConstraints";
 
     /// Populates the [MatcherSettings] to the current Binary Ninja settings instance.
     ///
     /// Call this once when you initialize so that the settings exist.
-    pub fn write_settings(&self) {
+    /// 
+    /// NOTE: If you are using this as a library then just modify the MatcherSettings directly 
+    /// in the matcher instance, that way you don't need to round-trip through Binary Ninja.
+    pub fn register() {
         let bn_settings = binaryninja::settings::Settings::new("");
-        bn_settings.set_integer(
+
+        let trivial_function_len_props = json!({
+            "title" : "Trivial Function Length",
+            "type" : "number",
+            "default" : Self::TRIVIAL_FUNCTION_LEN_DEFAULT,
+            "description" : "Functions below this length will be required to match on constraints.",
+            "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
+        });
+        bn_settings.register_setting_json(
             Self::TRIVIAL_FUNCTION_LEN_SETTING,
-            self.trivial_function_len,
-            None,
-            None,
+            trivial_function_len_props.to_string(),
+        );
+
+        let minimum_function_len_props = json!({
+            "title" : "Minimum Function Length",
+            "type" : "number",
+            "default" : Self::MINIMUM_FUNCTION_LEN_DEFAULT,
+            "description" : "Functions below this length will not be matched.",
+            "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
+        });
+        bn_settings.register_setting_json(
+            Self::MINIMUM_FUNCTION_LEN_SETTING,
+            minimum_function_len_props.to_string(),
+        );
+
+        let maximum_function_len_props = json!({
+            "title" : "Maximum Function Length",
+            "type" : "number",
+            "default" : Self::MAXIMUM_FUNCTION_LEN_DEFAULT,
+            "description" : "Functions above this length will not be matched. A value of 0 will disable this check.",
+            "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
+        });
+        bn_settings.register_setting_json(
+            Self::MAXIMUM_FUNCTION_LEN_SETTING,
+            maximum_function_len_props.to_string(),
+        );
+
+        let minimum_matched_constraints_props = json!({
+            "title" : "Minimum Matched Constraints",
+            "type" : "number",
+            "default" : Self::MINIMUM_MATCHED_CONSTRAINTS_DEFAULT,
+            "description" : "When function constraints are checked the amount of constraints matched must be at-least this.",
+            "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
+        });
+        bn_settings.register_setting_json(
+            Self::MINIMUM_MATCHED_CONSTRAINTS_SETTING,
+            minimum_matched_constraints_props.to_string(),
         );
     }
 
-    pub fn from_view(_view: &BinaryView) -> Self {
+    pub fn global() -> Self {
         let mut settings = MatcherSettings::default();
         let bn_settings = binaryninja::settings::Settings::new("");
         if bn_settings.contains(Self::TRIVIAL_FUNCTION_LEN_SETTING) {
             settings.trivial_function_len =
                 bn_settings.get_integer(Self::TRIVIAL_FUNCTION_LEN_SETTING, None, None);
+        }
+        if bn_settings.contains(Self::MINIMUM_FUNCTION_LEN_SETTING) {
+            settings.minimum_function_len =
+                bn_settings.get_integer(Self::MINIMUM_FUNCTION_LEN_SETTING, None, None);
+        }
+        if bn_settings.contains(Self::MAXIMUM_FUNCTION_LEN_SETTING) {
+            match bn_settings.get_integer(Self::MAXIMUM_FUNCTION_LEN_SETTING, None, None) {
+                0 => settings.maximum_function_len = None,
+                len => settings.maximum_function_len = Some(len),
+            }
+        }
+        if bn_settings.contains(Self::MINIMUM_MATCHED_CONSTRAINTS_SETTING) {
+            settings.minimum_matched_constraints =
+                bn_settings.get_integer(Self::MINIMUM_MATCHED_CONSTRAINTS_SETTING, None, None)
+                    as usize;
         }
         settings
     }
@@ -382,6 +468,9 @@ impl Default for MatcherSettings {
     fn default() -> Self {
         Self {
             trivial_function_len: MatcherSettings::TRIVIAL_FUNCTION_LEN_DEFAULT,
+            minimum_function_len: MatcherSettings::MINIMUM_FUNCTION_LEN_DEFAULT,
+            maximum_function_len: None,
+            minimum_matched_constraints: MatcherSettings::MINIMUM_MATCHED_CONSTRAINTS_DEFAULT,
         }
     }
 }

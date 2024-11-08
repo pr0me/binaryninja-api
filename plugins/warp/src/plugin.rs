@@ -4,7 +4,9 @@ use crate::cache::{
     register_cache_destructor, ViewID, FUNCTION_CACHE, GUID_CACHE, MATCHED_FUNCTION_CACHE,
 };
 use crate::convert::{to_bn_symbol_at_address, to_bn_type};
-use crate::matcher::{invalidate_function_matcher_cache, Matcher, PlatformID, PLAT_MATCHER_CACHE};
+use crate::matcher::{
+    invalidate_function_matcher_cache, Matcher, MatcherSettings, PlatformID, PLAT_MATCHER_CACHE,
+};
 use crate::{build_function, cache};
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::{Command, FunctionCommand};
@@ -120,6 +122,7 @@ impl Command for DebugCache {
             if let Some(cache) = plat_cache.get(&platform_id) {
                 log::info!("Platform functions: {}", cache.functions.len());
                 log::info!("Platform types: {}", cache.types.len());
+                log::info!("Platform settings: {:?}", cache.settings);
             }
         }
     }
@@ -148,6 +151,9 @@ impl Command for DebugInvalidateCache {
 #[allow(non_snake_case)]
 pub extern "C" fn CorePluginInit() -> bool {
     binaryninja::logger::init(LevelFilter::Debug);
+
+    // Register our matcher settings.
+    MatcherSettings::register();
 
     // Make sure caches are flushed when the views get destructed.
     register_cache_destructor();
