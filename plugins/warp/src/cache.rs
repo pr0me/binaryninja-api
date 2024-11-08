@@ -9,7 +9,6 @@ use binaryninja::rc::Ref as BNRef;
 use binaryninja::symbol::Symbol as BNSymbol;
 use binaryninja::{llil, ObjectDestructor};
 use dashmap::mapref::one::Ref;
-use dashmap::try_result::TryResult;
 use dashmap::DashMap;
 use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -168,14 +167,13 @@ impl FunctionCache {
         llil: &llil::Function<A, M, NonSSA<V>>,
     ) -> Function {
         let function_id = FunctionID::from(function);
-        match self.cache.try_get_mut(&function_id) {
-            TryResult::Present(function) => function.value().to_owned(),
-            TryResult::Absent => {
+        match self.cache.get(&function_id) {
+            Some(function) => function.value().to_owned(),
+            None => {
                 let function = build_function(function, llil);
                 self.cache.insert(function_id, function.clone());
                 function
             }
-            TryResult::Locked => build_function(function, llil),
         }
     }
 }
@@ -289,14 +287,13 @@ impl GUIDCache {
         llil: &llil::Function<A, M, NonSSA<V>>,
     ) -> FunctionGUID {
         let function_id = FunctionID::from(function);
-        match self.cache.try_get_mut(&function_id) {
-            TryResult::Present(function_guid) => function_guid.value().to_owned(),
-            TryResult::Absent => {
+        match self.cache.get(&function_id) {
+            Some(function_guid) => function_guid.value().to_owned(),
+            None => {
                 let function_guid = function_guid(function, llil);
                 self.cache.insert(function_id, function_guid);
                 function_guid
             }
-            TryResult::Locked => function_guid(function, llil),
         }
     }
 
