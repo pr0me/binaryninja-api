@@ -854,7 +854,7 @@ to make it available for users to experiment with as soon as possible. </p>
 	}
 	if (!(settings.contains(QSETTINGS_KEY_ALPHA_POPUP_SEEN) && settings.value(QSETTINGS_KEY_ALPHA_POPUP_SEEN).toBool()))
 	{
-		LogAlert("dyld_shared_cache support is highly experimental! We do not expect it to work on all versions yet! See the 'alpha' tab in the Triage view for more information. ");
+		LogAlert("dyld_shared_cache support is highly experimental! We do not expect it to work on all versions yet! See the 'Shared Cache Alpha' tab in the DSCTriage view for more information. ");
 		settings.setValue(QSETTINGS_KEY_ALPHA_POPUP_SEEN, true);
 		defaultWidget = tb;
 	}
