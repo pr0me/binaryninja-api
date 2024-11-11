@@ -370,9 +370,7 @@ impl From<&BinaryView> for ViewID {
     fn from(value: &BinaryView) -> Self {
         let mut hasher = DefaultHasher::new();
         hasher.write_u64(value.original_image_base());
-        hasher.write(value.view_type().to_bytes());
-        hasher.write_u64(value.entry_point());
-        hasher.write(value.file().filename().to_bytes());
+        hasher.write_usize(value.file().session_id());
         Self(hasher.finish())
     }
 }
