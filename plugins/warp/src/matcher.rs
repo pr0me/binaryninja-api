@@ -18,7 +18,10 @@ use warp::r#type::Type;
 use warp::signature::function::{Function, FunctionGUID};
 use warp::signature::Data;
 
-use crate::cache::{cached_adjacency_constraints, cached_call_site_constraints, cached_function_match, try_cached_function_guid};
+use crate::cache::{
+    cached_adjacency_constraints, cached_call_site_constraints, cached_function_match,
+    try_cached_function_guid,
+};
 use crate::convert::to_bn_type;
 use crate::plugin::on_matched_function;
 
@@ -288,7 +291,7 @@ impl Matcher {
             .into_iter()
             .filter_map(|c| c.symbol.map(|s| s.name))
             .collect();
-        
+
         // Ordered from the lowest confidence to the highest confidence constraint.
         let checked_constraints = [
             find_highest_common_count(&adjacent_symbol_names, matched_functions, |matched| {
@@ -383,8 +386,8 @@ impl MatcherSettings {
     /// Populates the [MatcherSettings] to the current Binary Ninja settings instance.
     ///
     /// Call this once when you initialize so that the settings exist.
-    /// 
-    /// NOTE: If you are using this as a library then just modify the MatcherSettings directly 
+    ///
+    /// NOTE: If you are using this as a library then just modify the MatcherSettings directly
     /// in the matcher instance, that way you don't need to round-trip through Binary Ninja.
     pub fn register() {
         let bn_settings = binaryninja::settings::Settings::new("");
