@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -12,11 +12,8 @@ use binaryninja::function::Function as BNFunction;
 use binaryninja::rc::Guard as BNGuard;
 use serde_json::json;
 use walkdir::WalkDir;
-use warp::r#type::ComputedType;
-use warp::signature::function::constraints::FunctionConstraint;
-use warp::signature::function::{Function, FunctionGUID};
 use warp::signature::Data;
-use warp_ninja::convert::from_bn_type;
+use warp_ninja::cache::{cached_type_references, register_cache_destructor};
 
 #[derive(Parser, Debug)]
 #[command(about, long_about)]
@@ -65,6 +62,20 @@ fn main() {
 
     log::debug!("Starting Binary Ninja session...");
     let _headless_session = binaryninja::headless::Session::new();
+
+    // Adjust the amount of worker threads so that we can actually free BinaryViews.
+    let bn_settings = binaryninja::settings::Settings::new("");
+    let worker_count = rayon::current_num_threads() * 4;
+    log::debug!("Adjusting Binary Ninja worker count to {}...", worker_count);
+    bn_settings.set_integer(
+        "analysis.limits.workerThreadCount",
+        worker_count as u64,
+        None,
+        None,
+    );
+
+    // Make sure caches are flushed when the views get destructed.
+    register_cache_destructor();
 
     log::info!("Creating functions for {:?}...", args.path);
     let start = std::time::Instant::now();
@@ -151,11 +162,8 @@ fn data_from_archive<R: Read>(mut archive: Archive<R>) -> Option<Data> {
             data_from_file(&path)
         })
         .collect::<Vec<_>>();
-
-    let mut archive_data = Data::merge(&entry_data);
-    // Archives can resolve like this, its assumed that the symbols are weak.
-    resolve_guids(&mut archive_data.functions);
-    Some(archive_data)
+    
+    Some(Data::merge(entry_data))
 }
 
 fn data_from_directory(dir: PathBuf) -> Option<Data> {
@@ -174,50 +182,16 @@ fn data_from_directory(dir: PathBuf) -> Option<Data> {
     let unmerged_data = files
         .into_par_iter()
         .filter_map(|path| {
-            log::debug!("Creating data for FILE {:?}...", path);
+            log::info!("Creating data for FILE {:?}...", path);
             data_from_file(&path)
         })
         .collect::<Vec<_>>();
 
     if !unmerged_data.is_empty() {
-        Some(Data::merge(&unmerged_data))
+        Some(Data::merge(unmerged_data))
     } else {
         None
     }
-}
-
-fn resolve_guids(functions: &mut [Function]) {
-    let guid_map: HashMap<String, FunctionGUID> = functions
-        .iter()
-        .map(|f| (f.symbol.name.to_owned(), f.guid))
-        .collect();
-
-    let resolve_constraint = |mut constraint: FunctionConstraint| {
-        // If we don't have a guid for the constraint grab it from the symbol name
-        if constraint.guid.is_none() {
-            if let Some(symbol) = &constraint.symbol {
-                constraint.guid = guid_map.get(&symbol.name).copied();
-            }
-        }
-        constraint
-    };
-
-    functions.iter_mut().for_each(|f| {
-        f.constraints.call_sites = f
-            .constraints
-            .call_sites
-            .iter()
-            .cloned()
-            .map(resolve_constraint)
-            .collect();
-        f.constraints.adjacent = f
-            .constraints
-            .adjacent
-            .iter()
-            .cloned()
-            .map(resolve_constraint)
-            .collect();
-    });
 }
 
 // TODO: Pass settings.
@@ -227,6 +201,7 @@ fn data_from_file(path: &Path) -> Option<Data> {
     let settings_json = json!({
         "analysis.linearSweep.autorun": false,
         "analysis.signatureMatcher.autorun": false,
+        "analysis.mode": "full",
         // We don't need these
         "analysis.warp.matcher": false,
         "analysis.warp.guid": false,
