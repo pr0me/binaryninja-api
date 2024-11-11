@@ -133,7 +133,7 @@ pub fn try_cached_function_guid(function: &BNFunction) -> Option<FunctionGUID> {
     guid_cache.get(&view_id)?.try_function_guid(function)
 }
 
-pub fn cached_type_reference<'a>(
+pub fn cached_type_reference(
     view: &BinaryView,
     visited_refs: &mut HashSet<TypeRefID>,
     type_ref: &BNNamedTypeReference,
@@ -151,7 +151,7 @@ pub fn cached_type_reference<'a>(
     }
 }
 
-pub fn cached_type_references<'a>(view: &BinaryView) -> Option<Ref<ViewID, TypeRefCache>> {
+pub fn cached_type_references(view: &BinaryView) -> Option<Ref<ViewID, TypeRefCache>> {
     let view_id = ViewID::from(view);
     let type_ref_cache = TYPE_REF_CACHE.get_or_init(Default::default);
     type_ref_cache.get(&view_id)
