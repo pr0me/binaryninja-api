@@ -4,6 +4,7 @@ use binaryninja::binaryview::BinaryView;
 use binaryninja::{command, logger};
 use binaryninja::command::Command;
 use binaryninja::demangle::{Demangler, CustomDemangler};
+use binaryninja::logger::Logger;
 use binaryninja::rc::Ref;
 use binaryninja::types::{QualifiedName, Type};
 
@@ -57,7 +58,7 @@ impl Command for DemangleCommand {
 
 #[no_mangle]
 pub extern "C" fn CorePluginInit() -> bool {
-    logger::init(LevelFilter::Info);
+    Logger::new("Demangle Test").with_level(LevelFilter::Info).init();
     Demangler::register("Test", TestDemangler {});
     command::register("Demangle Test", "Test", DemangleCommand {});
     true

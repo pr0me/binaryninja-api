@@ -42,7 +42,7 @@ use gimli::{constants, CfaRule, DebuggingInformationEntry, Dwarf, DwarfFileType,
 
 use helpers::{get_build_id, load_debug_info_for_build_id};
 use log::{debug, error, warn, LevelFilter};
-
+use binaryninja::logger::Logger;
 
 trait ReaderType: Reader<Offset = usize> {}
 impl<T: Reader<Offset = usize>> ReaderType for T {}
@@ -658,7 +658,7 @@ impl CustomDebugInfoParser for DWARFParser {
 
 #[no_mangle]
 pub extern "C" fn CorePluginInit() -> bool {
-    logger::init(LevelFilter::Debug);
+    Logger::new("DWARF").init();
 
     let settings = Settings::new("");
 

@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
-
+use log::LevelFilter;
 use binaryninja::relocation::{Relocation, RelocationHandlerExt};
 use binaryninja::{
     add_optional_plugin_dependency, architecture,
@@ -42,6 +42,7 @@ use riscv_dis::{
     FloatReg, FloatRegType, Instr, IntRegType, Op, RegFile, Register as RiscVRegister,
     RiscVDisassembler, RoundMode,
 };
+use binaryninja::logger::Logger;
 
 enum RegType {
     Integer(u32),
@@ -2891,7 +2892,7 @@ impl FunctionRecognizer for RiscVELFPLTRecognizer {
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn CorePluginInit() -> bool {
-    binaryninja::logger::init(log::LevelFilter::Trace);
+    Logger::new("RISCV").with_level(LevelFilter::Trace).init();
 
     use riscv_dis::{RiscVIMACDisassembler, Rv32GRegs, Rv64GRegs};
     let arch32 =

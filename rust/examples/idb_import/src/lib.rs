@@ -16,6 +16,7 @@ use idb_rs::til::Type as TILType;
 use log::{error, trace, warn, LevelFilter};
 
 use anyhow::Result;
+use binaryninja::logger::Logger;
 
 struct IDBDebugInfoParser;
 impl CustomDebugInfoParser for IDBDebugInfoParser {
@@ -337,7 +338,7 @@ fn parse_id0_section_info(
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn CorePluginInit() -> bool {
-    logger::init(LevelFilter::Error);
+    Logger::new("IDB Import").with_level(LevelFilter::Error).init();
     DebugInfoParser::register("IDB Parser", IDBDebugInfoParser);
     DebugInfoParser::register("TIL Parser", TILDebugInfoParser);
     true

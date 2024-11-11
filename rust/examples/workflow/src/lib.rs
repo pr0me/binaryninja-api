@@ -3,6 +3,7 @@ use binaryninja::llil::{
 };
 use binaryninja::workflow::{Activity, AnalysisContext, Workflow};
 use log::LevelFilter;
+use binaryninja::logger::Logger;
 
 const RUST_ACTIVITY_NAME: &'static str = "analysis.plugins.rustexample";
 const RUST_ACTIVITY_CONFIG: &'static str = r#"{
@@ -55,7 +56,7 @@ fn example_activity(analysis_context: &AnalysisContext) {
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn CorePluginInit() -> bool {
-    binaryninja::logger::init(LevelFilter::Info);
+    Logger::new("Workflow Example").with_level(LevelFilter::Info).init();
 
     log::info!("Initialized the plugin");
 

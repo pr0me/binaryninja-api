@@ -15,6 +15,7 @@ use binaryninja::rc::Ref;
 use binaryninja::tags::TagType;
 use binaryninja::ObjectDestructor;
 use warp::signature::function::Function as WarpFunction;
+use binaryninja::logger::Logger;
 
 mod copy;
 mod create;
@@ -150,7 +151,7 @@ impl Command for DebugInvalidateCache {
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "C" fn CorePluginInit() -> bool {
-    binaryninja::logger::init(LevelFilter::Debug);
+    Logger::new("WARP").with_level(LevelFilter::Debug).init();
 
     // Register our matcher settings.
     MatcherSettings::register();

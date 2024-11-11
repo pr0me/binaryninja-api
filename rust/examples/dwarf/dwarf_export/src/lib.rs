@@ -15,13 +15,13 @@ use binaryninja::{
     command::{register, Command},
     interaction,
     interaction::{FormResponses, FormResponses::Index},
-    logger::init,
     rc::Ref,
     string::BnString,
     symbol::SymbolType,
     types::{Conf, MemberAccess, StructureType, Type, TypeClass},
 };
 use log::{error, info, LevelFilter};
+use binaryninja::logger::Logger;
 
 fn export_type(
     name: String,
@@ -781,7 +781,7 @@ impl Command for MyCommand {
 
 #[no_mangle]
 pub extern "C" fn CorePluginInit() -> bool {
-    init(LevelFilter::Debug);
+    Logger::new("DWARF Export").with_level(LevelFilter::Debug).init();
 
     register(
         "Export as DWARF",
