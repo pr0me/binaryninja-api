@@ -1,18 +1,20 @@
-use crate::convert::from_bn_symbol;
+use crate::convert::{from_bn_symbol, from_bn_type_internal};
 use crate::{build_function, function_guid};
 use binaryninja::architecture::Architecture;
-use binaryninja::binaryview::{BinaryView, BinaryViewBase, BinaryViewExt};
+use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::function::Function as BNFunction;
 use binaryninja::llil::{FunctionMutability, NonSSA, NonSSAVariant};
 use binaryninja::rc::Guard;
 use binaryninja::rc::Ref as BNRef;
 use binaryninja::symbol::Symbol as BNSymbol;
+use binaryninja::types::NamedTypeReference as BNNamedTypeReference;
 use binaryninja::{llil, ObjectDestructor};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::OnceLock;
+use warp::r#type::ComputedType;
 use warp::signature::function::constraints::FunctionConstraint;
 use warp::signature::function::{Function, FunctionGUID};
 
@@ -20,6 +22,7 @@ pub static MATCHED_FUNCTION_CACHE: OnceLock<DashMap<ViewID, MatchedFunctionCache
     OnceLock::new();
 pub static FUNCTION_CACHE: OnceLock<DashMap<ViewID, FunctionCache>> = OnceLock::new();
 pub static GUID_CACHE: OnceLock<DashMap<ViewID, GUIDCache>> = OnceLock::new();
+pub static TYPE_REF_CACHE: OnceLock<DashMap<ViewID, TypeRefCache>> = OnceLock::new();
 
 pub fn register_cache_destructor() {
     pub static mut CACHE_DESTRUCTOR: CacheDestructor = CacheDestructor;
@@ -128,6 +131,30 @@ pub fn try_cached_function_guid(function: &BNFunction) -> Option<FunctionGUID> {
     let view_id = ViewID::from(view);
     let guid_cache = GUID_CACHE.get_or_init(Default::default);
     guid_cache.get(&view_id)?.try_function_guid(function)
+}
+
+pub fn cached_type_reference<'a>(
+    view: &BinaryView,
+    visited_refs: &mut HashSet<TypeRefID>,
+    type_ref: &BNNamedTypeReference,
+) -> Option<ComputedType> {
+    let view_id = ViewID::from(view);
+    let type_ref_cache = TYPE_REF_CACHE.get_or_init(Default::default);
+    match type_ref_cache.get(&view_id) {
+        Some(cache) => cache.cached_type_reference(view, visited_refs, type_ref),
+        None => {
+            let cache = TypeRefCache::default();
+            let ntr = cache.cached_type_reference(view, visited_refs, type_ref);
+            type_ref_cache.insert(view_id, cache);
+            ntr
+        }
+    }
+}
+
+pub fn cached_type_references<'a>(view: &BinaryView) -> Option<Ref<ViewID, TypeRefCache>> {
+    let view_id = ViewID::from(view);
+    let type_ref_cache = TYPE_REF_CACHE.get_or_init(Default::default);
+    type_ref_cache.get(&view_id)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -305,6 +332,36 @@ impl GUIDCache {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct TypeRefCache {
+    pub cache: DashMap<TypeRefID, Option<ComputedType>>,
+}
+
+impl TypeRefCache {
+    /// NOTE: No self-referential type must be used on this function.
+    pub fn cached_type_reference(
+        &self,
+        view: &BinaryView,
+        visited_refs: &mut HashSet<TypeRefID>,
+        type_ref: &BNNamedTypeReference,
+    ) -> Option<ComputedType> {
+        let ntr_id = TypeRefID::from(type_ref);
+        match self.cache.get(&ntr_id) {
+            Some(cache) => cache.to_owned(),
+            None => match type_ref.target(view) {
+                Some(raw_ty) => {
+                    let computed_ty = ComputedType::new(from_bn_type_internal(view, visited_refs, &raw_ty, 255));
+                    self.cache
+                        .entry(ntr_id)
+                        .insert(Some(computed_ty))
+                        .to_owned()
+                }
+                None => self.cache.entry(ntr_id).insert(None).to_owned(),
+            },
+        }
+    }
+}
+
 /// A unique view ID, used for caching.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ViewID(u64);
@@ -358,6 +415,30 @@ impl From<Guard<'_, BNFunction>> for FunctionID {
     }
 }
 
+/// A unique named type reference ID, used for caching.
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TypeRefID(u64);
+
+impl From<&BNNamedTypeReference> for TypeRefID {
+    fn from(value: &BNNamedTypeReference) -> Self {
+        let mut hasher = DefaultHasher::new();
+        hasher.write(value.id().as_bytes());
+        Self(hasher.finish())
+    }
+}
+
+impl From<BNRef<BNNamedTypeReference>> for TypeRefID {
+    fn from(value: BNRef<BNNamedTypeReference>) -> Self {
+        Self::from(value.as_ref())
+    }
+}
+
+impl From<Guard<'_, BNNamedTypeReference>> for TypeRefID {
+    fn from(value: Guard<'_, BNNamedTypeReference>) -> Self {
+        Self::from(value.as_ref())
+    }
+}
+
 pub struct CacheDestructor;
 
 impl ObjectDestructor for CacheDestructor {
@@ -371,6 +452,9 @@ impl ObjectDestructor for CacheDestructor {
             cache.remove(&view_id);
         }
         if let Some(cache) = GUID_CACHE.get() {
+            cache.remove(&view_id);
+        }
+        if let Some(cache) = TYPE_REF_CACHE.get() {
             cache.remove(&view_id);
         }
         log::debug!("Removed WARP caches for {:?}", view);

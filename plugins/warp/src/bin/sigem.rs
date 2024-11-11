@@ -103,10 +103,17 @@ fn data_from_view(view: &BinaryView) -> Data {
             Some(warp_ninja::cache::cached_function(&f, &llil))
         })
         .collect::<Vec<_>>();
-    data.types.extend(view.types().iter().map(|ty| {
-        let ref_ty = ty.type_object().to_owned();
-        ComputedType::new(from_bn_type(view, &ref_ty, u8::MAX))
-    }));
+
+    if let Some(ref_ty_cache) = cached_type_references(view) {
+        let referenced_types = ref_ty_cache
+            .cache
+            .iter()
+            .filter_map(|t| t.to_owned())
+            .collect::<Vec<_>>();
+
+        data.types.extend(referenced_types);
+    }
+    
     data
 }
 

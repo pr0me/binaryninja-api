@@ -17,6 +17,7 @@ use binaryninja::types::{
     StructureType as BNStructureType, Type as BNType, TypeClass as BNTypeClass,
 };
 
+use crate::cache::{cached_type_reference, TypeRefID};
 use warp::r#type::class::array::ArrayModifiers;
 use warp::r#type::class::function::{Location, RegisterLocation};
 use warp::r#type::class::pointer::PointerAddressing;
@@ -26,7 +27,6 @@ use warp::r#type::class::{
     EnumerationMember, FloatClass, FunctionClass, FunctionMember, IntegerClass, PointerClass,
     ReferrerClass, StructureClass, StructureMember, TypeClass,
 };
-use warp::r#type::guid::TypeGUID;
 use warp::r#type::Type;
 use warp::symbol::class::SymbolClass;
 use warp::symbol::{Symbol, SymbolModifiers};
@@ -121,9 +121,9 @@ pub fn from_bn_type(view: &BinaryView, raw_ty: &BNType, confidence: u8) -> Type 
     from_bn_type_internal(view, &mut HashSet::new(), raw_ty, confidence)
 }
 
-fn from_bn_type_internal(
+pub fn from_bn_type_internal(
     view: &BinaryView,
-    visited_refs: &mut HashSet<String>,
+    visited_refs: &mut HashSet<TypeRefID>,
     raw_ty: &BNType,
     confidence: u8,
 ) -> Type {
@@ -318,32 +318,17 @@ fn from_bn_type_internal(
         }
         BNTypeClass::NamedTypeReferenceClass => {
             let raw_ntr = raw_ty.get_named_type_reference().unwrap();
-            let ref_id_str = raw_ntr.id().to_string();
-            let raw_ntr_ty = raw_ntr.target(view);
-            if raw_ntr_ty.is_none() || !visited_refs.insert(ref_id_str.clone()) {
-                let ref_class = ReferrerClass::new(None, Some(raw_ntr.name().to_string()));
-                TypeClass::Referrer(ref_class)
-            } else {
-                use dashmap::DashMap;
-                use std::sync::Arc;
-                use std::sync::OnceLock;
-                static REF_CACHE: OnceLock<Arc<DashMap<String, TypeClass>>> = OnceLock::new();
-                let ref_cache = REF_CACHE.get_or_init(|| Arc::new(DashMap::new()));
-                // Check the cache first before proceeding
-                if let Some(cached_type) = ref_cache.get(&ref_id_str) {
-                    cached_type.value().to_owned()
-                } else {
-                    let ntr_ty =
-                        from_bn_type_internal(view, visited_refs, &raw_ntr_ty.unwrap(), confidence);
-                    visited_refs.remove(&ref_id_str);
+            let ref_id = TypeRefID::from(raw_ntr.as_ref());
+            let mut ref_class = ReferrerClass::new(None, Some(raw_ntr.name().to_string()));
+            if visited_refs.insert(ref_id) {
+                // This ntr is NOT self-referential, meaning we can deduce a type GUID.
+                if let Some(computed_ty) = cached_type_reference(view, visited_refs, &raw_ntr) {
                     // NOTE: The GUID here must always equal the same for any given type for this to work effectively.
-                    let ntr_guid = TypeGUID::from(&ntr_ty);
-                    let ref_class = ReferrerClass::new(Some(ntr_guid), ntr_ty.name);
-                    let ntr_ty_class = TypeClass::Referrer(ref_class);
-                    ref_cache.insert(ref_id_str, ntr_ty_class.clone());
-                    ntr_ty_class
+                    ref_class.guid = Some(computed_ty.guid);
                 }
+                visited_refs.remove(&ref_id);
             }
+            TypeClass::Referrer(ref_class)
         }
         BNTypeClass::WideCharTypeClass => {
             let char_class = CharacterClass {
