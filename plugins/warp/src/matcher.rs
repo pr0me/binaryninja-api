@@ -79,7 +79,7 @@ impl Matcher {
         let user_data = get_data_from_dir(&plat_user_sig_dir);
 
         data.extend(user_data);
-        let merged_data = Data::merge(&data.values().cloned().collect::<Vec<_>>());
+        let merged_data = Data::merge(data.values().cloned().collect::<Vec<_>>());
         log::debug!("Loaded signatures: {:?}", data.keys());
         Matcher::from_data(merged_data)
     }
