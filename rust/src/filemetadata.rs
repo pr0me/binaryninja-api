@@ -12,35 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use binaryninjacore_sys::{
-    BNBeginUndoActions,
-    BNCloseFile,
-    BNCommitUndoActions,
-    BNCreateDatabase,
-    BNCreateFileMetadata,
-    BNFileMetadata,
-    BNFreeFileMetadata,
-    BNGetCurrentOffset,
-    BNGetCurrentView,
-    BNGetFileMetadataDatabase,
-    BNGetFileViewOfType,
-    BNGetFilename,
-    BNGetProjectFile,
-    BNIsAnalysisChanged,
-    BNIsBackedByDatabase,
-    BNIsFileModified,
-    BNMarkFileModified,
-    BNMarkFileSaved,
-    BNNavigate,
-    BNNewFileReference,
-    BNOpenDatabaseForConfiguration,
-    BNOpenExistingDatabase,
-    BNRedo,
-    BNRevertUndoActions,
-    BNSaveAutoSnapshot,
-    BNSetFilename,
-    BNUndo
-};
+use binaryninjacore_sys::{BNBeginUndoActions, BNCloseFile, BNCommitUndoActions, BNCreateDatabase, BNCreateFileMetadata, BNFileMetadata, BNFileMetadataGetSessionId, BNFreeFileMetadata, BNGetCurrentOffset, BNGetCurrentView, BNGetFileMetadataDatabase, BNGetFileViewOfType, BNGetFilename, BNGetProjectFile, BNIsAnalysisChanged, BNIsBackedByDatabase, BNIsFileModified, BNMarkFileModified, BNMarkFileSaved, BNNavigate, BNNewFileReference, BNOpenDatabaseForConfiguration, BNOpenExistingDatabase, BNRedo, BNRevertUndoActions, BNSaveAutoSnapshot, BNSetFilename, BNUndo};
 use binaryninjacore_sys::{BNCreateDatabaseWithProgress, BNOpenExistingDatabaseWithProgress};
 
 use crate::binaryview::BinaryView;
@@ -82,6 +54,12 @@ impl FileMetadata {
     pub fn close(&self) {
         unsafe {
             BNCloseFile(self.handle);
+        }
+    }
+    
+    pub fn session_id(&self) -> usize {
+        unsafe {
+            BNFileMetadataGetSessionId(self.handle)
         }
     }
 
