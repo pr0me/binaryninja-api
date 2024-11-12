@@ -93,15 +93,21 @@ pub fn cached_call_site_constraints(function: &BNFunction) -> HashSet<FunctionCo
     }
 }
 
-pub fn cached_adjacency_constraints(function: &BNFunction) -> HashSet<FunctionConstraint> {
+pub fn cached_adjacency_constraints<F>(
+    function: &BNFunction,
+    filter: F,
+) -> HashSet<FunctionConstraint>
+where
+    F: Fn(&BNFunction) -> bool,
+{
     let view = function.view();
     let view_id = ViewID::from(view);
     let guid_cache = GUID_CACHE.get_or_init(Default::default);
     match guid_cache.get(&view_id) {
-        Some(cache) => cache.adjacency_constraints(function),
+        Some(cache) => cache.adjacency_constraints(function, filter),
         None => {
             let cache = GUIDCache::default();
-            let constraints = cache.adjacency_constraints(function);
+            let constraints = cache.adjacency_constraints(function, filter);
             guid_cache.insert(view_id, cache);
             constraints
         }
@@ -226,6 +232,7 @@ impl GUIDCache {
                         if cs_ref_func_id != func_id {
                             let call_site_offset: i64 =
                                 call_site.address.wrapping_sub(func_start) as i64;
+                            // TODO: If the function is thunk we should also insert the called function.
                             constraints
                                 .insert(self.function_constraint(&cs_ref_func, call_site_offset));
                         }
@@ -249,7 +256,14 @@ impl GUIDCache {
         constraints
     }
 
-    pub fn adjacency_constraints(&self, function: &BNFunction) -> HashSet<FunctionConstraint> {
+    pub fn adjacency_constraints<F>(
+        &self,
+        function: &BNFunction,
+        filter: F,
+    ) -> HashSet<FunctionConstraint>
+    where
+        F: Fn(&BNFunction) -> bool,
+    {
         let view = function.view();
         let func_id = FunctionID::from(function);
         let func_start = function.start();
@@ -259,7 +273,7 @@ impl GUIDCache {
             // NOTE: We could potentially have dozens of functions all at the same start address.
             for curr_func in &view.functions_at(func_start_addr) {
                 let curr_func_id = FunctionID::from(curr_func.as_ref());
-                if curr_func_id != func_id {
+                if curr_func_id != func_id && filter(curr_func.as_ref()) {
                     // NOTE: For this to work the GUID has to have already been cached. If not it will just be the symbol.
                     // Function adjacent to another function, constrain on the pattern.
                     let curr_addr_offset = (func_start_addr as i64) - func_start as i64;
@@ -350,7 +364,8 @@ impl TypeRefCache {
             Some(cache) => cache.to_owned(),
             None => match type_ref.target(view) {
                 Some(raw_ty) => {
-                    let computed_ty = ComputedType::new(from_bn_type_internal(view, visited_refs, &raw_ty, 255));
+                    let computed_ty =
+                        ComputedType::new(from_bn_type_internal(view, visited_refs, &raw_ty, 255));
                     self.cache
                         .entry(ntr_id)
                         .insert(Some(computed_ty))

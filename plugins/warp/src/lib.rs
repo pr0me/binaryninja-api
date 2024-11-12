@@ -35,7 +35,8 @@ pub fn build_function<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
         ty: from_bn_type(&func.view(), &bn_fn_ty, 255),
         constraints: FunctionConstraints {
             // NOTE: Adding adjacent only works if analysis is complete.
-            adjacent: cached_adjacency_constraints(func),
+            // NOTE: We do not filter out adjacent functions here.
+            adjacent: cached_adjacency_constraints(func, |_| true),
             call_sites: cached_call_site_constraints(func),
             // TODO: Add caller sites (when adjacent and call sites are minimal)
             // NOTE: Adding caller sites only works if analysis is complete.

@@ -251,8 +251,17 @@ impl Matcher {
         function: &BNFunction,
         matched_functions: &'a [Function],
     ) -> Option<&'a Function> {
+        // Filter out adjacent functions which are trivial, this helps avoid false positives.
+        // NOTE: If the user sets `trivial_function_adjacent_allowed` to true we will always match.
+        // TODO: Expand on this more later. We might want to match on adjacent functions smaller than this.
+        let adjacent_function_filter = |adj_func: &BNFunction| {
+            let adj_func_len = adj_func.highest_address() - adj_func.lowest_address();
+            adj_func_len > self.settings.trivial_function_len
+                || self.settings.trivial_function_adjacent_allowed
+        };
+
         let call_sites = cached_call_site_constraints(function);
-        let adjacent = cached_adjacency_constraints(function);
+        let adjacent = cached_adjacency_constraints(function, adjacent_function_filter);
 
         // "common" being the intersection between the observed and matched.
         fn find_highest_common_count<'a, F, T>(
@@ -370,6 +379,10 @@ pub struct MatcherSettings {
     ///
     /// This is set to [MatcherSettings::DEFAULT_TRIVIAL_FUNCTION_LEN] by default.
     pub minimum_matched_constraints: usize,
+    /// For a successful constrained function match the number of matches must be above this.
+    ///
+    /// This is set to [MatcherSettings::DEFAULT_TRIVIAL_FUNCTION_LEN] by default.
+    pub trivial_function_adjacent_allowed: bool,
 }
 
 impl MatcherSettings {
@@ -382,6 +395,9 @@ impl MatcherSettings {
     pub const MINIMUM_MATCHED_CONSTRAINTS_DEFAULT: usize = 1;
     pub const MINIMUM_MATCHED_CONSTRAINTS_SETTING: &'static str =
         "analysis.warp.minimumMatchedConstraints";
+    pub const TRIVIAL_FUNCTION_ADJACENT_ALLOWED_DEFAULT: bool = false;
+    pub const TRIVIAL_FUNCTION_ADJACENT_ALLOWED_SETTING: &'static str =
+        "analysis.warp.trivialFunctionAdjacentAllowed";
 
     /// Populates the [MatcherSettings] to the current Binary Ninja settings instance.
     ///
@@ -439,6 +455,18 @@ impl MatcherSettings {
             Self::MINIMUM_MATCHED_CONSTRAINTS_SETTING,
             minimum_matched_constraints_props.to_string(),
         );
+
+        let trivial_function_adjacent_allowed_props = json!({
+            "title" : "Trivial Function Adjacent Constraints Allowed",
+            "type" : "boolean",
+            "default" : Self::TRIVIAL_FUNCTION_ADJACENT_ALLOWED_DEFAULT,
+            "description" : "When function constraints are checked if this is enabled functions can match based off trivial adjacent functions.",
+            "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
+        });
+        bn_settings.register_setting_json(
+            Self::TRIVIAL_FUNCTION_ADJACENT_ALLOWED_SETTING,
+            trivial_function_adjacent_allowed_props.to_string(),
+        );
     }
 
     pub fn global() -> Self {
@@ -474,6 +502,8 @@ impl Default for MatcherSettings {
             minimum_function_len: MatcherSettings::MINIMUM_FUNCTION_LEN_DEFAULT,
             maximum_function_len: None,
             minimum_matched_constraints: MatcherSettings::MINIMUM_MATCHED_CONSTRAINTS_DEFAULT,
+            trivial_function_adjacent_allowed:
+                MatcherSettings::TRIVIAL_FUNCTION_ADJACENT_ALLOWED_DEFAULT,
         }
     }
 }
