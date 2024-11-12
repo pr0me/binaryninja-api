@@ -1,4 +1,4 @@
-use crate::cache::cached_function;
+use crate::cache::{cached_function, cached_type_references};
 use crate::convert::from_bn_type;
 use crate::matcher::invalidate_function_matcher_cache;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
@@ -36,12 +36,17 @@ impl Command for CreateSignatureFile {
                     let llil = func.low_level_il().ok()?;
                     Some(cached_function(&func, &llil))
                 }));
-            data.types.extend(view.types().iter().map(|ty| {
-                let ref_ty = ty.type_object().to_owned();
-                ComputedType::new(from_bn_type(&view, &ref_ty, u8::MAX))
-            }));
+            
+            if let Some(ref_ty_cache) = cached_type_references(&view) {
+                let referenced_types = ref_ty_cache
+                    .cache
+                    .iter()
+                    .filter_map(|t| t.to_owned())
+                    .collect::<Vec<_>>();
 
-            // And type generation :3
+                data.types.extend(referenced_types);
+            }
+            
             log::info!("Signature generation took {:?}", start.elapsed());
 
             if let Some(sig_file_name) = binaryninja::interaction::get_text_line_input(
