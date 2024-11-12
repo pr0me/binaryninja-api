@@ -6,7 +6,8 @@ use binaryninja::binaryview::BinaryViewExt;
 use binaryninja::function::{Function as BNFunction, NativeBlock};
 use binaryninja::llil;
 use binaryninja::llil::{
-    ExprInfo, FunctionMutability, InstrInfo, NonSSA, NonSSAVariant, Register, VisitorAction,
+    ExprInfo, FunctionMutability, InstrInfo, Instruction, NonSSA, NonSSAVariant, Register,
+    VisitorAction,
 };
 use binaryninja::rc::Ref as BNRef;
 use warp::signature::basic_block::BasicBlockGUID;
@@ -78,8 +79,8 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
     let max_instr_len = arch.max_instr_len();
 
     // NOPs and useless moves are blacklisted to allow for hot-patchable functions.
-    let is_blacklisted_instr = |info: InstrInfo<A, M, NonSSA<V>>| {
-        match info {
+    let is_blacklisted_instr = |instr: &Instruction<A, M, NonSSA<V>>| {
+        match instr.info() {
             InstrInfo::Nop(_) => true,
             InstrInfo::SetReg(op) => {
                 match op.source_expr().info() {
@@ -104,6 +105,35 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
         }
     };
 
+    let is_variant_instr = |instr: &Instruction<A, M, NonSSA<V>>| {
+        let is_variant_expr = |expr: &ExprInfo<A, M, NonSSA<V>>| {
+            match expr {
+                ExprInfo::ConstPtr(op) if !view.sections_at(op.value()).is_empty() => {
+                    // Constant Pointer must be in a section for it to be relocatable.
+                    // NOTE: We cannot utilize segments here as there will be a zero based segment.
+                    true
+                }
+                ExprInfo::ExternPtr(_) => true,
+                ExprInfo::Const(op) if !view.sections_at(op.value()).is_empty() => {
+                    // Constant value must be in a section for it to be relocatable.
+                    // NOTE: We cannot utilize segments here as there will be a zero based segment.
+                    true
+                }
+                _ => false,
+            }
+        };
+
+        // Visit instruction expressions looking for variant expression, [VisitorAction::Halt] means variant.
+        instr.visit_tree(&mut |_expr, expr_info| {
+            if is_variant_expr(expr_info) {
+                // Found a variant expression
+                VisitorAction::Halt
+            } else {
+                VisitorAction::Descend
+            }
+        }) == VisitorAction::Halt
+    };
+
     let basic_block_range = basic_block.raw_start()..basic_block.raw_end();
     let mut basic_block_bytes = Vec::with_capacity(basic_block_range.count());
     for instr_addr in basic_block.into_iter() {
@@ -112,24 +142,8 @@ pub fn basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant
             instr_bytes.truncate(instr_info.len());
             if let Some(instr_llil) = llil.instruction_at(instr_addr) {
                 // If instruction is blacklisted don't include the bytes.
-                if !is_blacklisted_instr(instr_llil.info()) {
-                    if instr_llil.visit_tree(&mut |_expr, expr_info| match expr_info {
-                        ExprInfo::ConstPtr(op) if view.segment_at(op.value()).is_some() => {
-                            // Constant Pointer must be in a segment for it to be relocatable.
-                            VisitorAction::Halt
-                        }
-                        ExprInfo::ExternPtr(_) => VisitorAction::Halt,
-                        ExprInfo::Const(op)
-                            if !view.functions_at(op.value()).is_empty()
-                                || view.data_variable_at_address(op.value()).is_some() =>
-                        {
-                            // Constant Pointer promotion for Constants that would be promoted at MLIL.
-                            // If the value backs a symbol than we are eagerly masking for the sake of simplicity.
-                            VisitorAction::Halt
-                        }
-                        _ => VisitorAction::Descend,
-                    }) == VisitorAction::Halt
-                    {
+                if !is_blacklisted_instr(&instr_llil) {
+                    if is_variant_instr(&instr_llil) {
                         // Found a variant instruction, mask off entire instruction.
                         instr_bytes.fill(0);
                     }
