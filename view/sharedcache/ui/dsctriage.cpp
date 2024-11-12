@@ -1004,6 +1004,10 @@ QWidget* DSCTriageViewType::create(BinaryViewRef data, ViewFrame* viewFrame)
 	{
 		return nullptr;
 	}
+	if (SharedCacheAPI::SharedCache::FastGetBackingCacheCount(data) == 0)
+	{
+		return nullptr;
+	}
 	return new DSCTriageView(viewFrame, data);
 }
 
