@@ -30,7 +30,7 @@ use binaryninja::downloadprovider::{DownloadInstanceInputOutputCallbacks, Downlo
 use binaryninja::interaction::{MessageBoxButtonResult, MessageBoxButtonSet};
 use binaryninja::settings::Settings;
 use binaryninja::string::BnString;
-use binaryninja::{add_optional_plugin_dependency, interaction, logger, user_directory};
+use binaryninja::{add_optional_plugin_dependency, interaction, user_directory};
 use binaryninja::logger::Logger;
 use parser::PDBParserInstance;
 

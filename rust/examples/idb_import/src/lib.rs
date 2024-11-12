@@ -7,7 +7,6 @@ use binaryninja::binaryview::{BinaryView, BinaryViewBase, BinaryViewExt};
 use binaryninja::debuginfo::{
     CustomDebugInfoParser, DebugFunctionInfo, DebugInfo, DebugInfoParser,
 };
-use binaryninja::logger;
 
 use idb_rs::id0::{ID0Section, IDBParam1, IDBParam2};
 use idb_rs::til::section::TILSection;

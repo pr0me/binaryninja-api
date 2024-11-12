@@ -1,7 +1,7 @@
 use log::{info, LevelFilter};
 use binaryninja::architecture::CoreArchitecture;
 use binaryninja::binaryview::BinaryView;
-use binaryninja::{command, logger};
+use binaryninja::command;
 use binaryninja::command::Command;
 use binaryninja::demangle::{Demangler, CustomDemangler};
 use binaryninja::logger::Logger;

@@ -29,7 +29,6 @@ use binaryninja::binaryview::BinaryViewBase;
 use binaryninja::{
     binaryview::{BinaryView, BinaryViewExt},
     debuginfo::{CustomDebugInfoParser, DebugInfo, DebugInfoParser},
-    logger,
     settings::Settings,
     templatesimplifier::simplify_str_to_str,
 };
@@ -41,7 +40,7 @@ use functions::parse_lexical_block;
 use gimli::{constants, CfaRule, DebuggingInformationEntry, Dwarf, DwarfFileType, Reader, Section, SectionId, Unit, UnwindContext, UnwindSection};
 
 use helpers::{get_build_id, load_debug_info_for_build_id};
-use log::{debug, error, warn, LevelFilter};
+use log::{debug, error, warn};
 use binaryninja::logger::Logger;
 
 trait ReaderType: Reader<Offset = usize> {}
