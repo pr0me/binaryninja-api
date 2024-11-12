@@ -9,7 +9,7 @@ use binaryninja::llil::{
     ExprInfo, FunctionMutability, InstrInfo, NonSSA, NonSSAVariant, Register, VisitorAction,
 };
 use binaryninja::rc::Ref as BNRef;
-use warp::signature::basic_block::{BasicBlock, BasicBlockGUID};
+use warp::signature::basic_block::BasicBlockGUID;
 use warp::signature::function::constraints::FunctionConstraints;
 use warp::signature::function::{Function, FunctionGUID};
 
@@ -41,18 +41,7 @@ pub fn build_function<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
             // NOTE: Adding caller sites only works if analysis is complete.
             caller_sites: Default::default(),
         },
-        // TODO: We need more than one entry block.
-        entry: entry_basic_block_guid(func, llil).map(BasicBlock::new),
     }
-}
-
-pub fn entry_basic_block_guid<A: Architecture, M: FunctionMutability, V: NonSSAVariant>(
-    func: &BNFunction,
-    llil: &llil::Function<A, M, NonSSA<V>>,
-) -> Option<BasicBlockGUID> {
-    // NOTE: This is not actually the entry point. This is the highest basic block.
-    let first_basic_block = sorted_basic_blocks(func).into_iter().next()?;
-    Some(basic_block_guid(&first_basic_block, llil))
 }
 
 /// Basic blocks sorted from high to low.
