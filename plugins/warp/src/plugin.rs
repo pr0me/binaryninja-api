@@ -11,11 +11,11 @@ use crate::{build_function, cache};
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::{Command, FunctionCommand};
 use binaryninja::function::{Function, FunctionUpdateType};
+use binaryninja::logger::Logger;
 use binaryninja::rc::Ref;
 use binaryninja::tags::TagType;
 use binaryninja::ObjectDestructor;
 use warp::signature::function::Function as WarpFunction;
-use binaryninja::logger::Logger;
 
 mod copy;
 mod create;

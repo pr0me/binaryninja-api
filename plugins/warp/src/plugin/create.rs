@@ -1,5 +1,4 @@
 use crate::cache::{cached_function, cached_type_references};
-use crate::convert::from_bn_type;
 use crate::matcher::invalidate_function_matcher_cache;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::Command;
@@ -7,7 +6,6 @@ use rayon::prelude::*;
 use std::io::Write;
 use std::thread;
 use std::time::Instant;
-use warp::r#type::ComputedType;
 
 pub struct CreateSignatureFile;
 
@@ -36,7 +34,7 @@ impl Command for CreateSignatureFile {
                     let llil = func.low_level_il().ok()?;
                     Some(cached_function(&func, &llil))
                 }));
-            
+
             if let Some(ref_ty_cache) = cached_type_references(&view) {
                 let referenced_types = ref_ty_cache
                     .cache
@@ -46,7 +44,7 @@ impl Command for CreateSignatureFile {
 
                 data.types.extend(referenced_types);
             }
-            
+
             log::info!("Signature generation took {:?}", start.elapsed());
 
             if let Some(sig_file_name) = binaryninja::interaction::get_text_line_input(

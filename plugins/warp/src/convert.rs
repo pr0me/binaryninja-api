@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use binaryninja::architecture::ArchitectureExt;
 use binaryninja::architecture::Architecture as BNArchitecture;
+use binaryninja::architecture::ArchitectureExt;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::callingconvention::CallingConvention as BNCallingConvention;
 use binaryninja::rc::Ref as BNRef;

@@ -10,10 +10,10 @@ use rayon::prelude::*;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::function::Function as BNFunction;
 use binaryninja::rc::Guard as BNGuard;
+use binaryninja::settings::Settings;
 use serde_json::{json, Value};
 use walkdir::WalkDir;
 use warp::signature::Data;
-use binaryninja::settings::Settings;
 use warp_ninja::cache::{cached_type_references, register_cache_destructor};
 
 #[derive(Parser, Debug)]
@@ -55,13 +55,13 @@ fn default_settings(bn_settings: &Settings) -> Value {
         "analysis.signatureMatcher.autorun": false,
         "analysis.mode": "full",
     });
-    
+
     // If WARP is enabled we must turn it off to prevent matching on other stuff.
     if bn_settings.contains("analysis.warp.matcher") {
         settings["analysis.warp.matcher"] = json!(false);
         settings["analysis.warp.guid"] = json!(false);
     }
-    
+
     settings
 }
 
@@ -70,7 +70,10 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     // If no output file was given, just prepend binary with extension sbin
-    let output_file = args.output.unwrap_or(args.path.to_owned()).with_extension("sbin");
+    let output_file = args
+        .output
+        .unwrap_or(args.path.to_owned())
+        .with_extension("sbin");
 
     if output_file.exists() && !args.overwrite.unwrap_or(false) {
         log::info!("Output file already exists, skipping... {:?}", output_file);
@@ -93,7 +96,7 @@ fn main() {
 
     // Make sure caches are flushed when the views get destructed.
     register_cache_destructor();
-    
+
     let settings = default_settings(&bn_settings);
 
     log::info!("Creating functions for {:?}...", args.path);
@@ -143,7 +146,7 @@ fn data_from_view(view: &BinaryView) -> Data {
 
         data.types.extend(referenced_types);
     }
-    
+
     data
 }
 
@@ -181,7 +184,7 @@ fn data_from_archive<R: Read>(settings: &Value, mut archive: Archive<R>) -> Opti
             data_from_file(settings, &path)
         })
         .collect::<Vec<_>>();
-    
+
     Some(Data::merge(entry_data))
 }
 
@@ -228,8 +231,7 @@ fn data_from_file(settings: &Value, path: &Path) -> Option<Data> {
         _ if path.is_dir() => data_from_directory(settings, path.into()),
         _ => {
             let path_str = path.to_str().unwrap();
-            let view =
-                binaryninja::load_with_options(path_str, true, Some(settings.to_string()))?;
+            let view = binaryninja::load_with_options(path_str, true, Some(settings.to_string()))?;
             let data = data_from_view(&view);
             view.file().close();
             Some(data)
