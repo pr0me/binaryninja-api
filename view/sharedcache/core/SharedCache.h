@@ -953,41 +953,28 @@ namespace SharedCacheCore {
 			}
 			m_activeContext.doc.AddMember("headers", headers, m_activeContext.allocator);
 			// std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> m_exportInfos
-			rapidjson::Value exportInfos(rapidjson::kArrayType);
-			for (auto& exportInfo : m_exportInfos)
+			// std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> exportInfos;
+			rapidjson::Document exportInfos(rapidjson::kArrayType);
+
+			for (const auto& pair1 : m_exportInfos)
 			{
-				rapidjson::Value exportInfoArr(rapidjson::kArrayType);
-				for (auto& exportInfoPair : exportInfo.second)
+				rapidjson::Value subObj(rapidjson::kObjectType);
+				rapidjson::Value subArr(rapidjson::kArrayType);
+				for (const auto& pair2 : pair1.second)
 				{
-					rapidjson::Value exportInfoPairArr(rapidjson::kArrayType);
-					exportInfoPairArr.PushBack(exportInfoPair.first, m_activeContext.allocator);
-					exportInfoPairArr.PushBack(exportInfoPair.second.first, m_activeContext.allocator);
-					exportInfoPairArr.PushBack(
-						rapidjson::Value(exportInfoPair.second.second.c_str(), m_activeContext.allocator),
-						m_activeContext.allocator);
-					exportInfoArr.PushBack(exportInfoPairArr, m_activeContext.allocator);
+					rapidjson::Value subSubObj(rapidjson::kObjectType);
+					subSubObj.AddMember("key", pair2.first, m_activeContext.allocator);
+					subSubObj.AddMember("val1", pair2.second.first, m_activeContext.allocator);
+					subSubObj.AddMember("val2", pair2.second.second, m_activeContext.allocator);
+					subArr.PushBack(subSubObj, m_activeContext.allocator);
 				}
-				exportInfos.PushBack(exportInfoArr, m_activeContext.allocator);
+
+				subObj.AddMember("key", pair1.first, m_activeContext.allocator);
+				subObj.AddMember("value", subArr, m_activeContext.allocator);
+
+				exportInfos.PushBack(subObj, m_activeContext.allocator);
 			}
 			m_activeContext.doc.AddMember("exportInfos", exportInfos, m_activeContext.allocator);
-			// std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> m_symbolInfos
-			rapidjson::Value symbolInfos(rapidjson::kArrayType);
-			for (auto& symbolInfo : m_symbolInfos)
-			{
-				rapidjson::Value symbolInfoArr(rapidjson::kArrayType);
-				for (auto& symbolInfoPair : symbolInfo.second)
-				{
-					rapidjson::Value symbolInfoPairArr(rapidjson::kArrayType);
-					symbolInfoPairArr.PushBack(symbolInfoPair.first, m_activeContext.allocator);
-					symbolInfoPairArr.PushBack(symbolInfoPair.second.first, m_activeContext.allocator);
-					symbolInfoPairArr.PushBack(
-						rapidjson::Value(symbolInfoPair.second.second.c_str(), m_activeContext.allocator),
-						m_activeContext.allocator);
-					symbolInfoArr.PushBack(symbolInfoPairArr, m_activeContext.allocator);
-				}
-				symbolInfos.PushBack(symbolInfoArr, m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember("symbolInfos", symbolInfos, m_activeContext.allocator);
 
 			rapidjson::Value backingCaches(rapidjson::kArrayType);
 			for (auto bc : m_backingCaches)
@@ -1053,15 +1040,16 @@ namespace SharedCacheCore {
 			MSL(m_imageStarts);
 			MSL(m_baseFilePath);
 			m_exportInfos.clear();
-			for (auto& exportInfo : m_activeDeserContext.doc["exportInfos"].GetArray())
+			for (const auto& obj1 : m_activeDeserContext.doc["exportInfos"].GetArray())
 			{
-				std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> exportInfoVec;
-				for (auto& exportInfoPair : exportInfo.GetArray())
+				std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> innerVec;
+				for (const auto& obj2 : obj1["value"].GetArray())
 				{
-					exportInfoVec.push_back({exportInfoPair[0].GetUint64(),
-						{(BNSymbolType)exportInfoPair[1].GetUint(), exportInfoPair[2].GetString()}});
+					std::pair<BNSymbolType, std::string> innerPair = { (BNSymbolType)obj2["val1"].GetUint64(), obj2["val2"].GetString() };
+					innerVec.push_back({ obj2["key"].GetUint64(), innerPair });
 				}
-				m_exportInfos[exportInfo[0].GetUint64()] = exportInfoVec;
+
+				m_exportInfos[obj1["key"].GetUint64()] = innerVec;
 			}
 			m_symbolInfos.clear();
 			for (auto& symbolInfo : m_activeDeserContext.doc["symbolInfos"].GetArray())

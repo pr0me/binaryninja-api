@@ -662,27 +662,18 @@ bool DSCView::Init()
 		}
 
 		std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> exportInfos;
-		for (auto& exportInfo : result["exportInfos"].GetArray())
-		{
-			std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> exportInfoVec;
-			for (auto& exportInfoPair : exportInfo.GetArray())
-			{
-				exportInfoVec.push_back({exportInfoPair[0].GetUint64(), { (BNSymbolType)exportInfoPair[1].GetUint(), exportInfoPair[2].GetString()}});
-			}
-			exportInfos.push_back({exportInfo[0].GetUint64(), exportInfoVec});
-		}
 
-		std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> symbolInfos;
-		for (auto& symbolInfo : result["symbolInfos"].GetArray())
+		for (const auto& obj1 : result["exportInfos"].GetArray())
 		{
-			std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> symbolInfoVec;
-			for (auto& symbolInfoPair : symbolInfo.GetArray())
+			std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> innerVec;
+			for (const auto& obj2 : obj1["value"].GetArray())
 			{
-				symbolInfoVec.push_back({symbolInfoPair[0].GetUint64(), { (BNSymbolType)symbolInfoPair[1].GetUint(), symbolInfoPair[2].GetString()}});
+				std::pair<BNSymbolType, std::string> innerPair = { (BNSymbolType)obj2["val1"].GetUint64(), obj2["val2"].GetString() };
+				innerVec.push_back({ obj2["key"].GetUint64(), innerPair });
 			}
-			symbolInfos.push_back({symbolInfo[0].GetUint64(), symbolInfoVec});
-		}
 
+			exportInfos.push_back({obj1["key"].GetUint64(), innerVec});
+		}
 		// We need to re-map data located in the Raw (parent parent) viewtype to the DSCRaw (parent) viewtype.
 		for (auto region : regionsMappedIntoMemory)
 		{
@@ -693,31 +684,6 @@ bool DSCView::Init()
 		}
 
 		BeginBulkModifySymbols();
-		for (const auto & [imageBaseAddr, symbolList] : symbolInfos)
-		{
-			std::vector<Ref<Symbol>> symbolsList;
-			for (const auto & [symAddr, symTypeAndName] : symbolList)
-			{
-				symbolsList.push_back(new Symbol(symTypeAndName.first, symTypeAndName.second, symAddr));
-			}
-
-			auto typelib = GetTypeLibrary(imageStartToInstallName[imageBaseAddr]);
-
-			for (const auto& symbol : symbolsList)
-			{
-				if (typelib)
-				{
-					auto type = typelib->GetNamedObject(symbol->GetRawName());
-					if (type)
-					{
-						DefineAutoSymbolAndVariableOrFunction(GetDefaultPlatform(), symbol, type);
-						continue;
-					}
-				}
-				DefineAutoSymbol(symbol);
-			}
-		}
-
 		for (const auto & [imageBaseAddr, exportList] : exportInfos)
 		{
 			std::vector<Ref<Symbol>> symbolsList;
@@ -730,6 +696,8 @@ bool DSCView::Init()
 
 			for (const auto& symbol : symbolsList)
 			{
+				if (!IsValidOffset(symbol->GetAddress()))
+					continue;
 				if (typelib)
 				{
 					auto type = typelib->GetNamedObject(symbol->GetRawName());
