@@ -824,9 +824,9 @@ DSCTriageView::DSCTriageView(QWidget* parent, BinaryViewRef data) : QWidget(pare
 		tb->setOpenExternalLinks(true);
 		auto alphaHtml =
 			R"(
-<h1>Shared Cache Alpha</h1>
+<h1>Dyld Shared Cache Alpha</h1>
 
-<p> This is an experimental alpha release of the Shared Cache view! We are hard at work improving this and adding features, but we wanted
+<p> This is an experimental alpha release of the dyld shared cache view! We are hard at work improving this and adding features, but we wanted
 to make it available for users to experiment with as soon as possible. </p>
 
 <h2> Platforms </h2>
@@ -838,7 +838,7 @@ to make it available for users to experiment with as soon as possible. </p>
 
 <p> iOS parsing should work fairly well for now. macOS parsing should be usable, but both are still a work in progress. </p>
 <h2> Getting the latest version of the plugin </h2>
-<p> We frequently release "dev" builds which will contain the latest version of the Shared Cache plugin (and many other things). </p>
+<p> We frequently release "dev" builds which will contain the latest version of the dyld shared cache plugin (and many other things). </p>
 <p> You can find instructions on how to install these builds <a href="https://docs.binary.ninja/guide/index.html#development-branch">here</a>. </p>
 
 <h3> Reading / building the source </h3>
@@ -848,13 +848,13 @@ to make it available for users to experiment with as soon as possible. </p>
 )";
 		tb->setHtml(alphaHtml);
 
-		m_triageTabs->addTab(tb, "Shared Cache Alpha");
+		m_triageTabs->addTab(tb, "Dyld Shared Cache Alpha");
 		m_triageTabs->setCanCloseTab(tb, false);
 
 	}
 	if (!(settings.contains(QSETTINGS_KEY_ALPHA_POPUP_SEEN) && settings.value(QSETTINGS_KEY_ALPHA_POPUP_SEEN).toBool()))
 	{
-		LogAlert("dyld_shared_cache support is highly experimental! We do not expect it to work on all versions yet! See the 'Shared Cache Alpha' tab in the DSCTriage view for more information. ");
+		LogAlert("dyld_shared_cache support is highly experimental! We do not expect it to work on all versions yet! See the 'Dlyd Shared Cache Alpha' tab in the DSCTriage view for more information. ");
 		settings.setValue(QSETTINGS_KEY_ALPHA_POPUP_SEEN, true);
 		defaultWidget = tb;
 	}
@@ -982,7 +982,7 @@ void CollapsibleSection::setCollapsed(bool collapsed, bool animated)
 
 
 DSCTriageViewType::DSCTriageViewType()
-	: ViewType("DSCTriage", "Shared Cache Triage")
+	: ViewType("DSCTriage", "Dyld Shared Cache Triage")
 {
 
 }
