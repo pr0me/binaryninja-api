@@ -1,5 +1,5 @@
 use log::LevelFilter;
-
+use warp::signature::function::constraints::FunctionConstraint;
 use crate::cache::{
     register_cache_destructor, ViewID, FUNCTION_CACHE, GUID_CACHE, MATCHED_FUNCTION_CACHE,
 };
@@ -79,11 +79,35 @@ impl FunctionCommand for DebugMatcher {
             return;
         };
         let platform = function.platform();
-        // Build the matcher every time this is called to make sure we arent in a bad state.
+        // Build the matcher every time this is called to make sure we aren't in a bad state.
         let matcher = Matcher::from_platform(platform);
         let func = build_function(function, &llil);
+        // TODO: Clean this up.
         if let Some(possible_matches) = matcher.functions.get(&func.guid) {
-            log::info!("{:#?}", possible_matches.value());
+            let print_constraint = |prefix: &str, constraint: &FunctionConstraint| {
+                log::info!(
+                    "    {} {} ({})",
+                    prefix,
+                    constraint
+                        .to_owned()
+                        .symbol
+                        .map(|s| s.name)
+                        .unwrap_or("*".to_string()),
+                    constraint
+                        .guid
+                        .map(|g| g.to_string())
+                        .unwrap_or("*".to_string())
+                );
+            };
+            for possible_match in possible_matches.value() {
+                log::info!("{} ({})", possible_match.symbol.name, possible_match.guid);
+                for constraint in &possible_match.constraints.call_sites {
+                    print_constraint("CS", constraint);
+                }
+                for constraint in &possible_match.constraints.call_sites {
+                    print_constraint("ADJ", constraint);
+                }
+            }
         } else {
             log::error!(
                 "No possible matches found for the function 0x{:x}",
