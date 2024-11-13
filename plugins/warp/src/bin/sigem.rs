@@ -50,10 +50,16 @@ struct Args {
 }
 
 fn default_settings(bn_settings: &Settings) -> Value {
+    // TODO: Make these settings configurable through the CLI
     let mut settings = json!({
         "analysis.linearSweep.autorun": false,
         "analysis.signatureMatcher.autorun": false,
         "analysis.mode": "full",
+        // The reason we need to do this is a little unfortunate.
+        // Basically some of the COFF's have really low image bases that confuses
+        // Analysis and also our basic block GUID when a constant value points to a low address section.
+        // TODO: This might not exist, we should set this based on the view.
+        "loader.imageBase": 0x1000000,
     });
 
     // If WARP is enabled we must turn it off to prevent matching on other stuff.
