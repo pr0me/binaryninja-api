@@ -530,36 +530,20 @@ namespace SharedCacheCore {
 		void Store(SerializationContext& context) const;
 		void Load(DeserializationContext& context);
 
+		struct State;
+
 	private:
 		Ref<Logger> m_logger;
 		/* VIEW STATE BEGIN -- SERIALIZE ALL OF THIS AND STORE IT IN RAW VIEW */
 
 		// Updated as the view is loaded further, more images are added, etc
-		DSCViewState m_viewState = DSCViewStateUnloaded;
-		std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>
-			m_exportInfos;
-		std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>
-			m_symbolInfos;
-		// ---
+		// NOTE: Access via `State()` or `MutableState()` below.
+		// `WillMutateState()` must be called before the first access to `MutableState()`.
+		std::shared_ptr<State> m_state;
+		bool m_stateIsShared = false;
 
 		// Serialized once by PerformInitialLoad and available after m_viewState == Loaded
 		bool m_metadataValid = false;
-
-		std::string m_baseFilePath;
-		SharedCacheFormat m_cacheFormat;
-
-		std::unordered_map<std::string, uint64_t> m_imageStarts;
-		std::unordered_map<uint64_t, SharedCacheMachOHeader> m_headers;
-
-		std::vector<CacheImage> m_images;
-
-		std::vector<MemoryRegion> m_regionsMappedIntoMemory;
-
-		std::vector<BackingCache> m_backingCaches;
-
-		std::vector<MemoryRegion> m_stubIslandRegions;
-		std::vector<MemoryRegion> m_dyldDataRegions;
-		std::vector<MemoryRegion> m_nonImageRegions;
 
 		/* VIEWSTATE END -- NOTHING PAST THIS IS SERIALIZED */
 
@@ -592,20 +576,17 @@ namespace SharedCacheCore {
 
 		std::vector<std::pair<std::string, Ref<Symbol>>> LoadAllSymbolsAndWait();
 
-		std::unordered_map<std::string, uint64_t> AllImageStarts() const { return m_imageStarts; }
-		std::unordered_map<uint64_t, SharedCacheMachOHeader> AllImageHeaders() const { return m_headers; }
+		const std::unordered_map<std::string, uint64_t>& AllImageStarts() const;
+		const std::unordered_map<uint64_t, SharedCacheMachOHeader>& AllImageHeaders() const;
 
 		std::string SerializedImageHeaderForAddress(uint64_t address);
 		std::string SerializedImageHeaderForName(std::string name);
 
 		void FindSymbolAtAddrAndApplyToAddr(uint64_t symbolLocation, uint64_t targetLocation, bool triggerReanalysis);
 
-		std::vector<BackingCache> BackingCaches() const {
+		const std::vector<BackingCache>& BackingCaches() const;
 
-			return m_backingCaches;
-		}
-
-		DSCViewState State() const { return m_viewState; }
+		DSCViewState ViewState() const;
 
 		explicit SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> rawView);
 		virtual ~SharedCache();
@@ -614,12 +595,21 @@ namespace SharedCacheCore {
 			std::shared_ptr<VM> vm, uint64_t address, std::string installName);
 		void InitializeHeader(
 			Ref<BinaryView> view, VM* vm, SharedCacheMachOHeader header, std::vector<MemoryRegion*> regionsToLoad);
-		void ReadExportNode(std::vector<Ref<Symbol>>& symbolList, SharedCacheMachOHeader& header, DataBuffer& buffer, uint64_t textBase,
-			const std::string& currentText, size_t cursor, uint32_t endGuard);
+		void ReadExportNode(std::vector<Ref<Symbol>>& symbolList, SharedCacheMachOHeader& header, DataBuffer& buffer,
+			uint64_t textBase, const std::string& currentText, size_t cursor, uint32_t endGuard);
 		std::vector<Ref<Symbol>> ParseExportTrie(
 			std::shared_ptr<MMappedFileAccessor> linkeditFile, SharedCacheMachOHeader header);
-	};
 
+		const State& State() const { return *m_state; }
+		struct State& MutableState() { AssertMutable(); return *m_state; }
+
+		void AssertMutable() const;
+
+		// Ensures that the state is uniquely owned, copying it if it is not.
+		// Must be called before first access to `MutableState()` after the state
+		// is loaded from the cache. Can safely be called multiple times.
+		void WillMutateState();
+	};
 
 }
 
