@@ -833,7 +833,9 @@ class Function:
 
 			>>> current_function.add_tag("Important", "I think this is the main function")
 			>>> current_function.add_tag("Crashes", "Nullpointer dereference", here)
-			>>>
+
+		Warning: For performance reasons, this function does not ensure the address you
+		have supplied is within the function's bounds.
 		"""
 		tag_type = self.view.get_tag_type(tag_type)
 		if tag_type is None:
@@ -2560,6 +2562,9 @@ class Function:
 
 			>>> current_function.set_user_instr_highlight(here, HighlightStandardColor.BlueHighlightColor)
 			>>> current_function.set_user_instr_highlight(here, highlight.HighlightColor(red=0xff, blue=0xff, green=0))
+
+		Warning: For performance reasons, this function does not ensure the address you have supplied is within the
+		function's bounds.
 		"""
 		if arch is None:
 			arch = self.arch
