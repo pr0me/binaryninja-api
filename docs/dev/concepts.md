@@ -163,7 +163,7 @@ Binary Ninja uses this capability internally for its own value set analysis and 
 
 Memory permissions and annotations directly impact Binary Ninja's analysis. The system employs a **most-specific-wins** strategy for memory granularity.
 
-So for example an annotation such as `const` takes precedence over a memory [section](https://api.binary.ninja/binaryninja.binaryview-module.html#binaryninja.binaryview.Section) with [ReadWriteDataSectionSemantics](https://api.binary.ninja/binaryninja.enums-module.html#binaryninja.enums.SectionSemantics). Additionally, a section with ReadOnlyDataSectionSemantics over a [segment](https://api.binary.ninja/binaryninja.binaryview-module.html#binaryninja.binaryview.Segment) with a [SegmentExecutable](https://api.binary.ninja/binaryninja.enums-module.html#binaryninja.enums.SegmentFlag) flag, will still block linear sweep from creating functions in that region of memory.
+So, for example, an annotation such as `const` takes precedence over a memory [section](https://api.binary.ninja/binaryninja.binaryview-module.html#binaryninja.binaryview.Section) with [ReadWriteDataSectionSemantics](https://api.binary.ninja/binaryninja.enums-module.html#binaryninja.enums.SectionSemantics). Additionally, a section with ReadOnlyDataSectionSemantics over a [segment](https://api.binary.ninja/binaryninja.binaryview-module.html#binaryninja.binaryview.Segment) with a [SegmentExecutable](https://api.binary.ninja/binaryninja.enums-module.html#binaryninja.enums.SegmentFlag) flag will still block linear sweep from creating functions in that region of memory.
 
 This is most notable for how the data flow system works and for how linear sweep/code identification works.
 
@@ -173,7 +173,7 @@ Binary Ninja utilizes two distinct data flow systems that are influenced by memo
 
 1. **Constant Propagation:** This system runs continuously and performs constant propagation across the code. It is less computationally intensive and is always active, ensuring that constant values are propagated wherever applicable.
 
-2. **Possible Value Set System:** This more computationally expensive system is executed on-demand and is used to identify switch statement targets in cases of indirect control flow among other uses. It constructs possible value sets for variables to determine potential execution paths.
+2. **Possible Value Set System:** This more computationally expensive system is executed on-demand and is used to identify switch statement targets in cases of indirect control flow, among other uses. It constructs possible value sets for variables to determine potential execution paths.
 
 The distinction between readable and writable values affects how data flow analysis is performed:
 - **Readable Values:** Variables marked as readable are analyzed primarily for the flow of data without modification, aiding in tracking data dependencies.
@@ -185,7 +185,7 @@ By overriding variable annotations or memory flags, you can alter Binary Ninja's
 
 Memory permissions at the segment or section level directly influence how the linear sweep analysis operates:
 - **Executable Segments:** Segments marked as executable ([SegmentExecutable](https://api.binary.ninja/binaryninja.enums-module.html#binaryninja.enums.SegmentFlag)) allow the linear sweep to interpret the region as code, enabling function creation and disassembly.
-- **Non-Executable Segments:** If a segment is marked as non-executable, the linear sweep will refrain from creating functions within that region. If the initial segment analysis is incorrect or is changed at runtime and you want to mirror that, you can [override](../guide/index.md#memory-map) it by creating a new section.
+- **Non-Executable Segments:** If a segment is marked as non-executable, linear sweep will not create functions within that region. If the initial segment analysis is incorrect, or is changed at runtime and you want to mirror that, you can [override](../guide/index.md#memory-map) it by creating a new section.
 - **Read-Only vs Read-Write Sections:** Sections with [ReadOnlyCodeSectionSemantics](https://api.binary.ninja/binaryninja.enums-module.html#binaryninja.enums.SectionSemantics) allow for the creation of functions, while any other semantics will not.
 
 By modifying memory permissions, you can guide Binary Ninja's linear sweep analysis to more accurately analyze a given binary.
