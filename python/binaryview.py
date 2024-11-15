@@ -7935,7 +7935,11 @@ class BinaryView:
 
 	def export_type_to_library(self, lib: typelibrary.TypeLibrary, name: Optional[str], type_obj: StringOrType) -> None:
 		"""
-		``export_type_to_library`` recursively exports ``type_obj`` into ``lib`` as a type with name ``name``
+		Recursively exports ``type_obj`` into ``lib`` as a type with a ``name``.
+
+		This should be used to store type definitions with no symbol information. For example, `color` might be a type
+		of `enum {RED=0, ORANGE=1, YELLOW=2, ...}` used by this library. If you have a function, variable, or other
+		object that is exported, you probably want :py:meth:`export_object_to_library` instead.
 
 		As other referenced types are encountered, they are either copied into the destination type library or
 		else the type library that provided the referenced type is added as a dependency for the destination library.
@@ -7964,7 +7968,11 @@ class BinaryView:
 	    self, lib: typelibrary.TypeLibrary, name: Optional[str], type_obj: StringOrType
 	) -> None:
 		"""
-		``export_object_to_library`` recursively exports ``type_obj`` into ``lib`` as an object with name ``name``
+		Recursively exports ``type_obj`` into ``lib`` as an object with a ``name``.
+
+		This should be used to store definitions for functions, variables, and other things that are named symbols.
+		For example, `MessageBoxA` might be the name of a function with the type `int ()(HWND, LPCSTR, LPCSTR, UINT)`.
+		If you just want to store a type definition, you probably want :py:meth:`export_type_to_library`.
 
 		As other referenced types are encountered, they are either copied into the destination type library or
 		else the type library that provided the referenced type is added as a dependency for the destination library.
