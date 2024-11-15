@@ -846,21 +846,19 @@ void SharedCache::PerformInitialLoad()
 						// Part before the overlap
 						if (regionStart < segmentStart)
 						{
-							MemoryRegion newRegion;
+							MemoryRegion newRegion(*it);
 							newRegion.start = regionStart;
 							newRegion.size = segmentStart - regionStart;
-							newRegion.prettyName = it->prettyName;
-							newRegions.push_back(newRegion);
+							newRegions.push_back(std::move(newRegion));
 						}
 
 						// Part after the overlap
 						if (regionEnd > segmentEnd)
 						{
-							MemoryRegion newRegion;
+							MemoryRegion newRegion(*it);
 							newRegion.start = segmentEnd;
 							newRegion.size = regionEnd - segmentEnd;
-							newRegion.prettyName = it->prettyName;
-							newRegions.push_back(newRegion);
+							newRegions.push_back(std::move(newRegion));
 						}
 
 						// Erase the original region
@@ -909,21 +907,19 @@ void SharedCache::PerformInitialLoad()
 						// Part before the overlap
 						if (regionStart < segmentStart)
 						{
-							MemoryRegion newRegion;
+							MemoryRegion newRegion(*it);
 							newRegion.start = regionStart;
 							newRegion.size = segmentStart - regionStart;
-							newRegion.prettyName = it->prettyName;
-							newRegions.push_back(newRegion);
+							newRegions.push_back(std::move(newRegion));
 						}
 
 						// Part after the overlap
 						if (regionEnd > segmentEnd)
 						{
-							MemoryRegion newRegion;
+							MemoryRegion newRegion(*it);
 							newRegion.start = segmentEnd;
 							newRegion.size = regionEnd - segmentEnd;
-							newRegion.prettyName = it->prettyName;
-							newRegions.push_back(newRegion);
+							newRegions.push_back(std::move(newRegion));
 						}
 
 						// Erase the original region
