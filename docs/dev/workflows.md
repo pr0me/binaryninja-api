@@ -298,6 +298,8 @@ This example demonstrates how to customize the function-level analysis by adding
 
 The example above demonstrates how the auto-generated control setting allows users to enable or disable an activity directly through the settings UI. This provides a convenient way to control the execution of custom analysis steps without modifying the code. As shown in the image below, the control setting automatically appears in a function's context menu under the *Function Analysis* group. By defaulting the setting to false, users can selectively enable the custom analysis step for specific functions as needed.
 
+Please refer to the [Activity Eligibility](#activity-eligibility) section for more details on setting-based eligibility and control settings.
+
 ![eligibility-control-setting](../img/eligibility-control-setting.png "Eligibility Control Setting"){ width="800" }
 
 ### Workflow Configuration
@@ -374,11 +376,11 @@ Activities can have different roles, defining their behavior and how they intera
 
 Eligibility determines whether an Activity should execute, based on certain conditions or predicates. Key eligibility properties:
 
-- `runOnce`: A boolean indicating whether the activity should run only once, including across multiple sessions.
-- `runOncePerSession`: A boolean indicating whether the activity should run only once per session.
+- `runOnce`: A boolean indicating whether the activity executes only once across all file/analysis sessions. Once the activity runs, its state is saved persistently, and it will not run again unless explicitly reset. This is useful for activities that only need to be performed once, such as initial setup tasks.
+- `runOncePerSession`: A boolean indicating whether the activity executes only once within the current session. Its state is not saved persistently, meaning it resets when a new session begins. This is useful for tasks that should run once per analysis session, such as initialization steps specific to a particular execution context.
 - `predicates`: An array of objects defining the condition that must be met for the activity to be eligible to run.
-	- `auto`: An object that automatically generates a control setting and predicate. It includes the following properties:
-		- `default`: The default value for the auto-generated setting. If not provided, the default is `true`.
+	- `auto`: An object that automatically generates a boolean control setting and predicate. It includes one optional field:
+		- `default`: The default boolean value for the auto-generated setting. If not provided, the default is `true`.
 	- `type` (required): A string indicating the type of predicate. Valid values:
 		- `"setting"`: Evaluates the value of specific setting.
 		- `"viewType"`: Evaluates the type of BinaryView.
@@ -517,13 +519,19 @@ An Activity must have at least a `name` and can include other properties like `r
 					"type": "viewType",
 					"value": ["COFF", "PE"],
 					"operator": "in"
+				},
+				{
+					"type": "setting",
+					"identifier": "analysis.windows.forceAnalysis",
+					"value": True
 				}
-			]
+			],
+			"logicalOperator": "or"
 		}
 	})
 	```
 
-**_NOTE:_** Compound eligibility predicates provide a powerful mechanism for defining complex conditions that determine activity execution. By combining multiple predicates, you can create sophisticated eligibility rules that adapt to various scenarios and requirements. By default, compound predicates are evaluated using the logical AND operator. The `logicalOperator` field controls how to combine multiple predicates. Supported values are `and` (default) and `or`.
+**_NOTE:_** Compound eligibility predicates provide a powerful mechanism for defining complex conditions that determine activity execution. By combining multiple predicates, you can create sophisticated eligibility rules that adapt to various scenarios and requirements. By default, compound predicates are evaluated using the logical AND operator. The optional `logicalOperator` field controls how to combine multiple predicates. Supported values are `and` (default) and `or`.
 
 ### Activity Eligibility Overrides
 
@@ -540,6 +548,12 @@ The **Workflow Machine** includes an override system that allows you to manually
 ---
 
 ## Workflow Machine Fundamentals
+
+The **Workflow Machine** is the core engine that manages and executes workflows. It controls the flow of analysis, ensuring that activities are executed in the correct order and respecting their dependencies. The Workflow Machine also handles activity eligibility, state transitions, and execution semantics, providing a robust and flexible framework for analysis.
+
+There is an API to interact directly with the Workflow Machine, allowing you to issue commands, query state, and control activity eligibility.
+
+**_NOTE:_** This API is only available in **Commercial** and above product editions.
 
 ### WorkflowMachine CLI Commands
 
