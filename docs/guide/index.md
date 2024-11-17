@@ -691,6 +691,37 @@ clickable to navigate to the virtual address.
 Strings can be double clicked to navigate to them, and the table can be sorted or the list filtered by
 typing in the search box.
 
+## Dyld Shared Cache Triage (Alpha)
+
+The Dyld Shared Cache Triage View (or DSCView) allows loading dyld shared cache files from macOS and iOS. You can selectively load specific images, search for specific symbols, and follow analysis between specific images, search for specific symbols, and follow analysis references between any loaded images in one view.
+
+!!! note "Dyld Shared Cache Tabs"
+
+    === "Image List"
+
+        ![Dyld Shared Cache Image List](../img/dsc/images.png "Dyld Shared Cache Image List"){ width="800" }
+
+        The image list shows a list of all images within the dyld shared cache and their virtual addresses. Double clicking on an image will load the image and begin analyzing it.
+
+    === "Symbol Search"
+
+        ![Dyld Shared Cache Symbol Search](../img/dsc/symbols.png "Dyld Shared Cache Symbol List"){ width="800" }
+
+        All symbols exported by each of the shared libraries in the cache can be searched from this view. Double clicking any line will prompt the user whether to load the associated library for that symbol.
+
+    === "Cache"
+
+        ![Dyld Shared Cache Cache](../img/dsc/cache.png "Dyld Shared Cache Cache"){ width="800" }
+
+        The cache view shows currently loaded shared objects and is informational only.
+
+    === "Alpha"
+
+        ![Dyld Shared Cache Alpha](../img/dsc/alpha.png "Dyld Shared Cache Alpha"){ width="800" }
+
+        The current DSCView is considered an Alpha feature and more details on the limitations and known-issues is included in this tab. As the DSCView leaves alpha state, this tab will be removed.
+
+
 ## Byte Overview
 
 ![byte overview](../img/byteoverview.png "Byte Overview"){ width="800" }
