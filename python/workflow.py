@@ -39,10 +39,13 @@ from . import highlevelil
 
 ActivityType = Union['Activity', str]
 
+
 class AnalysisContext:
 	"""
-	The ``AnalysisContext`` object is used to represent the current state of analysis for a given function.
-	It allows direct modification of IL and other analysis information.
+	:class:`AnalysisContext` is a proxy object that provides access to the current analysis context,
+	including the associated :class:`BinaryView`, :class:`Function`, and intermediate language (IL)
+	representations. It provides APIs to retrieve and modify the in-progress analysis state and allows
+	users to notify the analysis system of any changes or updates.
 	"""
 
 	def __init__(self, handle: core.BNAnalysisContextHandle):
@@ -136,9 +139,16 @@ class AnalysisContext:
 	def inform(self, request: str) -> bool:
 		return core.BNAnalysisContextInform(self.handle, request)
 
+
 class Activity(object):
 	"""
-	:class:`Activity`
+	:class:`Activity` in Binary Ninja represents an individual analysis or action to be performed on a
+	:class:`BinaryView` or :class:`Function` object.
+
+	Activities are the fundamental units of execution within a :class:`Workflow`. Each Activity encapsulates
+	a specific task and defines its own behavior, dependencies, and eligibility criteria. Activities are
+	executed in the context of an :class:`AnalysisContext`, which provides access to binary data, analysis
+	state, and utility functions.
 	"""
 
 	_action_callbacks = {}
@@ -230,39 +240,51 @@ class _WorkflowMetaclass(type):
 
 class Workflow(metaclass=_WorkflowMetaclass):
 	"""
-	:class:`Workflow` A Binary Ninja Workflow is an abstraction of a computational binary analysis pipeline and it provides the extensibility \
-	mechanism needed for tailored binary analysis and decompilation. More specifically, a Workflow is a repository of activities along with a \
-	unique strategy to execute them. Binary Ninja provides two Workflows named ``core.module.defaultAnalysis`` and ``core.function.defaultAnalysis`` \
-	which expose the core analysis.
+	``class Workflow`` in Binary Ninja defines the set of analyses to perform on a binary,
+	including their dependencies and execution order.
 
-	A Workflow starts in the unregistered state from either creating a new empty Workflow, or cloning an existing Workflow. While unregistered \
-	it's possible to add and remove activities, as well as change the execution strategy. In order to use the Workflow on a binary it must be \
-	registered. Once registered the Workflow is immutable and available for use.
+	Workflows are represented as Directed Acyclic Graphs (DAGs), where each node corresponds to
+	an :class:`Activity` (an individual analysis or action). Workflows are used to tailor the
+	analysis process for :class:`BinaryView` or :class:`Function` objects, providing granular
+	control over analysis tasks at module or function levels.
 
-	Retrieve the default Workflow by creating a Workflow object::
+	A Workflow starts in an unregistered state, either by creating a new empty Workflow or by
+	cloning an existing one. While unregistered, it is possible to add and remove :class:`Activity`
+	objects, as well as modify the execution strategy. To apply a Workflow to a binary, it must be
+	registered. Once registered, the Workflow becomes immutable and is available for use.
 
-		>>> Workflow()
-		<Workflow: core.module.defaultAnalysis>
+	:Example:
 
-	Retrieve any registered Workflow by name::
+	.. code-block:: python
+		# Define the custom activity configuration
+		configuration = json.dumps({
+			"name": "analysis.plugins.xorStringDecoder",
+			"title": "XOR String Decoder",
+			"description": "This analysis step transforms XOR-encoded strings within the current function.",
+			"eligibility": {
+				"auto": {
+					"default": False
+				}
+			}
+		})
 
-		>>> list(Workflow)
-		[<Workflow: core.function.defaultAnalysis>, <Workflow: core.module.defaultAnalysis>]
-		>>> Workflow('core.module.defaultAnalysis')
-		<Workflow: core.module.defaultAnalysis>
-		>>> Workflow('core.function.defaultAnalysis')
-		<Workflow: core.function.defaultAnalysis>
+		# Clone the meta function workflow for customization
+		workflow = Workflow("core.function.metaAnalysis").clone()
 
-	Create a new Workflow, show it in the UI, modify and then register it. Try it via Open with Options and selecting the new Workflow::
+		# Register a new activity
+		workflow.register_activity(Activity(
+			configuration,
+			action=lambda analysis_context: log_warn(
+				f"Decoder running for function: {hex(analysis_context.function.start)}"
+				# Insert decoder logic here :P
+			)
+		))
 
-		>>> pwf = Workflow().clone("PythonLogWarnWorkflow")
-		>>> pwf.show_topology()
-		>>> pwf.register_activity(Activity("PythonLogWarn", action=lambda analysis_context: log_warn("PythonLogWarn Called!")))
-		>>> pwf.insert("core.function.basicBlockAnalysis", ["PythonLogWarn"])
-		>>> pwf.register()
+		# Insert the new activity before the "generateHighLevelIL" step
+		workflow.insert("core.function.generateHighLevelIL", ["analysis.plugins.xorStringDecoder"])
 
-	.. note:: Binary Ninja Workflows is currently under development and available as an early feature preview. For additional documentation see Help / User Guide / Developer Guide / Workflows
-
+		# Register the modified meta function workflow
+		workflow.register()
 	"""
 	def __init__(self, name: str = "", handle: core.BNWorkflowHandle = None, query_registry: bool = True, object_handle: Union[core.BNFunctionHandle, core.BNBinaryViewHandle] = None):
 		if handle is None:
