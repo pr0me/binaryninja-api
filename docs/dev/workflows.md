@@ -25,7 +25,7 @@
 		- [Activity Eligibility](#activity-eligibility)
 	- [Defining Activities](#defining-activities)
 		- [Activity with Run-Once Eligibility](#activity-with-run-once-eligibility)
-		- [Activity with Auto-Generated Eligibility](#activity-with-auto-generated-control-setting-eligibility)
+		- [Activity with Auto-Generated Control Setting Eligibility](#activity-with-auto-generated-control-setting-eligibility)
 		- [Activity with Setting-Based Eligibility](#activity-with-setting-based-eligibility)
 		- [Activity with View-Type Eligibility](#activity-with-view-type-eligibility)
 		- [Activity with Compound Eligibility](#activity-with-compound-eligibility)
@@ -121,7 +121,7 @@ As always, it's possible to interact with these settings programmatically using 
 	Settings().set_string("analysis.workflows.functionWorkflow", 'core.function.defaultAnalysis', current_function)
 	Settings().get_string("analysis.workflows.functionWorkflow", current_function)
 	'core.function.defaultAnalysis'
-	
+
 	# BinaryView settings scope
 	Settings().get_string("analysis.workflows.functionWorkflow", bv)
 	'core.function.metaAnalysis'
@@ -181,11 +181,11 @@ You can query the list of all registered workflows or filter them by type using 
 	<Workflow: core.function.objectiveC>,
 	<Workflow: core.module.defaultAnalysis>,
 	<Workflow: core.module.metaAnalysis>]
-	
+
 	# List all module workflows from the Settings API
 	Settings().query_property_string_list("analysis.workflows.moduleWorkflow", "enum")
 	['core.module.defaultAnalysis', 'core.module.metaAnalysis']
-	
+
 	# List all function workflows from the Settings API
 	>>> Settings().query_property_string_list("analysis.workflows.functionWorkflow", "enum")
 	['core.function.defaultAnalysis', 'core.function.dsc', 'core.function.metaAnalysis', 'core.function.objectiveC']
@@ -201,22 +201,22 @@ The following example demonstrates how to modify a module workflow by clearing a
 	```python
 	# Clone the workflow
 	workflow = Workflow("core.module.metaAnalysis").clone()
-	
+
 	# Optional: Visualize the workflow topology in the UI
 	workflow.show_topology()
-	
+
 	# Get the root activity of the workflow
 	root = workflow.get_activity("core.module.defaultAnalysis")
-	
+
 	# Clear all activities in the workflow
 	workflow.clear()
-	
+
 	# Re-register the root activity as the only activity in the workflow
 	workflow.register_activity(root)
-	
+
 	# Register the modified workflow
 	workflow.register()
-	
+
 	# Trigger an analysis update on the BinaryView and observe the no-op behavior
 	bv.update_analysis()
 	```
@@ -229,22 +229,22 @@ This example demonstrates how to create a custom workflow that performs only the
 	```python
 	# Clone the workflow and give it a unique name
 	stringsWorkflowOnly = Workflow("core.module.metaAnalysis").clone("stringsAnalysisOnly")
-	
+
 	# Retrieve relevant activities for strings analysis
 	root = stringsWorkflowOnly.get_activity("core.module.defaultAnalysis")
 	sa1 = stringsWorkflowOnly.get_activity("core.module.queueRegionsForStringsAnalysis")
 	sa2 = stringsWorkflowOnly.get_activity("core.module.stringsAnalysis")
-	
+
 	# Clear all existing activities
 	stringsWorkflowOnly.clear()
-	
+
 	# Register only the strings analysis activities
 	stringsWorkflowOnly.register_activity(sa1)
 	stringsWorkflowOnly.register_activity(sa2)
-	
+
 	# Register the root activity to include the strings analysis steps
 	stringsWorkflowOnly.register_activity(root, [sa1, sa2])
-	
+
 	# Register the modified workflow
 	configuration = json.dumps({
 		"title" : "Strings-Only Analysis",
@@ -252,7 +252,7 @@ This example demonstrates how to create a custom workflow that performs only the
 		"targetType": "module"
 	})
 	stringsWorkflowOnly.register(configuration)
-	
+
 	# Apply the custom workflow to a binary view and run the analysis
 	options = {"analysis.workflows.moduleWorkflow": "stringsAnalysisOnly"}
 	with load(".../helloworld", options=options) as view:
@@ -276,10 +276,10 @@ This example demonstrates how to customize the function-level analysis by adding
 			}
 		}
 	})
-	
+
 	# Clone the meta function workflow for customization
 	workflow = Workflow("core.function.metaAnalysis").clone()
-	
+
 	# Register a new activity
 	workflow.register_activity(Activity(
 		configuration,
@@ -288,10 +288,10 @@ This example demonstrates how to customize the function-level analysis by adding
 			# Insert decoder logic here :P
 		)
 	))
-	
+
 	# Insert the new activity before the "generateHighLevelIL" step
 	workflow.insert("core.function.generateHighLevelIL", ["analysis.plugins.xorStringDecoder"])
-	
+
 	# Register the modified meta function workflow
 	workflow.register()
 	```
@@ -600,7 +600,7 @@ The `show_topology()` function offers two distinct ways to visualize a workflow:
 	```python
 	# The Module Workflow is bound to a BinaryView instance and its Workflow Machine
 	bv.workflow.show_topology()
-	
+
 	# The Function Workflow is bound to a Function instance and its Workflow Machine
 	current_function.workflow.show_topology()
 	```
