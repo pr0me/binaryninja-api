@@ -605,14 +605,13 @@ std::optional<VirtualFunctionTableInfo> MicrosoftRTTIProcessor::ProcessVFT(uint6
         }
         m_view->DefineType(typeId, vftTypeName,
                            Confidence(TypeBuilder::StructureType(vftBuilder.Finalize()).Finalize(), RTTI_CONFIDENCE));
-        vftType = m_view->GetTypeById(typeId);
     }
 
     auto vftName = fmt::format("{}::`vftable'", classInfo.className);
     if (classInfo.baseClassName.has_value())
         vftName += fmt::format("{{for `{}'}}", classInfo.baseClassName.value());
     m_view->DefineAutoSymbol(new Symbol{DataSymbol, vftName, vftAddr});
-    m_view->DefineDataVariable(vftAddr, Confidence(vftType, RTTI_CONFIDENCE));
+    m_view->DefineDataVariable(vftAddr, Confidence(Type::NamedType(m_view, vftTypeName), RTTI_CONFIDENCE));
     return vftInfo;
 }
 
