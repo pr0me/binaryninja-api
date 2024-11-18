@@ -287,7 +287,7 @@ Please note that we offer no support for running Binary Ninja with modified Qt l
      - On Linux, replace the `libQt6Core.so.6`, `libQt6DBus.so.6`, `libQt6Gui.so.6`, `libQt6Network.so.6`, `libQt6Widgets.so.6`, `libQt6XcbQpa.so.6` files wherever Binary Ninja was extracted.
 
 [Building Qt 6 from Git]: https://wiki.qt.io/Building_Qt_6_from_Git
-[Qt 6.7]: https://www.qt.io/qt-licensing-terms/
+[Qt 6.7]: https://www.qt.io/licensing/open-source-lgpl-obligations
 [abseil-cpp]: https://github.com/abseil/abseil-cpp
 [abseil-cpp license]: https://github.com/abseil/abseil-cpp/blob/master/LICENSE
 [capstone]: https://github.com/aquynh/capstone
@@ -317,7 +317,7 @@ Please note that we offer no support for running Binary Ninja with modified Qt l
 [PPC architecture module]: https://github.com/Vector35/ppc-capstone
 [python]: https://github.com/python/cpython
 [python license]: https://github.com/python/cpython/blob/master/LICENSE
-[qt license]: https://www.qt.io/qt-licensing-terms/
+[qt license]: https://www.qt.io/licensing/open-source-lgpl-obligations
 [qt]: https://www.qt.io/download/
 [rapidjson]: http://rapidjson.org/
 [rapidjson license]: https://github.com/Tencent/rapidjson/blob/master/license.txt
