@@ -287,7 +287,7 @@ fn export_type(
 
                 dwarf.unit.get_mut(array_dimension_die_uid).set(
                     gimli::DW_AT_upper_bound,
-                    AttributeValue::Data8((current_t.width() / element_type.width()) - 1),
+                    AttributeValue::Data8(current_t.count() - 1),
                 );
 
                 if element_type.type_class() != TypeClass::ArrayTypeClass {
