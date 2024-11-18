@@ -6,7 +6,7 @@ This document is organized into five sections describing how to work with variou
 1. [Types](#types) documents creating and interacting with types through the API
 1. [Tags](#tags) describes how to create tags and bookmarks
 1. [Type Libraries](typelibraries.md) explains how to work with Type Libraries, including multiple sources of information from which Binary Ninja can automatically source for type information from and how you can add to them
-1. [Signature Libraries](#signature-library) explains how to work with the signature library which match statically compiled functions which are then matched with type libraries
+1. [Signature Libraries](#signature-libraries) explains how to work with the signature library which match statically compiled functions which are then matched with type libraries
 
 ## Symbols
 
@@ -487,11 +487,15 @@ Exporting a header uses the `TypePrinter.print_all_types` api, and outputs a str
 
 Type Library documentation has outgrown this section and now lives [in a separate file](typelibraries.md).
 
-## SigKit Signature Libraries
+## Signature Libraries
+
+There are now two different signature library systems: [SigKit](#sigkit-signature-libraries), and [WARP](#warp-signature-libraries). SigKit will be deprecated in the near future as WARP represents a superset of its features.
+
+### SigKit Signature Libraries
 
 While many signatures are [built-in](https://github.com/Vector35/binaryninja-api/issues/1551) and require no interaction to automatically match functions, you may wish to add or modify your own. First, install the [SigKit](https://github.com/Vector35/sigkit/) plugin from the [plugin manager](../guide/plugins.md#plugin-manager).
 
-### Running the signature matcher
+#### Running the signature matcher
 
 The signature matcher runs automatically by default once analysis completes. You can turn this off in `Settings > Analysis > Autorun Function Signature Matcher` (or, [analysis.signatureMatcher.autorun](../guide/settings.md#analysis.signatureMatcher.autorun) in Settings).
 
@@ -503,7 +507,7 @@ Once the signature matcher runs, it will print a brief report to the console det
 1 functions matched total, 0 name-only matches, 0 thunks resolved, 33 functions skipped because they were too small
 ```
 
-### Generating signature libraries
+#### Generating signature libraries
 
 To generate a signature library for the currently-open binary, use `Tools > Signature Library > Generate Signature Library`. This will generate signatures for all functions in the binary that have a name attached to them. Note that functions with automatically-chosen names such as `sub_401000` will be skipped. Once it's generated, you'll be prompted where to save the resulting signature library.
 
@@ -515,7 +519,7 @@ If you are accessing the sigkit API through the Binary Ninja GUI and you've inst
 import Vector35_sigkit as sigkit
 ```
 
-### Installing signature libraries
+#### Installing signature libraries
 
 Binary Ninja loads signature libraries from 2 locations:
 
@@ -536,7 +540,7 @@ To help debug and optimize your signature libraries in a Signature Explorer GUI 
 For a text-based approach, you can also export your signature libraries to JSON using the Signature Explorer. Then, you can edit them in a text editor and convert them back to a .sig using the Signature Explorer afterwards. Of course, these conversions are also accessible through the API as the [`sigkit.sig_serialize_json`](https://github.com/Vector35/sigkit/blob/master/sigkit/sig_serialize_json.py) module, which provides a pickle-like interface. Likewise, [`sigkit.sig_serialize_fb`](https://github.com/Vector35/sigkit/blob/master/sigkit/sig_serialize_fb.py) provides serialization for the standard .sig format.
 
 
-## WARP Signature Libraries
+### WARP Signature Libraries
 
 WARP integration is included with Binary Ninja but turned **off** by default, for more information about WARP itself visit the open source repository [here](https://github.com/Vector35/warp)!
 
@@ -545,7 +549,7 @@ Alongside fewer false positives WARP will match more functions with less informa
 After matching has completed WARP functions will be tagged and the types for those functions will be transferred, this means less work for those looking to 
 transfer analysis information from one version of a binary to another version.
 
-### Configuration
+#### Configuration
 
 Binary Ninja by default will _only_ use [SigKit signatures](#sigkit-signature-libraries) to match functions, to **enable** WARP signatures you must enable the `analysis.warp` option and restart, after which you will have a few options:
 
@@ -563,13 +567,13 @@ The primary way to create this set of GUID's is to have **WARP GUID** enabled.
 ???+ Danger "Warning"
     These settings are cached internally to not slow down analysis, it is best to restart after changing any of these settings.
 
-### Consumer Usage
+#### Consumer Usage
 
 **WARP** function matching will occur automatically whenever you first open a binary, this process runs at the end of analysis and will trigger reanalysis on matched functions.
 
 After the function matching has finished, all the matched functions are tagged with "WARP" and can be found in the [Tags Sidebar](../guide/index.md#tagsbookmarks).
 
-### Producer Usage
+#### Producer Usage
 
 Before you create signatures you must first identify the binary for which you want to produce said signatures for and whether that format is directly supported by Binary Ninja.
 
