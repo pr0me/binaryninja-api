@@ -1,42 +1,5 @@
 # Binary Ninja Workflows
 
----
-
-## **Contents**
-
-- [Introduction](#introduction)
-- [Concepts](#concepts)
-	- [Workflow](#workflow)
-	- [Activity](#activity)
-	- [Workflow Machine](#workflow-machine)
-- [Workflow Fundamentals](#workflow-fundamentals)
-	- [Workflow Selection](#workflow-selection)
-	- [Foundational Workflows](#foundational-workflows)
-	- [Workflow Cloning and Registration](#workflow-cloning-and-registration)
-		- [Querying Registered Workflows](#querying-registered-workflows)
-		- [Example: NOP'ing Module-Level Analysis](#example-noping-module-level-analysis)
-		- [Example: Strings-Only Module-Level Analysis](#example-strings-only-module-level-analysis)
-		- [Example: Custom Function-Level Analysis](#example-custom-function-level-analysis)
-	- [Workflow Configuration](#workflow-configuration)
-- [Activity Fundamentals](#activity-fundamentals)
-	- [Key Characteristics](#key-characteristics)
-	- [Activity Configuration](#activity-configuration)
-		- [Activity Roles](#activity-roles)
-		- [Activity Eligibility](#activity-eligibility)
-	- [Defining Activities](#defining-activities)
-		- [Activity with Run-Once Eligibility](#activity-with-run-once-eligibility)
-		- [Activity with Auto-Generated Control Setting Eligibility](#activity-with-auto-generated-control-setting-eligibility)
-		- [Activity with Setting-Based Eligibility](#activity-with-setting-based-eligibility)
-		- [Activity with View-Type Eligibility](#activity-with-view-type-eligibility)
-		- [Activity with Compound Eligibility](#activity-with-compound-eligibility)
-	- [Activity Eligibility Overrides](#activity-eligibility-overrides)
-- [Workflow Machine Fundamentals](#workflow-machine-fundamentals)
-	- [WorkflowMachine CLI Commands](#workflowmachine-cli-commands)
-- [Workflow Topology](#workflow-topology)
-- [Advanced Topics (Coming Soon)](#advanced-topics-coming-soon)
-
----
-
 ## Introduction
 
 Binary Ninja's **Workflows** provide a powerful and flexible framework for customizing and extending binary analysis. This framework allows you to tailor the analysis process to meet your specific needs. With Workflows, you can:
@@ -47,11 +10,9 @@ Binary Ninja's **Workflows** provide a powerful and flexible framework for custo
 
 - **Extend and Scale Analysis Capabilities**: Seamlessly integrate new analysis stages, plugins, or custom scripts, allowing the analysis pipeline to adapt as new challenges or requirements arise.
 
-- **Utilize Concurrent and Asynchronous Execution**: Leverage advanced execution models like subflows and tasks to perform analyses concurrently, improving efficiency and enabling complex analysis strategies.
+- **Utilize Concurrent and Asynchronous Execution**: Leverage advanced execution models like sub-flows and tasks to perform analyses concurrently, improving efficiency and enabling complex analysis strategies.
 
 By leveraging Workflows, you gain unparalleled control over the decompilation and analysis process. This flexibility empowers you to perform in-depth, tailored binary analysis, adapting quickly to evolving needs and supporting future enhancements.
-
----
 
 ## Concepts
 
@@ -70,12 +31,15 @@ Workflows enable you to:
 - **Extend Functionality**: Seamlessly integrate custom analyses or third-party plugins into the analysis process.
 
 There are two distinct types of Workflows:
-- **Module Workflows**:
+
+**Module Workflows**:
+
   - Applied to `BinaryView` objects.
   - Perform analysis on the entire binary.
   - Coordinate high-level analysis tasks and oversee function-level analysis.
 
-- **Function Workflows**:
+**Function Workflows**:
+
   - Applied to `Function` objects.
   - Perform analysis at the function granularity.
   - Pipelines can run concurrently and be executed independently of the Module Workflow.
@@ -90,8 +54,6 @@ The **Workflow Machine** is the engine that manages and executes a Workflow. It 
 
 In Binary Ninja, the terms **Workflow Machine** and **Pipeline** are used interchangeably to describe the execution of a Workflow on a particular target (such as a `BinaryView` or `Function`).
 
----
-
 ## Workflow Fundamentals
 
 Configuring and customizing Workflows in Binary Ninja allows you to tailor the analysis process to your needs. This section covers key concepts and operations related to Workflow configuration and management.
@@ -105,35 +67,37 @@ By default, `Function` and `BinaryView` objects get their assigned workflow from
 
 These settings are configurable in the Binary Ninja Settings UI. Additionally, as new workflows are registered, the name and description are automatically added to the UI for easy selection.
 
-![workflow-settings](../img/workflow-settings.png "Workflows"){ width="800" }
+![workflow-settings](../img/workflow-settings.png "Workflows")
 
 These settings are scoped to the Resource level, meaning they are saved within each BinaryView. This allows each BinaryView to have its own unique workflow settings. Additionally, Binary Ninja supports function instance-level settings, enabling you to customize settings (and workflows) per function instance. In the UI, the *Edit Function Properties* dialog allows you to set the workflow for a specific function instance, as shown below:
 
-![function-properties-workflow](../img/function-properties-workflow.png "Function Properties Workflow"){ width="800" }
+![function-properties-workflow](../img/function-properties-workflow.png "Function Properties Workflow")
 
 As always, it's possible to interact with these settings programmatically using the Binary Ninja API. For example:
 
-- **Modify Workflow for a Function Instance**:
-	```python
-	# Function settings scope
-	Settings().get_string("analysis.workflows.functionWorkflow", current_function)
-	'core.function.metaAnalysis'
-	Settings().set_string("analysis.workflows.functionWorkflow", 'core.function.defaultAnalysis', current_function)
-	Settings().get_string("analysis.workflows.functionWorkflow", current_function)
-	'core.function.defaultAnalysis'
+**Modify Workflow for a Function Instance**:
 
-	# BinaryView settings scope
-	Settings().get_string("analysis.workflows.functionWorkflow", bv)
-	'core.function.metaAnalysis'
-	Settings().get_string("analysis.workflows.moduleWorkflow", bv)
-	'core.module.metaAnalysis'
-	```
+```python
+# Function settings scope
+Settings().get_string("analysis.workflows.functionWorkflow", current_function)
+'core.function.metaAnalysis'
+Settings().set_string("analysis.workflows.functionWorkflow", 'core.function.defaultAnalysis', current_function)
+Settings().get_string("analysis.workflows.functionWorkflow", current_function)
+'core.function.defaultAnalysis'
+
+# BinaryView settings scope
+Settings().get_string("analysis.workflows.functionWorkflow", bv)
+'core.function.metaAnalysis'
+Settings().get_string("analysis.workflows.moduleWorkflow", bv)
+'core.module.metaAnalysis'
+```
 
 ### Foundational Workflows
 
 Binary Ninja provides a set of foundational workflows that serve as the basis for both module-level and function-level analysis. These workflows are designed to meet standard analysis needs while also serving as a starting point for customization.
 
 **Immutable Core Workflows**
+
 These workflows are immutable and represent the core analysis functionality in Binary Ninja. They provide a reliable baseline for analysis and cannot be altered directly:
 
 - **Default Module Analysis** (`core.module.defaultAnalysis`): Defines the core analysis tasks for module-level analysis on a `BinaryView` object. This workflow ensures consistent and thorough analysis of the entire binary.
@@ -147,9 +111,11 @@ These workflows are clones of the default core workflows but are mutable, allowi
 
 These foundational workflows are designed to be cloned and customized to create new workflows tailored to specific needs. By leveraging these base workflows, you can build upon existing analyses and extend the capabilities of Binary Ninja.
 
-**_NOTE:_** The workflow settings default to the meta workflows to facilitate seamless integration and customization by installed plugins or scripts. This approach ensures that multiple plugins can extend or modify the analysis pipeline without conflicting with the core workflows. The term "meta" reflects the workflow’s role as a flexible and composable foundation, enabling collaborative customization while preserving the integrity of the default analyses.
+!!! note
+	The workflow settings default to the meta workflows to facilitate seamless integration and customization by installed plugins or scripts. This approach ensures that multiple plugins can extend or modify the analysis pipeline without conflicting with the core workflows. The term "meta" reflects the workflow's role as a flexible and composable foundation, enabling collaborative customization while preserving the integrity of the default analyses.
 
-**_NOTE:_** Binary Ninja’s analysis is structured through the Workflow system, providing immediate extensibility for interposing custom analysis steps. While most Activities within the Workflow represent specific analysis tasks, some serve purely to maintain the pipeline’s functionality. These non-analysis Activities are transitional and will be phased out as we refine and modernize the underlying infrastructure.
+!!! note
+	Binary Ninja's analysis is structured through the Workflow system, providing immediate extensibility for interposing custom analysis steps. While most Activities within the Workflow represent specific analysis tasks, some serve purely to maintain the pipeline's functionality. These non-analysis Activities are transitional and will be phased out as we refine and modernize the underlying infrastructure.
 
 Additionally, some Activities currently act as containers for multiple analysis steps. As we continue to evolve the foundational models, these composite Activities will be further decomposed and restructured to enhance clarity, flexibility, and granularity in the analysis pipeline.
 
@@ -157,12 +123,14 @@ Additionally, some Activities currently act as containers for multiple analysis 
 
 Binary Ninja utilizes a copy-on-write mechanism to enable safe workflow customization. This approach allows you to create and modify workflows without impacting the integrity of registered workflows that may already be in use. When you clone a workflow, you generate a new, independent version that can be safely customized. Once the cloned workflow has been tailored to your needs, it can be registered under a new unique name, or—if the original workflow is mutable—under the same name to seamlessly replace it.
 
-The process involves three simple steps:
+The process involves three steps:
+
 1. **Clone** an existing Workflow.
 2. **Modify** the cloned Workflow as needed.
 3. **Register** the Workflow.
 
 **Key Points**
+
 - **Registered Workflows Are Immutable**: Once registered, workflows cannot be modified.
 - **Workflows Require Unique Names**: Each workflow must have a unique identifier to prevent conflicts.
 - **Naming Convention**: Currently, we use `core.function...` and `core.module...` for the foundational workflows. Custom workflows should use clear and descriptive names.
@@ -171,130 +139,126 @@ The process involves three simple steps:
 
 You can query the list of all registered workflows or filter them by type using the API. This is useful for inspecting available workflows or ensuring your custom workflows are correctly registered.
 
-- **Query for Registered Workflows**
-	```python
-	# List all Module and Function workflows
-	list(Workflow)
-	[<Workflow: core.function.defaultAnalysis>,
-	<Workflow: core.function.dsc>,
-	<Workflow: core.function.metaAnalysis>,
-	<Workflow: core.function.objectiveC>,
-	<Workflow: core.module.defaultAnalysis>,
-	<Workflow: core.module.metaAnalysis>]
+```python
+# List all Module and Function workflows
+list(Workflow)
+[<Workflow: core.function.defaultAnalysis>,
+<Workflow: core.function.dsc>,
+<Workflow: core.function.metaAnalysis>,
+<Workflow: core.function.objectiveC>,
+<Workflow: core.module.defaultAnalysis>,
+<Workflow: core.module.metaAnalysis>]
 
-	# List all module workflows from the Settings API
-	Settings().query_property_string_list("analysis.workflows.moduleWorkflow", "enum")
-	['core.module.defaultAnalysis', 'core.module.metaAnalysis']
+# List all module workflows from the Settings API
+Settings().query_property_string_list("analysis.workflows.moduleWorkflow", "enum")
+['core.module.defaultAnalysis', 'core.module.metaAnalysis']
 
-	# List all function workflows from the Settings API
-	>>> Settings().query_property_string_list("analysis.workflows.functionWorkflow", "enum")
-	['core.function.defaultAnalysis', 'core.function.dsc', 'core.function.metaAnalysis', 'core.function.objectiveC']
-	```
+# List all function workflows from the Settings API
+>>> Settings().query_property_string_list("analysis.workflows.functionWorkflow", "enum")
+['core.function.defaultAnalysis', 'core.function.dsc', 'core.function.metaAnalysis', 'core.function.objectiveC']
+```
 
-Once you’ve queried the available workflows, you can create your own by cloning and modifying an existing workflow. Below are some simple examples that demonstrate how to modify module-level analysis.
+Once you've queried the available workflows, you can create your own by cloning and modifying an existing workflow. Below are some simple examples that demonstrate how to modify module-level analysis.
 
 #### Example: NOP'ing Module-Level Analysis
 
 The following example demonstrates how to modify a module workflow by clearing all module-level analysis. This effectively disables module-level analysis while preserving the ability to analyze single functions at a time in the UI.
 
-- **No-Op Module-Level Analysis**
-	```python
-	# Clone the workflow
-	workflow = Workflow("core.module.metaAnalysis").clone()
+```python
+# Clone the workflow
+workflow = Workflow("core.module.metaAnalysis").clone()
 
-	# Optional: Visualize the workflow topology in the UI
-	workflow.show_topology()
+# Optional: Visualize the workflow topology in the UI
+workflow.show_topology()
 
-	# Get the root activity of the workflow
-	root = workflow.get_activity("core.module.defaultAnalysis")
+# Get the root activity of the workflow
+root = workflow.get_activity("core.module.defaultAnalysis")
 
-	# Clear all activities in the workflow
-	workflow.clear()
+# Clear all activities in the workflow
+workflow.clear()
 
-	# Re-register the root activity as the only activity in the workflow
-	workflow.register_activity(root)
+# Re-register the root activity as the only activity in the workflow
+workflow.register_activity(root)
 
-	# Register the modified workflow
-	workflow.register()
+# Register the modified workflow
+workflow.register()
 
-	# Trigger an analysis update on the BinaryView and observe the no-op behavior
-	bv.update_analysis()
-	```
+# Trigger an analysis update on the BinaryView and observe the no-op behavior
+bv.update_analysis()
+```
 
 #### Example: Strings-Only Module-Level Analysis
 
 This example demonstrates how to create a custom workflow that performs only the core strings analysis on a binary. While there are multiple ways to achieve this, the following method highlights the flexibility of the Workflow API.
 
-- **Custom Strings-Only Analysis**
-	```python
-	# Clone the workflow and give it a unique name
-	stringsWorkflowOnly = Workflow("core.module.metaAnalysis").clone("stringsAnalysisOnly")
+```python
+# Clone the workflow and give it a unique name
+stringsWorkflowOnly = Workflow("core.module.metaAnalysis").clone("stringsAnalysisOnly")
 
-	# Retrieve relevant activities for strings analysis
-	root = stringsWorkflowOnly.get_activity("core.module.defaultAnalysis")
-	sa1 = stringsWorkflowOnly.get_activity("core.module.queueRegionsForStringsAnalysis")
-	sa2 = stringsWorkflowOnly.get_activity("core.module.stringsAnalysis")
+# Retrieve relevant activities for strings analysis
+root = stringsWorkflowOnly.get_activity("core.module.defaultAnalysis")
+sa1 = stringsWorkflowOnly.get_activity("core.module.queueRegionsForStringsAnalysis")
+sa2 = stringsWorkflowOnly.get_activity("core.module.stringsAnalysis")
 
-	# Clear all existing activities
-	stringsWorkflowOnly.clear()
+# Clear all existing activities
+stringsWorkflowOnly.clear()
 
-	# Register only the strings analysis activities
-	stringsWorkflowOnly.register_activity(sa1)
-	stringsWorkflowOnly.register_activity(sa2)
+# Register only the strings analysis activities
+stringsWorkflowOnly.register_activity(sa1)
+stringsWorkflowOnly.register_activity(sa2)
 
-	# Register the root activity to include the strings analysis steps
-	stringsWorkflowOnly.register_activity(root, [sa1, sa2])
+# Register the root activity to include the strings analysis steps
+stringsWorkflowOnly.register_activity(root, [sa1, sa2])
 
-	# Register the modified workflow
-	configuration = json.dumps({
-		"title" : "Strings-Only Analysis",
-		"description": "This workflow defines a strings-only analysis.",
-		"targetType": "module"
-	})
-	stringsWorkflowOnly.register(configuration)
+# Register the modified workflow
+configuration = json.dumps({
+	"title" : "Strings-Only Analysis",
+	"description": "This workflow defines a strings-only analysis.",
+	"targetType": "module"
+})
+stringsWorkflowOnly.register(configuration)
 
-	# Apply the custom workflow to a binary view and run the analysis
-	options = {"analysis.workflows.moduleWorkflow": "stringsAnalysisOnly"}
-	with load(".../helloworld", options=options) as view:
-		print(view.strings)
-	```
+# Apply the custom workflow to a binary view and run the analysis
+options = {"analysis.workflows.moduleWorkflow": "stringsAnalysisOnly"}
+with load(".../helloworld", options=options) as view:
+	print(view.strings)
+```
 
-#### Example: Custom Function-Level Analysis
+#### Example: Custom Function-Level Analysis (XOR Decoder)
 
 This example demonstrates how to customize the function-level analysis by adding a new activity to the meta function workflow. The new activity decodes XOR-encoded strings within the function, providing a custom analysis step that enhances the existing workflow.
 
-- **Custom XOR String Decoder**
-	```python
-	# Define the custom activity configuration
-	configuration = json.dumps({
-		"name": "analysis.plugins.xorStringDecoder",
-		"title": "XOR String Decoder",
-		"description": "This analysis step transforms XOR-encoded strings within the current function.",
-		"eligibility": {
-			"auto": {
-				"default": False
-			}
+```python
+# Define the custom activity configuration
+configuration = json.dumps({
+	"name": "analysis.plugins.xorStringDecoder",
+	"title": "XOR String Decoder",
+	"description": "This analysis step transforms XOR-encoded strings within the current function.",
+	"eligibility": {
+		"auto": {
+			"default": False
 		}
-	})
+	}
+})
 
-	# Clone the meta function workflow for customization
-	workflow = Workflow("core.function.metaAnalysis").clone()
+# Clone the meta function workflow for customization
+workflow = Workflow("core.function.metaAnalysis").clone()
 
-	# Register a new activity
-	workflow.register_activity(Activity(
-		configuration,
-		action=lambda analysis_context: log_warn(
-			f"Decoder running for function: {hex(analysis_context.function.start)}"
-			# Insert decoder logic here :P
-		)
-	))
+# Register a new activity
+workflow.register_activity(Activity(
+	configuration,
+	action=lambda analysis_context: log_warn(
+		f"Decoder running for function: {hex(analysis_context.function.start)}"
+		# Insert decoder logic here :P
+	)
+))
 
-	# Insert the new activity before the "generateHighLevelIL" step
-	workflow.insert("core.function.generateHighLevelIL", ["analysis.plugins.xorStringDecoder"])
+# Insert the new activity before the "generateHighLevelIL" step
+workflow.insert("core.function.generateHighLevelIL", ["analysis.plugins.xorStringDecoder"])
 
-	# Register the modified meta function workflow
-	workflow.register()
-	```
+# Register the modified meta function workflow
+workflow.register()
+```
 
 The example above demonstrates how the auto-generated control setting allows users to enable or disable an activity directly through the settings UI. This provides a convenient way to control the execution of custom analysis steps without modifying the code. As shown in the image below, the control setting automatically appears in a function's context menu under the *Function Analysis* group. By defaulting the setting to false, users can selectively enable the custom analysis step for specific functions as needed.
 
@@ -314,19 +278,17 @@ When registering a workflow, provide an optional JSON configuration that defines
 }
 ```
 
----
-
 ## Activity Fundamentals
 
-An Activity represents a fundamental unit of work within a workflow. It encapsulates a specific analysis step or action as a callback function, which is augmented by a JSON configuration. This configuration defines the activity’s metadata, eligibility criteria, and execution semantics, allowing it to seamlessly integrate into the workflow system.
+An Activity represents a fundamental unit of work within a workflow. It encapsulates a specific analysis step or action as a callback function, which is augmented by a JSON configuration. This configuration defines the activity's metadata, eligibility criteria, and execution semantics, allowing it to seamlessly integrate into the workflow system.
 
 ### Key Characteristics
 
 - **Shared Across Workflows**:
-An Activity instance is shared among multiple workflows. As a result, the callback function must be reentrant, ensuring that it can be safely invoked concurrently across different analysis contexts.
+An Activity instance is shared among multiple workflows. As a result, the callback function must be re-entrant, ensuring that it can be safely invoked concurrently across different analysis contexts.
 
 - **Callback Function with Context**:
-The Activity’s callback function operates on an `AnalysisContext`, which provides access to resources such as the binary data, analysis state, and transformation utilities. This allows the Activity to perform its specific task, whether analyzing,
+The Activity's callback function operates on an `AnalysisContext`, which provides access to resources such as the binary data, analysis state, and transformation utilities. This allows the Activity to perform its specific task, whether analyzing,
 modifying, or transforming the context.
 
 - **Workflow-Defined Composition**:
@@ -370,7 +332,8 @@ Activities can have different roles, defining their behavior and how they intera
 - `subflow`: Creates a new task context and asynchronously processes its workflow sub-graph on a new thread within the workflow machine. The subflow executes asynchronously from the requestor, allowing the original thread to return immediately. Within this context, multiple task actions can be enqueued, enabling extensive parallel processing. After completing its workflow sub-graph, it enters a Stall state, waiting for all its asynchronous task actions to complete. Once all task actions are finished, it re-evaluates its dependencies and may re-execute the entire subflow. This facilitates complex iterative processes that continue until convergence is achieved.
 - `task`: Asynchronously processes the workflow graph on a new thread within the workflow machine. `task` activities enable the pipeline to execute asynchronously from its requestor. `task` activities require a task context to be present; if no task context exists, they execute immediately in the current thread.
 
-**_NOTE:_** Nested task contexts are not currently supported. We may consider adding this feature in the future if the need arises. Stated more simply, you may not embed a `subflow` within another `subflow`.
+!!! note
+	Nested task contexts are not currently supported. We may consider adding this feature in the future if the need arises. Stated more simply, you may not embed a `subflow` within another `subflow`.
 
 #### Activity Eligibility
 
@@ -389,7 +352,7 @@ Eligibility determines whether an Activity should execute, based on certain cond
 		- `number`
 		- `boolean`
 		- `array` of `string` (for `in` and `not in` operators)
-	- `identifier` (required for `type: "setting"`): A string specifying the identifer of the setting to evaluate.
+	- `identifier` (required for `type: "setting"`): A string specifying the identifier of the setting to evaluate.
 	- `operator` A string representing the comparison operator to use. Supported operators:
 		- `==`: Equal to (default)
 		- `!=`: Not equal to
@@ -459,7 +422,8 @@ An Activity must have at least a `name` and can include other properties like `r
 	})
 	```
 
-**_NOTE:_** Auto-generated control settings provide an efficient way to offer granular control over activity execution. Currently, the setting identifier is derived automatically from the activity name. In the core system, these generated control settings are organized under the *Core Analysis* settings group, using the prefixes core.function.* and core.module.*. However, this structure will evolve as we reconcile existing analysis settings with the new workflow system.
+!!! note
+	Auto-generated control settings provide an efficient way to offer granular control over activity execution. Currently, the setting identifier is derived automatically from the activity name. In the core system, these generated control settings are organized under the *Core Analysis* settings group, using the prefixes core.function.* and core.module.*. However, this structure will evolve as we reconcile existing analysis settings with the new workflow system.
 
 #### Activity with Setting-Based Eligibility
 - Activity executes based on the value of an existing setting.
@@ -481,7 +445,8 @@ An Activity must have at least a `name` and can include other properties like `r
 	})
 	```
 
-**_NOTE:_** Linking activity eligibility to an existing setting (or another activity's automatically generated control setting) enables the management of activities as groups. This allows multiple activities to be enabled or disabled with a single setting, simplifying control and enhancing coordination.
+!!! note
+	Linking activity eligibility to an existing setting (or another activity's automatically generated control setting) enables the management of activities as groups. This allows multiple activities to be enabled or disabled with a single setting, simplifying control and enhancing coordination.
 
 #### Activity with View-Type Eligibility
 - Activity executes based on all view types except 'Raw' BinaryViews.
@@ -531,21 +496,21 @@ An Activity must have at least a `name` and can include other properties like `r
 	})
 	```
 
-**_NOTE:_** Compound eligibility predicates provide a powerful mechanism for defining complex conditions that determine activity execution. By combining multiple predicates, you can create sophisticated eligibility rules that adapt to various scenarios and requirements. By default, compound predicates are evaluated using the logical AND operator. The optional `logicalOperator` field controls how to combine multiple predicates. Supported values are `and` (default) and `or`.
+!!! note
+	Compound eligibility predicates provide a powerful mechanism for defining complex conditions that determine activity execution. By combining multiple predicates, you can create sophisticated eligibility rules that adapt to various scenarios and requirements. By default, compound predicates are evaluated using the logical AND operator. The optional `logicalOperator` field controls how to combine multiple predicates. Supported values are `and` (default) and `or`.
 
 ### Activity Eligibility Overrides
 
 The **Workflow Machine** includes an override system that allows you to manually force activities to be either eligible or ineligible. This feature is particularly useful for debugging, testing, or customizing the analysis pipeline. Additionally, the override system is used to implement run-once functionality for specific activities.
 
-- **Override States**:
+ **Override States**:
 
   - **Enabled**: Forces the activity to be eligible.
   - **Disabled**: Forces the activity to be ineligible.
   - **Cleared**: Removes any override, returning to default eligibility.
 
-**_NOTE:_** Overrides can be managed either visually through the topology graph or programmatically via the API. Details on both approaches are provided in the following sections.
-
----
+!!! note
+	Overrides can be managed either visually through the topology graph or programmatically via the API. Details on both approaches are provided in the following sections.
 
 ## Workflow Machine Fundamentals
 
@@ -553,28 +518,28 @@ The **Workflow Machine** is the core engine that manages and executes workflows.
 
 There is an API to interact directly with the Workflow Machine, allowing you to issue commands, query state, and control activity eligibility.
 
-**_NOTE:_** This API is only available in **Commercial** and above product editions.
+!!! note
+	This API is only available in **Commercial** and above product editions.
 
 ### WorkflowMachine CLI Commands
 
 You can interact with the `WorkflowMachine` using the CLI for debugging purposes:
 
-- **Start the CLI**:
+ **Start the CLI**:
 
-  ```python
-  bv.workflow.machine.cli()
-  ```
+```python
+bv.workflow.machine.cli()
+```
 
-- **Available Commands**:
+**Available Commands**:
 
-  ```
-  abort       configure  dump    halt  log      override  reset   run     step
-  breakpoint  disable    enable  help  metrics  quit      resume  status
-  ```
+```
+abort       configure  dump    halt  log      override  reset   run     step
+breakpoint  disable    enable  help  metrics  quit      resume  status
+```
 
-**_NOTE:_** The CLI provides a convenient way to issue commands, query status, and manage the workflow machine interactively. It is particularly useful for debugging, testing, and exploring the behavior of the workflow machine during execution. It's currently still under development, and additional features, enhancements, and documentation are planned.
-
----
+!!! note
+	The CLI provides a convenient way to issue commands, query status, and manage the workflow machine interactively. It is particularly useful for debugging, testing, and exploring the behavior of the workflow machine during execution. It's currently still under development, and additional features, enhancements, and documentation are planned.
 
 ## Workflow Topology
 
@@ -590,28 +555,29 @@ Both modes offer a comprehensive way to understand the workflow's design and exe
 
 The `show_topology()` function offers two distinct ways to visualize a workflow:
 
-- **Static Workflow View**:
-	```python
-	Workflow("core.module.metaAnalysis").show_topology()
-	```
-	This command displays a static view of the workflow, showcasing its predefined structure. It highlights the configured activities and their relationships, providing a clear overview of the workflow's design. The topology graph is reactive, meaning if you're activly modifying the workflow, the graph will update in real-time to reflect the changes.
+**Static Workflow View**:
 
-- **Dynamic Workflow View**:
-	```python
-	# The Module Workflow is bound to a BinaryView instance and its Workflow Machine
-	bv.workflow.show_topology()
+```python
+Workflow("core.module.metaAnalysis").show_topology()
+```
 
-	# The Function Workflow is bound to a Function instance and its Workflow Machine
-	current_function.workflow.show_topology()
-	```
-	These commands build upon the static view by incorporating real-time dynamic state information. It provides additional insights such as the current eligibility of activities, override states, and other runtime data. This enhanced view offers a more detailed and interactive perspective, making it invaluable for monitoring and debugging during execution.
+This command displays a static view of the workflow, showcasing its predefined structure. It highlights the configured activities and their relationships, providing a clear overview of the workflow's design. The topology graph is reactive, meaning if you're actively modifying the workflow, the graph will update in real-time to reflect the changes.
 
-**_NOTE:_** Using the dynamic view, the eligibility of activities can be toggled interactively. Currently, this behavior is tied to the double-click event on an activity node. This feature allows you to quickly cycle through different eligibility states, enabling rapid testing and validation of activity configurations.
+**Dynamic Workflow View**:
 
----
+```python
+# The Module Workflow is bound to a BinaryView instance and its Workflow Machine
+bv.workflow.show_topology()
+
+# The Function Workflow is bound to a Function instance and its Workflow Machine
+current_function.workflow.show_topology()
+```
+
+These commands build upon the static view by incorporating real-time dynamic state information. It provides additional insights such as the current eligibility of activities, override states, and other runtime data. This enhanced view offers a more detailed and interactive perspective, making it invaluable for monitoring and debugging during execution.
+
+!!! note
+	Using the dynamic view, the eligibility of activities can be toggled interactively. Currently, this behavior is tied to the double-click event on an activity node. This feature allows you to quickly cycle through different eligibility states, enabling rapid testing and validation of activity configurations.
 
 ## Advanced Topics (Coming Soon)
 
 This section covers advanced topics related to Workflows, Activities, and the Workflow Machine. It explores emerging concepts, best practices, and strategies for optimizing and extending the analysis pipeline.
-
----
