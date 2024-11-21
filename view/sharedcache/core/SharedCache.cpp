@@ -3386,6 +3386,27 @@ void SharedCache::Store(SerializationContext& context) const
 	}
 	context.writer.EndArray();
 
+	Serialize(context, "symbolInfos");
+	context.writer.StartArray();
+	for (const auto& pair1 : State().symbolInfos)
+	{
+		context.writer.StartObject();
+		Serialize(context, "key", pair1.first);
+		Serialize(context, "value");
+		context.writer.StartArray();
+		for (const auto& pair2 : pair1.second)
+		{
+			context.writer.StartObject();
+			Serialize(context, "key", pair2.first);
+			Serialize(context, "val1", pair2.second.first);
+			Serialize(context, "val2", pair2.second.second);
+			context.writer.EndObject();
+		}
+		context.writer.EndArray();
+		context.writer.EndObject();
+	}
+	context.writer.EndArray();
+
 	Serialize(context, "backingCaches", State().backingCaches);
 	Serialize(context, "stubIslands", State().stubIslandRegions);
 	Serialize(context, "images", State().images);
@@ -3441,13 +3462,14 @@ void SharedCache::Load(DeserializationContext& context)
 
 	for (auto& symbolInfo : context.doc["symbolInfos"].GetArray())
 	{
-		std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> symbolInfoVec;
-		for (auto& symbolInfoPair : symbolInfo.GetArray())
+		std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>
+			symbolInfos;
+		for (auto& si : symbolInfo["value"].GetArray())
 		{
-			symbolInfoVec.push_back({symbolInfoPair[0].GetUint64(),
-				{(BNSymbolType)symbolInfoPair[1].GetUint(), symbolInfoPair[2].GetString()}});
+			symbolInfos.push_back({si["key"].GetUint64(),
+				{static_cast<BNSymbolType>(si["val1"].GetUint64()), si["val2"].GetString()}});
 		}
-		MutableState().symbolInfos[symbolInfo[0].GetUint64()] = std::move(symbolInfoVec);
+		MutableState().symbolInfos[symbolInfo["key"].GetUint64()] = std::move(symbolInfos);
 	}
 
 	for (auto& bcV : context.doc["backingCaches"].GetArray())
