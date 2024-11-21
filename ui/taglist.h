@@ -36,7 +36,6 @@ protected:
 	BinaryViewRef m_data;
 	NotificationsDispatcher* m_dispatcher = nullptr;
 	TagTypeStorage m_tagTypes;
-	std::vector<std::string> m_tagTypeIds;
 	std::unordered_map<std::string, uint64_t> m_tagTypeCounts;
 	TagStorage m_tagStorage;
 	TagTypeIndices m_tagTypeIndices;
