@@ -88,7 +88,9 @@ static void ExtendTypeName(TypeBuilder& type, const string& extend)
 		qn.back() += extend;
 	else
 		qn.push_back(extend);
-	type.SetTypeName(qn);
+	type.SetNamedTypeReference(
+		NamedTypeReference::GenerateAutoDemangledTypeReference(type.GetNamedTypeReference()->GetTypeReferenceClass(), qn)
+	);
 }
 
 
@@ -1770,7 +1772,9 @@ TypeBuilder DemangleGNU3::DemangleNestedName()
 			QualifiedName newName = type.GetTypeName() + newType.GetTypeName();
 			if (newName.StringSize() > MAX_DEMANGLE_LENGTH)
 				throw DemangleException("Detected adversarial mangled string");
-			type.SetTypeName(newName);
+			type.SetNamedTypeReference(
+				NamedTypeReference::GenerateAutoDemangledTypeReference(type.GetNamedTypeReference()->GetTypeReferenceClass(), newName)
+			);
 			type.SetHasTemplateArguments(false);
 		}
 		if (substitute && m_reader.Peek() != 'E')
