@@ -7,6 +7,7 @@
 #include <QtWidgets/QStyledItemDelegate>
 #include <QtWidgets/QDialog>
 #include "binaryninjaapi.h"
+#include "notificationsdispatcher.h"
 #include "sidebar.h"
 #include "viewframe.h"
 #include "filter.h"
@@ -26,16 +27,23 @@ class BINARYNINJAUIAPI TagListModel : public QAbstractItemModel
 {
 	Q_OBJECT
 
-  protected:
+	using TagStorage = std::vector<std::tuple<TagTypeRef, QString, std::vector<BinaryNinja::TagReference>>>;
+	using TagTypeStorage = std::vector<std::pair<TagTypeRef, QString>>;
+	using TagTypeIndices = std::map<TagTypeRef, size_t>;
+
+protected:
 	QWidget* m_owner;
 	BinaryViewRef m_data;
-	std::map<TagTypeRef, size_t> m_typeIndexes;
-	std::vector<std::pair<TagTypeRef, std::vector<BinaryNinja::TagReference>>> m_refs;
+	NotificationsDispatcher* m_dispatcher = nullptr;
+	TagTypeStorage m_tagTypes;
+	std::vector<std::string> m_tagTypeIds;
+	std::unordered_map<std::string, uint64_t> m_tagTypeCounts;
+	TagStorage m_tagStorage;
+	TagTypeIndices m_tagTypeIndices;
 	std::map<int, QSize> m_sectionSizeHints;
-	std::map<std::string, uint64_t> m_count;
 	DisassemblySettingsRef m_settings;
 
-  private:
+private:
 	void AddDisassemblyTokens(QList<QVariant>& line, std::vector<BinaryNinja::InstructionTextToken> tokens) const;
 
 	void TrimLeadingWhitespace(QList<QVariant>& line) const;
@@ -50,9 +58,12 @@ class BINARYNINJAUIAPI TagListModel : public QAbstractItemModel
 	QVariant GetDataColumn(const TagTypeRef& ref) const;
 	QVariant GetPreviewColumn(const TagTypeRef& ref) const;
 
-  public:
+public:
 	TagListModel(QWidget* parent, BinaryViewRef data);
 	virtual ~TagListModel();
+
+	void connectDataStore();
+	void disconnectDataStore();
 
 	BinaryNinja::TagReference& GetRef(const QModelIndex& index);
 	const BinaryNinja::TagReference& GetRef(const QModelIndex& index) const;
@@ -73,8 +84,11 @@ class BINARYNINJAUIAPI TagListModel : public QAbstractItemModel
 	virtual Qt::ItemFlags flags(const QModelIndex& i) const override;
 	virtual void sort(int column, Qt::SortOrder order) override;
 
-	bool setModelData(const std::vector<std::pair<TagTypeRef, std::vector<BinaryNinja::TagReference>>>& refs,
-	    QItemSelectionModel* selectionModel, int sortColumn, Qt::SortOrder sortOrder, bool& selectionUpdated);
+	void backgroundSort(int column, Qt::SortOrder order, TagStorage& tagStorage, TagTypeStorage& tagTypeStorage, TagTypeIndices& tagTypeIndices);
+	void refresh();
+
+Q_SIGNALS:
+	void notifyUpdateComplete(bool complete);
 };
 
 /*!
@@ -105,7 +119,7 @@ class BINARYNINJAUIAPI TagItemDelegate : public QStyledItemDelegate
 
     \ingroup taglist
 */
-class BINARYNINJAUIAPI TagList : public QTreeView, public BinaryNinja::BinaryDataNotification, public FilterTarget
+class BINARYNINJAUIAPI TagList : public QTreeView, public FilterTarget
 {
 	Q_OBJECT
 
@@ -119,7 +133,12 @@ class BINARYNINJAUIAPI TagList : public QTreeView, public BinaryNinja::BinaryDat
 	ContextMenuManager* m_contextMenuManager;
 	FilteredView* m_filterView;
 	Menu* m_menu;
-	std::unordered_map<std::string, bool> m_expandedItems;
+	std::mutex m_filterMutex;
+
+	// view state
+	std::set<QString> m_expandedItems;
+	bool m_editing = false;
+	std::vector<std::pair<TagTypeRef, std::vector<BinaryNinja::TagReference>>> m_savedSelections;
 
   public:
 	typedef std::function<bool(const BinaryNinja::TagReference&)> FilterFn;
@@ -130,11 +149,9 @@ class BINARYNINJAUIAPI TagList : public QTreeView, public BinaryNinja::BinaryDat
 	std::string m_searchFilter;
 
 	QTimer* m_hoverTimer;
-	QTimer* m_updateTimer;
 	QPoint m_hoverPos;
 
 	uint64_t m_curRefTarget = 0;
-	bool m_needsUpdate;
 	bool m_navToNextOrPrevStarted = false;
 
   protected:
@@ -148,22 +165,12 @@ class BINARYNINJAUIAPI TagList : public QTreeView, public BinaryNinja::BinaryDat
 
 	void setFilter(const std::string& filter) override;
 
-	virtual void OnAnalysisFunctionUpdated(BinaryNinja::BinaryView* view, BinaryNinja::Function* func) override;
-	virtual void OnTagAdded(BinaryNinja::BinaryView*, const BinaryNinja::TagReference&) override;
-	virtual void OnTagUpdated(BinaryNinja::BinaryView*, const BinaryNinja::TagReference&) override;
-	virtual void OnTagRemoved(BinaryNinja::BinaryView*, const BinaryNinja::TagReference&) override;
-	virtual void OnTagTypeUpdated(BinaryNinja::BinaryView*, TagTypeRef) override;
-
-	virtual void showEvent(QShowEvent* event) override;
-	virtual void hideEvent(QHideEvent* event) override;
-
   private Q_SLOTS:
 	void hoverTimerEvent();
-	void updateTimerEvent();
 	void referenceActivated(const QModelIndex& idx);
 
-	void saveExpanded();
-	void restoreExpanded();
+	void saveViewState();
+	void restoreViewState();
 
   public Q_SLOTS:
 	void showContextMenu();
@@ -179,11 +186,10 @@ class BINARYNINJAUIAPI TagList : public QTreeView, public BinaryNinja::BinaryDat
 	void removeSelection();
 	void copySelection();
 
+	void filterTagReferences(std::vector<BinaryNinja::TagReference>& refs);
 	void clearFilter();
 	void setFilter(FilterFn filter);
 	void setFilterView(FilteredView* filterView) { m_filterView = filterView; }
-
-	void updateTags();
 
 	bool hasSelection();
 	void navigateToNext();
