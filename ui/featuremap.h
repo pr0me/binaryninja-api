@@ -15,12 +15,11 @@
 #include <vector>
 
 #include "binaryninjaapi.h"
-#include "dockhandler.h"
+#include "action.h"
 #include "notificationsdispatcher.h"
 #include "uitypes.h"
 
 class ContextMenuManager;
-class Menu;
 class View;
 class SplitPaneWidget;
 

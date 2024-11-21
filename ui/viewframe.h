@@ -97,7 +97,6 @@ class BINARYNINJAUIAPI HistoryEntry : public BinaryNinja::RefCountObject
 class AssembleDialog;
 class ClickableStateLabel;
 class CompileDialog;
-class DockHandler;
 class FeatureMap;
 class StatusBarWidget;
 class ViewNavigationMode;
@@ -382,7 +381,7 @@ class BINARYNINJAUIAPI ViewFrame : public QWidget
 	Q_OBJECT
 
   private:
-	QWidget* createView(const QString& typeName, ViewType* type, BinaryViewRef data, bool createDynamicWidgets = true);
+	QWidget* createView(const QString& typeName, ViewType* type, BinaryViewRef data);
 	BinaryNinja::Ref<HistoryEntry> getHistoryEntry();
 	ViewFrame* searchForOtherPane(const std::function<void(const std::function<void(ViewPane*)>&)>& enumerator);
 
@@ -392,7 +391,6 @@ class BINARYNINJAUIAPI ViewFrame : public QWidget
 	QWidget* m_view = nullptr;
 	QWidget* m_viewContainer;
 	QVBoxLayout* m_viewLayout;
-	std::map<QString, std::map<QString, QPointer<QWidget>>> m_extViewCache;
 	std::map<QString, QWidget*> m_viewCache;
 	std::list<BinaryNinja::Ref<HistoryEntry>> m_back, m_forward;
 	bool m_graphViewPreferred = false;
@@ -421,14 +419,12 @@ class BINARYNINJAUIAPI ViewFrame : public QWidget
 	bool tryMainSymbolsNavigation();
 
   public:
-	explicit ViewFrame(QWidget* parent, FileContext* file, const QString& type, bool createDynamicWidgets = false);
+	explicit ViewFrame(QWidget* parent, FileContext* file, const QString& type);
 	virtual ~ViewFrame();
 
 	FileContext* getFileContext() const { return m_context; }
 	bool areFileContentsLocked(bool showToolTip = false);
 	void setFileContentsLocked(bool enable);
-
-	DockHandler* getDockHandler();
 
 	QString getTabName();
 	QString getShortFileName();
@@ -450,8 +446,6 @@ class BINARYNINJAUIAPI ViewFrame : public QWidget
 	void setPriorityView(const QString& viewType);
 	bool setViewType(const QString& viewType);
 	void focus();
-
-	QWidget* getExtendedView(const QString& name, bool create = false);
 
 	Sidebar* getSidebar();
 
@@ -484,7 +478,6 @@ class BINARYNINJAUIAPI ViewFrame : public QWidget
 	bool isAboutToClose() { return m_aboutToClose; }
 	bool closeRequest();
 	void closing();
-	void clearViewLocation();
 
 	void updateFonts();
 	void updateTheme();

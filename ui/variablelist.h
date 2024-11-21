@@ -7,7 +7,6 @@
 #include <QtWidgets/QWidget>
 
 #include "binaryninjacore.h"
-#include "dockhandler.h"
 #include "filter.h"
 #include "uitypes.h"
 #include "viewframe.h"

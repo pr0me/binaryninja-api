@@ -9,11 +9,11 @@
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QStyledItemDelegate>
 
-#include "dockhandler.h"
 #include "render.h"
 #include "sidebar.h"
 #include "uitypes.h"
 #include "fontsettings.h"
+#include "viewframe.h"
 
 /*!
 
