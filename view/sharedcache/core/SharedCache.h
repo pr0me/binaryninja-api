@@ -202,6 +202,7 @@ namespace SharedCacheCore {
 		uint32_t    version;            // currently 5
 		uint32_t    page_size;          // currently 4096 (may also be 16384)
 		uint32_t    page_starts_count;
+		uint32_t    pad;                // padding to ensure the value below is on an 8-byte boundary
 		uint64_t    value_add;
 		// uint16_t    page_starts[/* page_starts_count */];
 	};
