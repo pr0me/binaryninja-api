@@ -1087,16 +1087,16 @@ void DSCObjCProcessor::ApplyMethodTypes(Class& cls)
 	}
 }
 
-void DSCObjCProcessor::PostProcessObjCSections(VMReader* reader)
+void DSCObjCProcessor::PostProcessObjCSections(VMReader* reader, std::string baseName)
 {
 	auto ptrSize = m_data->GetAddressSize();
-	if (auto imageInfo = m_data->GetSectionByName("__objc_imageinfo"))
+	if (auto imageInfo = m_data->GetSectionByName(baseName + "::__objc_imageinfo"))
 	{
 		auto start = imageInfo->GetStart();
 		auto type = Type::NamedType(m_data, m_typeNames.imageInfo);
 		m_data->DefineDataVariable(start, type);
 	}
-	if (auto selrefs = m_data->GetSectionByName("__objc_selrefs"))
+	if (auto selrefs = m_data->GetSectionByName(baseName + "::__objc_selrefs"))
 	{
 		auto start = selrefs->GetStart();
 		auto end = selrefs->GetEnd();
@@ -1119,7 +1119,7 @@ void DSCObjCProcessor::PostProcessObjCSections(VMReader* reader)
 			DefineObjCSymbol(DataSymbol, type, "selRef_" + sel, i, true);
 		}
 	}
-	if (auto superRefs = m_data->GetSectionByName("__objc_classrefs"))
+	if (auto superRefs = m_data->GetSectionByName(baseName + "::__objc_classrefs"))
 	{
 		auto start = superRefs->GetStart();
 		auto end = superRefs->GetEnd();
@@ -1137,7 +1137,7 @@ void DSCObjCProcessor::PostProcessObjCSections(VMReader* reader)
 			}
 		}
 	}
-	if (auto superRefs = m_data->GetSectionByName("__objc_superrefs"))
+	if (auto superRefs = m_data->GetSectionByName(baseName + "::__objc_superrefs"))
 	{
 		auto start = superRefs->GetStart();
 		auto end = superRefs->GetEnd();
@@ -1155,7 +1155,7 @@ void DSCObjCProcessor::PostProcessObjCSections(VMReader* reader)
 			}
 		}
 	}
-	if (auto protoRefs = m_data->GetSectionByName("__objc_protorefs"))
+	if (auto protoRefs = m_data->GetSectionByName(baseName + "::__objc_protorefs"))
 	{
 		auto start = protoRefs->GetStart();
 		auto end = protoRefs->GetEnd();
@@ -1173,7 +1173,7 @@ void DSCObjCProcessor::PostProcessObjCSections(VMReader* reader)
 			}
 		}
 	}
-	if (auto ivars = m_data->GetSectionByName("__objc_ivar"))
+	if (auto ivars = m_data->GetSectionByName(baseName + "::__objc_ivar"))
 	{
 		auto start = ivars->GetStart();
 		auto end = ivars->GetEnd();
@@ -1416,7 +1416,7 @@ void DSCObjCProcessor::ProcessObjCData(std::shared_ptr<VM> vm, std::string baseN
 	if (auto protoList = m_data->GetSectionByName(baseName + "::__objc_protolist"))
 		LoadProtocols(&reader, protoList);
 
-	PostProcessObjCSections(&reader);
+	PostProcessObjCSections(&reader, baseName);
 
 	auto id = m_data->BeginUndoActions();
 	m_symbolQueue->Process();
