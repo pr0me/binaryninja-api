@@ -96,6 +96,7 @@ warnings.filterwarnings('once', '', DeprecatedWarning)
 # Only load Enterprise Client support on Ultimate builds
 if core.BNGetProduct() == "Binary Ninja Enterprise Client" or core.BNGetProduct() == "Binary Ninja Ultimate":
 	from .enterprise import *
+	from .firmwareninja import *
 
 
 def shutdown():

@@ -18369,6 +18369,129 @@ namespace BinaryNinja {
 		bool IsAborted();
 	};
 
+
+	/*!
+		\ingroup firmwareninja
+	*/
+	struct FirmwareNinjaDevice
+	{
+		std::string name;
+		uint64_t start;
+		uint64_t end;
+		std::string info;
+	};
+
+	/*!
+		\ingroup firmwareninja
+	*/
+	struct FirmwareNinjaFunctionMemoryAccesses
+	{
+		uint64_t start;
+		size_t count;
+		std::vector<BNFirmwareNinjaMemoryAccess> accesses;
+	};
+
+	/*!
+		\ingroup firmwareninja
+	*/
+	struct FirmwareNinjaDeviceAccesses
+	{
+		std::string name;
+		size_t total;
+		size_t unique;
+	};
+
+	/*! FirmwareNinja is a class containing features specific to embedded firmware analysis. This class is only
+		available in the Ultimate Edition of Binary Ninja.
+
+		\ingroup firmwareninja
+	*/
+	class FirmwareNinja
+	{
+		Ref<BinaryView> m_view;
+		BNFirmwareNinja* m_object;
+
+	public:
+		FirmwareNinja(Ref<BinaryView> view);
+		~FirmwareNinja();
+
+		/*! Store a user-defined Firmware Ninja device to the binary view metadata
+
+			\param device Hardware device information
+			\return true on success, false otherwise
+		 */
+		bool StoreCustomDevice(FirmwareNinjaDevice& device);
+
+		/*! Remove a user-defined Firmware Ninja device from the binary view metadata
+
+			\param name Name of the device to remove
+			\return true on success, false otherwise
+		 */
+		bool RemoveCustomDevice(const std::string& name);
+
+		/*! Query all user-defined Firmware Ninja devices from the binary view metadata
+
+			\return Vector of user-defined Firmware Ninja devices
+		 */
+		std::vector<FirmwareNinjaDevice> QueryCustomDevices();
+
+		/*! Query names of all boards that are compatable with the current binary view and contain bundled device
+			definitions
+
+			\return Vector of board names
+		 */
+		std::vector<std::string> QueryBoardNames();
+
+		/*! Query Firmware Ninja device definitions for the specified board
+
+			\param board Name of the board to query devices for
+			\return Vector of Firmware Ninja device definitions
+		 */
+		std::vector<FirmwareNinjaDevice> QueryDevicesForBoard(const std::string& board);
+
+		/*! Find sections in the binary with Firmware Ninja heuristics and entropy analysis
+
+			\param board highCodeEntropyThreshold High threshold for code entropy value range
+			\param board lowCodeEntropyThreshold Low threshold for code entropy value range
+			\param blockSize Size of blocks to analyze
+			\param mode Analysis mode of operation
+			\return Vector of Firmware Ninja section information
+		 */
+		std::vector<BNFirmwareNinjaSection> FindSections(float highCodeEntropyThreshold, float lowCodeEntropyThreshold,
+			size_t blockSize, BNFirmwareNinjaSectionAnalysisMode mode);
+
+		/*! Find functions that access memory-mapped I/O and other non-file backed memory regions
+
+			\param progress Progress callback function
+			\param progressContext Progress context
+			\return Vector of Firmware Ninja function memory accesses information
+		 */
+		std::vector<FirmwareNinjaFunctionMemoryAccesses> GetFunctionMemoryAccesses(BNProgressFunction progress,
+			void* progressContext);
+
+		/*! Store Firmware Ninja function memory accesses information in the binary view metadata
+
+			\param fma Vector of Firmware Ninja function memory accesses information
+		 */
+		void StoreFunctionMemoryAccesses(const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma);
+
+		/*! Query cached Firmware Ninja function memory accesses information from the binary view metadata
+
+			\return Vector of Firmware Ninja memory analyis information
+		 */
+		std::vector<FirmwareNinjaFunctionMemoryAccesses> QueryFunctionMemoryAccesses();
+
+		/*! Compute number of accesses mad to memory-mapped hardware devices for each board that is compatible with the
+			current architecture
+
+			\param fma Vector of Firmware Ninja function memory accesses information
+			\return Vector of Firmware Ninja device accesses information for each board
+		 */
+		std::vector<FirmwareNinjaDeviceAccesses> GetBoardDeviceAccesses(
+			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma);
+	};
+
+
 	/*!
 		\ingroup demangler
 	*/

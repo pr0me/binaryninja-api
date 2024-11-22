@@ -114,6 +114,10 @@ class RegisterValue:
 			return ConstantDataRegisterValue(reg_value.value, 0, RegisterValueType(reg_value.state), confidence=confidence, size=reg_value.size)
 		assert False, f"RegisterValueType {reg_value.state} not handled"
 
+	@classmethod
+	def to_BNRegisterValue(cls, reg_value: 'RegisterValue') -> core.BNRegisterValue:
+		return reg_value._to_core_struct()
+
 
 @dataclass(frozen=True, eq=False)
 class Undetermined(RegisterValue):

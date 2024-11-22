@@ -37,14 +37,14 @@
 // Current ABI version for linking to the core. This is incremented any time
 // there are changes to the API that affect linking, including new functions,
 // new types, or modifications to existing functions or types.
-#define BN_CURRENT_CORE_ABI_VERSION 83
+#define BN_CURRENT_CORE_ABI_VERSION 84
 
 // Minimum ABI version that is supported for loading of plugins. Plugins that
 // are linked to an ABI version less than this will not be able to load and
 // will require rebuilding. The minimum version is increased when there are
 // incompatible changes that break binary compatibility, such as changes to
 // existing types or functions.
-#define BN_MINIMUM_CORE_ABI_VERSION 81
+#define BN_MINIMUM_CORE_ABI_VERSION 82
 
 #ifdef __GNUC__
 	#ifdef BINARYNINJACORE_LIBRARY
@@ -3497,37 +3497,38 @@ extern "C"
 		float entropy;
 	} BNFirmwareNinjaSection;
 
-	typedef enum BNFirmwareNinjaMMIOHeuristic
+	typedef enum BNFirmwareNinjaMemoryHeuristic
 	{
-		NoMMIOHeuristic,
-		HasReadBarrierMMIOHeuristic,
-		HasWriteBarrierMMIOHeuristic,
-		StoreToOOBMemoryMMIOHeuristic,
-		LoadFromOOBMemoryMMIOHeuristic,
-		RepeatLoadStoreMMIOHeuristic,
-	} BNFirmwareNinjaMMIOHeuristic;
+		NoMemoryHeuristic,
+		HasReadBarrierMemoryHeuristic,
+		HasWriteBarrierMemoryHeuristic,
+		StoreToOOBMemoryMemoryHeuristic,
+		LoadFromOOBMemoryMemoryHeuristic,
+		RepeatLoadStoreMemoryHeuristic,
+	} BNFirmwareNinjaMemoryHeuristic;
 
-	typedef enum BNFirmwareNinjaMMIOAccessType
+	typedef enum BNFirmwareNinjaMemoryAccessType
 	{
-		NoMMIOAccessType,
-		ReadMMIOAccessType,
-		WriteMMIOAccessType,
-	} BNFirmwareNinjaMMIOAccessType;
+		NoMemoryAccessType,
+		ReadMemoryAccessType,
+		WriteMemoryAccessType,
+	} BNFirmwareNinjaMemoryAccessType;
 
-	typedef struct BNFirmwareNinjaMMIOAccess
+	typedef struct BNFirmwareNinjaMemoryAccess
 	{
 		uint64_t instrAddress;
-		BNRegisterValue reg;
-		BNFirmwareNinjaMMIOHeuristic heuristic;
-		BNFirmwareNinjaMMIOAccessType type;
-	} BNFirmwareNinjaMMIOAccess;
+		BNRegisterValue memAddress;
+		BNFirmwareNinjaMemoryHeuristic heuristic;
+		BNFirmwareNinjaMemoryAccessType type;
+		BNRegisterValue value;
+	} BNFirmwareNinjaMemoryAccess;
 
-	typedef struct BNFirmwareNinjaFunctionMMIOInfo
+	typedef struct BNFirmwareNinjaFunctionMemoryAccesses
 	{
 		uint64_t start;
 		size_t count;
-		BNFirmwareNinjaMMIOAccess** accesses;
-	} BNFirmwareNinjaFunctionMMIOInfo;
+		BNFirmwareNinjaMemoryAccess** accesses;
+	} BNFirmwareNinjaFunctionMemoryAccesses;
 
 	typedef struct BNFirmwareNinjaDeviceAccesses
 	{
@@ -8025,22 +8026,21 @@ extern "C"
 
 	// FirmwareNinja
 	BINARYNINJACOREAPI BNFirmwareNinja* BNCreateFirmwareNinja(BNBinaryView *view);
-	BINARYNINJACOREAPI bool BNFirmwareNinjaAddCustomDevice(BNFirmwareNinja* fn, const char* name, uint64_t start, uint64_t end, const char* info);
-	BINARYNINJACOREAPI bool BNFirmwareNinjaDeleteCustomDevice(BNFirmwareNinja* fn, const char* name);
+	BINARYNINJACOREAPI void BNFreeFirmwareNinja(BNFirmwareNinja* fn);
+	BINARYNINJACOREAPI bool BNFirmwareNinjaStoreCustomDevice(BNFirmwareNinja* fn, const char* name, uint64_t start, uint64_t end, const char* info);
+	BINARYNINJACOREAPI bool BNFirmwareNinjaRemoveCustomDevice(BNFirmwareNinja* fn, const char* name);
 	BINARYNINJACOREAPI int BNFirmwareNinjaQueryCustomDevices(BNFirmwareNinja* fn, BNFirmwareNinjaDevice** devices);
 	BINARYNINJACOREAPI void BNFirmwareNinjaFreeDevices(BNFirmwareNinjaDevice *devices, int size);
 	BINARYNINJACOREAPI int BNFirmwareNinjaQueryBoardNamesForArchitecture(BNFirmwareNinja* fn, BNArchitecture* arch, char ***boards);
 	BINARYNINJACOREAPI void BNFirmwareNinjaFreeBoardNames(char **boards, int size);
 	BINARYNINJACOREAPI int BNFirmwareNinjaQueryBoardDevices(BNFirmwareNinja* fn, BNArchitecture* arch, const char* board, BNFirmwareNinjaDevice** devices);
-	BINARYNINJACOREAPI int BNFirmwareNinjaFindSectionsWithEntropy(BNFirmwareNinja* fn, BNFirmwareNinjaSection** sections,
-		float highCodeEntropyThreshold, float lowCodeEntropyThreshold, size_t blockSize, BNFirmwareNinjaSectionAnalysisMode mode);
+	BINARYNINJACOREAPI int BNFirmwareNinjaFindSectionsWithEntropy(BNFirmwareNinja* fn, BNFirmwareNinjaSection** sections, float highCodeEntropyThreshold, float lowCodeEntropyThreshold, size_t blockSize, BNFirmwareNinjaSectionAnalysisMode mode);
 	BINARYNINJACOREAPI void BNFirmwareNinjaFreeSections(BNFirmwareNinjaSection *sections, int size);
-	BINARYNINJACOREAPI int BNFirmwareNinjaFindMMIOAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMMIOInfo*** mmio, BNProgressFunction progress, void* progressContext);
-	BINARYNINJACOREAPI void BNFirmwareNinjaFreeMMIOAccesses(BNFirmwareNinjaFunctionMMIOInfo **mmio, int size);
-	BINARYNINJACOREAPI void BNFirmwareNinjaSaveMMIOAccessesToMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMMIOInfo** mmio, int size);
-	BINARYNINJACOREAPI int BNFirmwareNinjaLoadMMIOAccessesFromMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMMIOInfo*** mmio);
-	BINARYNINJACOREAPI int BNFirmwareNinjaGetBoardDeviceAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMMIOInfo** mmio, int size,
-		BNFirmwareNinjaDeviceAccesses** accesses, BNArchitecture* arch);
+	BINARYNINJACOREAPI int BNFirmwareNinjaGetFunctionMemoryAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** mmio, BNProgressFunction progress, void* progressContext);
+	BINARYNINJACOREAPI void BNFirmwareNinjaFreeFunctionMemoryAccesses(BNFirmwareNinjaFunctionMemoryAccesses **mmio, int size);
+	BINARYNINJACOREAPI void BNFirmwareNinjaStoreFunctionMemoryAccessesToMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** mmio, int size);
+	BINARYNINJACOREAPI int BNFirmwareNinjaQueryFunctionMemoryAccessesFromMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** mmio);
+	BINARYNINJACOREAPI int BNFirmwareNinjaGetBoardDeviceAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** mmio, int size, BNFirmwareNinjaDeviceAccesses** accesses, BNArchitecture* arch);
 	BINARYNINJACOREAPI void BNFirmwareNinjaFreeBoardDeviceAccesses(BNFirmwareNinjaDeviceAccesses *accesses, int size);
 #ifdef __cplusplus
 }
