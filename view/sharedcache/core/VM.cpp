@@ -475,10 +475,6 @@ void MMappedFileAccessor::Read(void* dest, size_t address, size_t length)
 
 VM::VM(size_t pageSize, bool safe) : m_pageSize(pageSize), m_safe(safe)
 {
-	unsigned bits, var = (m_pageSize - 1 < 0) ? -(m_pageSize - 1) : m_pageSize - 1;
-	for (bits = 0; var != 0; ++bits)
-		var >>= 1;
-	m_pageSizeBits = bits;
 }
 
 VM::~VM()
@@ -498,36 +494,25 @@ void VM::MapPages(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView, uint64_t se
 		throw MappingPageAlignmentException();
 	}
 
-	size_t pagesRemainingCount = size / m_pageSize;
-	for (size_t i = 0; i < size; i += m_pageSize)
+	auto accessor = MMappedFileAccessor::Open(std::move(dscView), sessionID, filePath, postAllocationRoutine);
+	auto [it, inserted] = m_map.insert_or_assign({vm_address, vm_address + size}, PageMapping(std::move(filePath), std::move(accessor), fileoff));
+	if (m_safe && !inserted)
 	{
-		// Our pages will be delimited by shifting off the page size
-		// So, 0x12345000 will become 0x12345 (assuming m_pageSize is 0x1000)
-		auto page = (vm_address + (i)) >> m_pageSizeBits;
-		if (m_map.count(page) != 0)
-		{
-			if (m_safe)
-			{
-				BNLogWarn("Remapping page 0x%lx (i == 0x%lx) (a: 0x%zx, f: 0x%zx)", page, i, vm_address, fileoff);
-				throw MappingCollisionException();
-			}
-		}
-		m_map.insert_or_assign(page, PageMapping(filePath, MMappedFileAccessor::Open(dscView, sessionID, filePath, postAllocationRoutine), i + fileoff));
+		BNLogWarn("Remapping page 0x%zx (f: 0x%zx)", vm_address, fileoff);
+		throw MappingCollisionException();
 	}
 }
 
 std::pair<PageMapping, size_t> VM::MappingAtAddress(size_t address)
 {
-	// Get the page (e.g. 0x12345678 will become 0x12345 on 0x1000 aligned caches)
-	auto page = address >> m_pageSizeBits;
-	if (auto f = m_map.find(page); f != m_map.end())
+	if (auto it = m_map.find(address); it != m_map.end())
 	{
 		// The PageMapping object returned contains the page, and more importantly, the file pointer (there can be
-		// multiple in newer caches) This is relevant for reading out the data in the rest of this file. The second item
-		// in this pair is created by taking the fileOffset (which will be a page but with the trailing bits (e.g.
-		// 0x12345000)
-		//      and will add the "extra" bits lopped off when determining the page. (e.g. 0x12345678 -> 0x678)
-		return {f->second, f->second.fileOffset + (address & (m_pageSize - 1))};
+		// multiple in newer caches) This is relevant for reading out the data in the rest of this file.
+		// The second item in the returned pair is the offset of `address` within the file.
+		auto& range = it->first;
+		auto& mapping = it->second;
+		return {mapping, mapping.fileOffset + (address - range.start)};
 	}
 
 	throw MappingReadException();
@@ -536,14 +521,8 @@ std::pair<PageMapping, size_t> VM::MappingAtAddress(size_t address)
 
 bool VM::AddressIsMapped(uint64_t address)
 {
-	try
-	{
-		MappingAtAddress(address);
-		return true;
-	}
-	catch (...)
-	{}
-	return false;
+	auto it = m_map.find(address);
+	return it != m_map.end();
 }
 
 

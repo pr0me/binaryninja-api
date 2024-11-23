@@ -183,7 +183,7 @@ struct PageMapping {
 	std::shared_ptr<SelfAllocatingWeakPtr<MMappedFileAccessor>> fileAccessor;
     size_t fileOffset;
 	PageMapping(std::string filePath, std::shared_ptr<SelfAllocatingWeakPtr<MMappedFileAccessor>> fileAccessor, size_t fileOffset)
-		: filePath(filePath), fileAccessor(fileAccessor), fileOffset(fileOffset) {}
+		: filePath(std::move(filePath)), fileAccessor(std::move(fileAccessor)), fileOffset(fileOffset) {}
 };
 
 
@@ -215,9 +215,30 @@ class VMReader;
 
 
 class VM {
-    std::map<size_t, PageMapping> m_map;
+
+    // Represents a range of addresses [start, end).
+    // Note that `end` is not included within the range.
+    struct AddressRange {
+        size_t start;
+        size_t end;
+
+        bool operator<(const AddressRange& b) const {
+            return start < b.start || (start == b.start && end < b.end);
+        }
+
+        friend bool operator<(const AddressRange& range, size_t address) {
+            return range.end <= address;
+        }
+
+        friend bool operator<(size_t address, const AddressRange& range) {
+            return address < range.start;
+        }
+    };
+
+    // A map keyed by address ranges that can be looked up via any
+    // address within a range thanks to C++14's transparent comparators.
+    std::map<AddressRange, PageMapping, std::less<>> m_map;
     size_t m_pageSize;
-    size_t m_pageSizeBits;
     bool m_safe;
 
     friend VMReader;
