@@ -161,6 +161,11 @@ namespace SharedCacheCore {
 		uint64_t delta_mask;
 		uint64_t value_add;
 	};
+	#define DYLD_CACHE_SLIDE_PAGE_ATTR_EXTRA           0x8000  // index is into extras array (not starts array)
+	#define DYLD_CACHE_SLIDE_PAGE_ATTR_NO_REBASE       0x4000  // page has no rebasing
+	#define DYLD_CACHE_SLIDE_PAGE_ATTR_END             0x8000  // last chain entry for page
+
+	#define DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE    0xFFFF    // page has no rebasing
 
 	struct PACKED_STRUCT dyld_cache_slide_info_v3
 	{

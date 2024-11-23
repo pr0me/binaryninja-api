@@ -1135,33 +1135,98 @@ void SharedCache::ParseAndApplySlideInfoForFile(std::shared_ptr<MMappedFileAcces
 	for (const auto& [off, mapping] : mappings)
 	{
 		m_logger->LogDebug("Slide Info Version: %d", mapping.slideInfoVersion);
+		uint64_t extrasOffset = off;
 		uint64_t pageStartsOffset = off;
 		uint64_t pageStartCount;
 		uint64_t pageSize;
-		std::vector<uint64_t> pageStartFileOffsets;
 
 		if (mapping.slideInfoVersion == 2)
 		{
 			pageStartsOffset += mapping.slideInfoV2.page_starts_offset;
 			pageStartCount = mapping.slideInfoV2.page_starts_count;
 			pageSize = mapping.slideInfoV2.page_size;
-
-			pageStartFileOffsets.reserve(pageStartCount);
-			size_t cursor = pageStartsOffset;
+			extrasOffset += mapping.slideInfoV2.page_extras_offset;
+			auto cursor = pageStartsOffset;
 
 			for (size_t i = 0; i < pageStartCount; i++)
 			{
 				try
 				{
-					uint64_t pageStart = mapping.file->ReadUShort(cursor) * 4;
-					cursor += 2;
-					if (pageStart & 0x4000)
+					uint16_t start = mapping.file->ReadUShort(cursor);
+					cursor += sizeof(uint16_t);
+					if (start == DYLD_CACHE_SLIDE_PAGE_ATTR_NO_REBASE)
 						continue;
-					pageStartFileOffsets.push_back(mapping.mappingInfo.fileOffset + (pageSize * i) + pageStart);
+
+					auto rebaseChain = [&](const dyld_cache_slide_info_v2& slideInfo, uint64_t pageContent, uint16_t startOffset)
+					{
+						uintptr_t slideAmount = 0;
+
+						auto deltaMask = slideInfo.delta_mask;
+						auto valueMask = ~deltaMask;
+						auto valueAdd = slideInfo.value_add;
+
+						auto deltaShift = count_trailing_zeros(deltaMask) - 2;
+
+						uint32_t pageOffset = startOffset;
+						uint32_t delta = 1;
+						while ( delta != 0 )
+						{
+							uint64_t loc = pageContent + pageOffset;
+							try
+							{
+								uintptr_t rawValue = file->ReadULong(loc);
+								delta = (uint32_t)((rawValue & deltaMask) >> deltaShift);
+								uintptr_t value = (rawValue & valueMask);
+								if (value != 0)
+								{
+									value += valueAdd;
+									value += slideAmount;
+								}
+								pageOffset += delta;
+								rewrites.emplace_back(loc, value);
+							}
+							catch (MappingReadException& ex)
+							{
+								m_logger->LogError("Failed to read v2 slide pointer at 0x%llx\n", loc);
+								break;
+							}
+						}
+					};
+
+					if (start & DYLD_CACHE_SLIDE_PAGE_ATTR_EXTRA)
+					{
+						int j=(start & 0x3FFF);
+						bool done = false;
+						do
+						{
+							uint64_t extraCursor = extrasOffset + (j * sizeof(uint16_t));
+							try
+							{
+								auto extra = mapping.file->ReadUShort(extraCursor);
+								uint16_t aStart = extra;
+								uint64_t page = mapping.mappingInfo.fileOffset + (pageSize * i);
+								uint16_t pageStartOffset = (aStart & 0x3FFF)*4;
+								rebaseChain(mapping.slideInfoV2, page, pageStartOffset);
+								done = (extra & DYLD_CACHE_SLIDE_PAGE_ATTR_END);
+								++j;
+							}
+							catch (MappingReadException& ex)
+							{
+								m_logger->LogError("Failed to read v2 slide extra at 0x%llx\n", cursor);
+								break;
+							}
+						} while (!done);
+					}
+					else
+					{
+						uint64_t page = mapping.mappingInfo.fileOffset + (pageSize * i);
+						uint16_t pageStartOffset = start*4;
+						rebaseChain(mapping.slideInfoV2, page, pageStartOffset);
+					}
 				}
 				catch (MappingReadException& ex)
 				{
-
+					m_logger->LogError("Failed to read v2 slide info at 0x%llx\n", cursor);
 				}
 			}
 		}
@@ -1170,23 +1235,53 @@ void SharedCache::ParseAndApplySlideInfoForFile(std::shared_ptr<MMappedFileAcces
 			pageStartsOffset += sizeof(dyld_cache_slide_info_v3);
 			pageStartCount = mapping.slideInfoV3.page_starts_count;
 			pageSize = mapping.slideInfoV3.page_size;
-
-			pageStartFileOffsets.reserve(pageStartCount);
-			size_t cursor = pageStartsOffset;
+			auto cursor = pageStartsOffset;
 
 			for (size_t i = 0; i < pageStartCount; i++)
 			{
 				try
 				{
-					uint64_t pageStart = mapping.file->ReadUShort(cursor);
-					cursor += 2;
-					if (pageStart & 0x4000)
+					uint16_t delta = mapping.file->ReadUShort(cursor);
+					cursor += sizeof(uint16_t);
+					if (delta == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE)
 						continue;
-					pageStartFileOffsets.push_back(mapping.mappingInfo.fileOffset + (pageSize * i) + pageStart);
+					
+					delta = delta/sizeof(uint64_t); // initial offset is byte based
+					uint64_t loc = mapping.mappingInfo.fileOffset + (pageSize * i);
+					do
+					{
+						loc += delta * sizeof(dyld_cache_slide_pointer3);
+						try
+						{
+							dyld_cache_slide_pointer3 slideInfo;
+							file->Read(&slideInfo, loc, sizeof(slideInfo));
+							delta = slideInfo.plain.offsetToNextPointer;
+
+							if (slideInfo.auth.authenticated)
+							{
+								uint64_t value = slideInfo.auth.offsetFromSharedCacheBase;
+								value += mapping.slideInfoV3.auth_value_add;
+								rewrites.emplace_back(loc, value);
+							}
+							else
+							{
+								uint64_t value51 = slideInfo.plain.pointerValue;
+								uint64_t top8Bits = value51 & 0x0007F80000000000;
+								uint64_t bottom43Bits = value51 & 0x000007FFFFFFFFFF;
+								uint64_t value = (uint64_t)top8Bits << 13 | bottom43Bits;
+								rewrites.emplace_back(loc, value);
+							}
+						}
+						catch (MappingReadException& ex)
+						{
+							m_logger->LogError("Failed to read v3 slide pointer at 0x%llx\n", loc);
+							break;
+						}
+					} while (delta != 0);
 				}
 				catch (MappingReadException& ex)
 				{
-					m_logger->LogError("Failed to read slide info at 0x%llx\n", cursor);
+					m_logger->LogError("Failed to read v3 slide info at 0x%llx\n", cursor);
 				}
 			}
 		}
@@ -1194,124 +1289,49 @@ void SharedCache::ParseAndApplySlideInfoForFile(std::shared_ptr<MMappedFileAcces
 		{
 			pageStartsOffset += sizeof(dyld_cache_slide_info5);
 			pageStartCount = mapping.slideInfoV5.page_starts_count;
-			m_logger->LogDebug("Page Start Count: %d", pageStartCount);
 			pageSize = mapping.slideInfoV5.page_size;
 			auto cursor = pageStartsOffset;
+
 			for (size_t i = 0; i < pageStartCount; i++)
 			{
 				try
 				{
-					uint64_t pageStart = mapping.file->ReadUShort(cursor);
-					cursor += 2;
-					if (pageStart == DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE)
+					uint16_t delta = mapping.file->ReadUShort(cursor);
+					cursor += sizeof(uint16_t);
+					if (delta == DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE)
 						continue;
-					pageStartFileOffsets.push_back(mapping.mappingInfo.fileOffset + (pageSize * i) + pageStart);
+					
+					delta = delta/sizeof(uint64_t); // initial offset is byte based
+					uint64_t loc = mapping.mappingInfo.fileOffset + (pageSize * i);
+					do
+					{
+						loc += delta * sizeof(dyld_cache_slide_pointer5);
+						try
+						{
+							dyld_cache_slide_pointer5 slideInfo;
+							file->Read(&slideInfo, loc, sizeof(slideInfo));
+							delta = slideInfo.regular.next;
+							if (slideInfo.auth.auth)
+							{
+								uint64_t value = mapping.slideInfoV5.value_add + slideInfo.auth.runtimeOffset;
+								rewrites.emplace_back(loc, value);
+							}
+							else
+							{
+								uint64_t value = mapping.slideInfoV5.value_add + slideInfo.regular.runtimeOffset;
+								rewrites.emplace_back(loc, value);
+							}
+						}
+						catch (MappingReadException& ex)
+						{
+							m_logger->LogError("Failed to read v5 slide pointer at 0x%llx\n", loc);
+							break;
+						}
+					} while (delta != 0);
 				}
 				catch (MappingReadException& ex)
 				{
-					m_logger->LogError("Failed to read slide info at 0x%llx\n", cursor);
-				}
-			}
-		}
-		if (pageStartFileOffsets.empty())
-		{
-			m_logger->LogDebug("No page start file offsets found");
-		}
-		for (auto pageStart : pageStartFileOffsets)
-		{
-			if (mapping.slideInfoVersion == 2)
-			{
-				auto deltaMask = mapping.slideInfoV2.delta_mask;
-				auto valueMask = ~deltaMask;
-				auto valueAdd = mapping.slideInfoV2.value_add;
-
-				auto deltaShift = count_trailing_zeros(deltaMask) - 2;
-
-				uint64_t delta = 1;
-				uint64_t loc = pageStart;
-				while (delta != 0)
-				{
-					try {
-						uint64_t rawValue = file->ReadULong(loc);
-						delta = (rawValue & deltaMask) >> deltaShift;
-						uint64_t value = (rawValue & valueMask);
-						if (valueMask != 0)
-						{
-							value += valueAdd;
-						}
-						rewrites.emplace_back(loc, value);
-					}
-					catch (MappingReadException& ex)
-					{
-						m_logger->LogError("Failed to read slide info at 0x%llx\n", loc);
-						delta = 0;
-					}
-					loc += delta;
-				}
-			}
-			else if (mapping.slideInfoVersion == 3)
-			{
-				uint64_t loc = pageStart;
-				uint64_t delta = 1;
-				while (delta != 0)
-				{
-					dyld_cache_slide_pointer3 slideInfo;
-					try
-					{
-						file->Read(&slideInfo, loc, 8);
-						delta = slideInfo.plain.offsetToNextPointer * 8;
-
-						if (slideInfo.auth.authenticated)
-						{
-							uint64_t value = slideInfo.auth.offsetFromSharedCacheBase;
-							value += mapping.slideInfoV3.auth_value_add;
-							rewrites.emplace_back(loc, value);
-						}
-						else
-						{
-							uint64_t value51 = slideInfo.plain.pointerValue;
-							uint64_t top8Bits = value51 & 0x0007F80000000000;
-							uint64_t bottom43Bits = value51 & 0x000007FFFFFFFFFF;
-							uint64_t value = (uint64_t)top8Bits << 13 | bottom43Bits;
-							rewrites.emplace_back(loc, value);
-						}
-						loc += delta;
-					}
-					catch (MappingReadException& ex)
-					{
-						m_logger->LogError("Failed to read slide info at 0x%llx\n", loc);
-						delta = 0;
-					}
-				}
-			}
-			else if (mapping.slideInfoVersion == 5)
-			{
-				uint64_t loc = pageStart;
-				uint64_t delta = 1;
-				while (delta != 0)
-				{
-					dyld_cache_slide_pointer5 slideInfo;
-					try
-					{
-						file->Read(&slideInfo, loc, 8);
-						delta = slideInfo.regular.next * 8;
-						if (slideInfo.auth.auth)
-						{
-							uint64_t value = slideInfo.auth.runtimeOffset + mapping.slideInfoV5.value_add;
-							rewrites.emplace_back(loc, value);
-						}
-						else
-						{
-							uint64_t value = base + slideInfo.regular.runtimeOffset;
-							rewrites.emplace_back(loc, value);
-						}
-						loc += delta;
-					}
-					catch (MappingReadException& ex)
-					{
-						m_logger->LogError("Failed to read slide info at 0x%llx\n", loc);
-						delta = 0;
-					}
+					m_logger->LogError("Failed to read v5 slide info at 0x%llx\n", cursor);
 				}
 			}
 		}
