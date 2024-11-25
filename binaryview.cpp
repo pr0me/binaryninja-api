@@ -950,6 +950,24 @@ TagReference::TagReference(const BNTagReference& ref)
 }
 
 
+bool TagReference::EqualsByData(const TagReference& other) const
+{
+	if (refType != other.refType)
+		return false;
+	if (autoDefined != other.autoDefined)
+		return false;
+	if (addr != other.addr)
+		return false;
+	if (func != other.func)
+		return false;
+	if (arch != other.arch)
+		return false;
+	if (tag->GetData() != other.tag->GetData())
+		return false;
+	return true;
+}
+
+
 bool TagReference::operator==(const TagReference& other) const
 {
 	if (refType != other.refType)

@@ -4281,6 +4281,7 @@ namespace BinaryNinja {
 		TagReference();
 		TagReference(const BNTagReference& ref);
 
+		bool EqualsByData(const TagReference& other) const;
 		bool operator==(const TagReference& other) const;
 		bool operator!=(const TagReference& other) const;
 
