@@ -9942,15 +9942,6 @@ namespace BinaryNinja {
 
 	  public:
 		/*!
-
-			\code{.cpp}
-		    MyClass::MyActionMethod(Ref<AnalysisContext> ac);
-		    ...
-		 	// Create a clone of the default workflow named "core.function.myWorkflowName"
-		    Ref<Workflow> wf = BinaryNinja::Workflow::Instance("core.function.defaultAnalysis")->Clone("core.function.myWorkflowName");
-		 	wf->RegisterActivity(new BinaryNinja::Activity("core.function.myWorkflowName.resolveMethodCalls", &MyClass::MyActionMethod));
-		 	\endcode
-
 			\param configuration a JSON representation of the activity configuration
 			\param action Workflow action, a function taking a Ref<AnalysisContext> as an argument.
 		*/
@@ -9979,15 +9970,13 @@ namespace BinaryNinja {
 		bool ClearOverride(const std::string& activity);
 	};
 
-	/*! A Binary Ninja Workflow is an abstraction of a computational binary analysis pipeline and it provides the extensibility
-		mechanism needed for tailored binary analysis and decompilation. More specifically, a Workflow is a repository of activities along with a
-		unique strategy to execute them. Binary Ninja provides two Workflows named ``core.module.defaultAnalysis`` and ``core.function.defaultAnalysis``
-		which expose the core analysis.
+	/*! Workflows are represented as Directed Acyclic Graphs (DAGs), where each node corresponds to an Activity (an individual analysis or action).
+		Workflows are used to tailor the analysis process for :class:`BinaryView` or :class:`Function` objects, providing granular control over
+		analysis tasks at module or function levels.
 
-		A Workflow starts in the unregistered state from either creating a new empty Workflow, or cloning an existing Workflow. While unregistered
-		it's possible to add and remove activities, as well as change the execution strategy. In order to use the Workflow on a binary it must be
-		registered. Once registered the Workflow is immutable and available for use.
-
+		A Workflow starts in an unregistered state, either by creating a new empty Workflow or by cloning an existing one. While unregistered, it
+		is possible to add and remove Activity objects, as well as modify the execution strategy. To apply a Workflow to a binary, it must be
+		registered. Once registered, the Workflow becomes immutable and is available for use.
 	 	\ingroup workflow
 	*/
 	class Workflow : public CoreRefCountObject<BNWorkflow, BNNewWorkflowReference, BNFreeWorkflow>

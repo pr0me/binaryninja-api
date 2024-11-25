@@ -518,7 +518,7 @@ void fixObjCCallTypes(Ref<AnalysisContext> ctx)
 
 void SharedCacheWorkflow::Register()
 {
-	Ref<Workflow> wf = BinaryNinja::Workflow::Instance("core.function.defaultAnalysis")->Clone("core.function.dsc");
+	Ref<Workflow> wf = BinaryNinja::Workflow::Instance("core.function.baseAnalysis")->Clone("core.function.dsc");
 	wf->RegisterActivity(new BinaryNinja::Activity("core.analysis.dscstubs", &SharedCacheWorkflow::FixupStubs));
 	wf->RegisterActivity(new BinaryNinja::Activity("core.analysis.fixObjCCallTypes", &fixObjCCallTypes));
 	wf->Insert("core.function.analyzeTailCalls", "core.analysis.fixObjCCallTypes");
