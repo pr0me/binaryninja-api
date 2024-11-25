@@ -150,7 +150,6 @@ class BINARYNINJAUIAPI TagList : public QTreeView, public FilterTarget
 	QTimer* m_hoverTimer;
 	QPoint m_hoverPos;
 
-	uint64_t m_curRefTarget = 0;
 	bool m_navToNextOrPrevStarted = false;
 
   protected:
