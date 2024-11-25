@@ -1424,7 +1424,6 @@ SharedCache::SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView) : m_
 }
 
 SharedCache::~SharedCache() {
-	std::unique_lock<std::mutex> lock(viewSpecificMutexes[m_dscView->GetFile()->GetSessionId()].viewOperationsThatInfluenceMetadataMutex);
 	sharedCacheReferences--;
 }
 
