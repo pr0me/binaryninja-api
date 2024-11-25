@@ -6226,6 +6226,83 @@ class BinaryView:
 		core.BNAddTag(self.handle, tag.handle, user)
 		core.BNAddUserDataTag(self.handle, addr, tag.handle)
 
+	def _fetch_tags(self, c_api_func, *args) -> List[Tuple[int, 'Tag']]:
+		"""
+		Internal helper to fetch tags using the specified core API function.
+
+		:param c_api_func: The C API function to call.
+		:param args: Arguments for the C API function.
+		:return: List of (address, Tag) pairs.
+		"""
+		count = ctypes.c_ulonglong()
+		tags = c_api_func(self.handle, *args, count)
+		assert tags is not None, f"{c_api_func.__name__} returned None"
+
+		result = []
+		try:
+			for i in range(count.value):
+				tag_handle = core.BNNewTagReference(tags[i].tag)
+				assert tag_handle is not None, "core.BNNewTagReference returned None"
+				tag = Tag(tag_handle)
+				result.append((tags[i].addr, tag))
+			return result
+		finally:
+			core.BNFreeTagReferences(tags, count.value)
+
+	@property
+	def tags_all_scopes(self) -> List[Tuple[int, 'Tag']]:
+		"""``tags_all_scopes`` fetches all tags in all scopes."""
+		return self._fetch_tags(core.BNGetAllTagReferences)
+
+	@property
+	def tags_for_address(self) -> List[Tuple[int, 'Tag']]:
+		"""``tags_for_address`` fetches all address-specific tags."""
+		return self._fetch_tags(core.BNGetAllAddressTagReferences)
+
+	@property
+	def tags_for_function(self) -> List[Tuple[int, 'Tag']]:
+		"""``tags_for_function`` fetches all function-specific tags."""
+		return self._fetch_tags(core.BNGetAllFunctionTagReferences)
+
+	@property
+	def tags_for_data(self) -> List[Tuple[int, 'Tag']]:
+		"""
+		``tags_for_data`` fetches all data-specific tags."""
+		return self._fetch_tags(core.BNGetDataTagReferences)
+
+	def tags_by_type(self, tag_type: 'TagType') -> List[Tuple[int, 'Tag']]:
+		"""
+		``tags_by_type`` fetches tags of a specific type.
+
+		:param tag_type: The type of tags to fetch.
+		"""
+		return self._fetch_tags(core.BNGetAllTagReferencesOfType, tag_type.handle)
+
+	def tags_for_data_by_type(self, tag_type: 'TagType') -> List[Tuple[int, 'Tag']]:
+		"""
+		``tags_for_data_by_type`` fetches data-specific tags of a specific type.
+
+		:param tag_type: The type of tags to filter by.
+		:rtype: list(int, Tag)
+		"""
+		return self._fetch_tags(core.BNGetTagReferencesOfType, tag_type.handle)
+
+	def tags_for_data_with_source(self, auto: bool = True) -> List[Tuple[int, 'Tag']]:
+		"""
+		``tags_for_data_with_source`` fetches data-specific tags filtered by source.
+
+		:param auto: If True, fetch auto tags. If False, fetch user tags.
+		:rtype: list(int, Tag)
+		"""
+		if auto:
+			return self._fetch_tags(core.BNGetAutoDataTagReferences)
+		else:
+			return self._fetch_tags(core.BNGetUserDataTagReferences)
+
+	# Note: The 'Tags' APIs above have been added to expose the ability to fetch tags for various scopes in a
+	# in an efficient manner. By default, the 'tags' property on both `BinaryView` and `Function` objects returns
+	# all tags scoped to the object.
+
 	@property
 	def tags(self) -> List[Tuple[int, 'Tag']]:
 		"""
