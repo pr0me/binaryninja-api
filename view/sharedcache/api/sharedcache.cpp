@@ -20,10 +20,10 @@ namespace SharedCacheAPI {
 		return BNDSCViewFastGetBackingCacheCount(view->GetObject());
 	}
 
-	bool SharedCache::LoadImageWithInstallName(std::string installName)
+	bool SharedCache::LoadImageWithInstallName(std::string installName, bool skipObjC)
 	{
 		char* str = BNAllocString(installName.c_str());
-		return BNDSCViewLoadImageWithInstallName(m_object, str);
+		return BNDSCViewLoadImageWithInstallName(m_object, str, skipObjC);
 	}
 
 	bool SharedCache::LoadSectionAtAddress(uint64_t addr)
@@ -31,9 +31,9 @@ namespace SharedCacheAPI {
 		return BNDSCViewLoadSectionAtAddress(m_object, addr);
 	}
 
-	bool SharedCache::LoadImageContainingAddress(uint64_t addr)
+	bool SharedCache::LoadImageContainingAddress(uint64_t addr, bool skipObjC)
 	{
-		return BNDSCViewLoadImageContainingAddress(m_object, addr);
+		return BNDSCViewLoadImageContainingAddress(m_object, addr, skipObjC);
 	}
 
 	std::vector<std::string> SharedCache::GetAvailableImages()

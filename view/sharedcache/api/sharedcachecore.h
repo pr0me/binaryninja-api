@@ -120,9 +120,9 @@ extern "C"
 
 	SHAREDCACHE_FFI_API char** BNDSCViewGetInstallNames(BNSharedCache* cache, size_t* count);
 
-	SHAREDCACHE_FFI_API bool BNDSCViewLoadImageWithInstallName(BNSharedCache* cache, char* name);
+	SHAREDCACHE_FFI_API bool BNDSCViewLoadImageWithInstallName(BNSharedCache* cache, char* name, bool skipObjC);
 	SHAREDCACHE_FFI_API bool BNDSCViewLoadSectionAtAddress(BNSharedCache* cache, uint64_t name);
-	SHAREDCACHE_FFI_API bool BNDSCViewLoadImageContainingAddress(BNSharedCache* cache, uint64_t address);
+	SHAREDCACHE_FFI_API bool BNDSCViewLoadImageContainingAddress(BNSharedCache* cache, uint64_t address, bool skipObjC);
 
 	SHAREDCACHE_FFI_API char* BNDSCViewGetNameForAddress(BNSharedCache* cache, uint64_t address);
 	SHAREDCACHE_FFI_API char* BNDSCViewGetImageNameForAddress(BNSharedCache* cache, uint64_t address);

@@ -257,9 +257,9 @@ namespace SharedCacheAPI {
 		static BNDSCViewLoadProgress GetLoadProgress(Ref<BinaryView> view);
 		static uint64_t FastGetBackingCacheCount(Ref<BinaryView> view);
 
-		bool LoadImageWithInstallName(std::string installName);
+		bool LoadImageWithInstallName(std::string installName, bool skipObjC = false);
 		bool LoadSectionAtAddress(uint64_t addr);
-		bool LoadImageContainingAddress(uint64_t addr);
+		bool LoadImageContainingAddress(uint64_t addr, bool skipObjC = false);
 		std::vector<std::string> GetAvailableImages();
 
 		std::vector<DSCSymbol> LoadAllSymbolsAndWait();

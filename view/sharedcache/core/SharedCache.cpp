@@ -1406,7 +1406,7 @@ SharedCache::SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> dscView) : m_
 				{
 					lock.unlock();
 					m_logger->LogInfo("Loading core libsystem_c.dylib library");
-					LoadImageWithInstallName(header.installName);
+					LoadImageWithInstallName(header.installName, false);
 					lock.lock();
 					break;
 				}
@@ -1518,7 +1518,7 @@ std::string SharedCache::ImageNameForAddress(uint64_t address)
 	return "";
 }
 
-bool SharedCache::LoadImageContainingAddress(uint64_t address)
+bool SharedCache::LoadImageContainingAddress(uint64_t address, bool skipObjC)
 {
 	for (const auto& [start, header] : State().headers)
 	{
@@ -1526,7 +1526,7 @@ bool SharedCache::LoadImageContainingAddress(uint64_t address)
 		{
 			if (segment.vmaddr <= address && segment.vmaddr + segment.vmsize > address)
 			{
-				return LoadImageWithInstallName(header.installName);
+				return LoadImageWithInstallName(header.installName, skipObjC);
 			}
 		}
 	}
@@ -1727,7 +1727,7 @@ bool SharedCache::LoadSectionAtAddress(uint64_t address)
 	return true;
 }
 
-bool SharedCache::LoadImageWithInstallName(std::string installName)
+bool SharedCache::LoadImageWithInstallName(std::string installName, bool skipObjC)
 {
 	auto settings = m_dscView->GetLoadSettings(VIEW_NAME);
 
@@ -1837,28 +1837,31 @@ bool SharedCache::LoadImageWithInstallName(std::string installName)
 
 	SharedCache::InitializeHeader(m_dscView, vm.get(), *h, regions);
 
-	try
+	if (!skipObjC)
 	{
-		auto objc = std::make_unique<DSCObjC::DSCObjCProcessor>(m_dscView, this, false);
+		try
+		{
+			auto objc = std::make_unique<DSCObjC::DSCObjCProcessor>(m_dscView, this, false);
 
-		bool processCFStrings = true;
-		bool processObjCMetadata = true;
-		if (settings && settings->Contains("loader.dsc.processCFStrings"))
-			processCFStrings = settings->Get<bool>("loader.dsc.processCFStrings", m_dscView);
-		if (settings && settings->Contains("loader.dsc.processObjC"))
-			processObjCMetadata = settings->Get<bool>("loader.dsc.processObjC", m_dscView);
-		if (processObjCMetadata)
-			objc->ProcessObjCData(vm, h->identifierPrefix);
-		if (processCFStrings)
-			objc->ProcessCFStrings(vm, h->identifierPrefix);
-	}
-	catch (const std::exception& ex)
-	{
-		m_logger->LogWarn("Error processing ObjC data: %s", ex.what());
-	}
-	catch (...)
-	{
-		m_logger->LogWarn("Error processing ObjC data");
+			bool processCFStrings = true;
+			bool processObjCMetadata = true;
+			if (settings && settings->Contains("loader.dsc.processCFStrings"))
+				processCFStrings = settings->Get<bool>("loader.dsc.processCFStrings", m_dscView);
+			if (settings && settings->Contains("loader.dsc.processObjC"))
+				processObjCMetadata = settings->Get<bool>("loader.dsc.processObjC", m_dscView);
+			if (processObjCMetadata)
+				objc->ProcessObjCData(vm, h->identifierPrefix);
+			if (processCFStrings)
+				objc->ProcessCFStrings(vm, h->identifierPrefix);
+		}
+		catch (const std::exception& ex)
+		{
+			m_logger->LogWarn("Error processing ObjC data: %s", ex.what());
+		}
+		catch (...)
+		{
+			m_logger->LogWarn("Error processing ObjC data");
+		}
 	}
 
 	m_dscView->AddAnalysisOption("linearsweep");
@@ -3033,13 +3036,13 @@ extern "C"
 		cache->object->ReleaseAPIRef();
 	}
 
-	bool BNDSCViewLoadImageWithInstallName(BNSharedCache* cache, char* name)
+	bool BNDSCViewLoadImageWithInstallName(BNSharedCache* cache, char* name, bool skipObjC)
 	{
 		std::string imageName = std::string(name);
 		// FIXME !!!!!!!! BNFreeString(name);
 
 		if (cache->object)
-			return cache->object->LoadImageWithInstallName(imageName);
+			return cache->object->LoadImageWithInstallName(imageName, skipObjC);
 
 		return false;
 	}
@@ -3054,11 +3057,11 @@ extern "C"
 		return false;
 	}
 
-	bool BNDSCViewLoadImageContainingAddress(BNSharedCache* cache, uint64_t address)
+	bool BNDSCViewLoadImageContainingAddress(BNSharedCache* cache, uint64_t address, bool skipObjC)
 	{
 		if (cache->object)
 		{
-			return cache->object->LoadImageContainingAddress(address);
+			return cache->object->LoadImageContainingAddress(address, skipObjC);
 		}
 
 		return false;

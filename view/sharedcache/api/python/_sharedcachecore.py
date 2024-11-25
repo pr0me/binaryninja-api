@@ -528,15 +528,17 @@ _BNDSCViewLoadImageContainingAddress.restype = ctypes.c_bool
 _BNDSCViewLoadImageContainingAddress.argtypes = [
 		ctypes.POINTER(BNSharedCache),
 		ctypes.c_ulonglong,
+		ctypes.c_bool,
 	]
 
 
 # noinspection PyPep8Naming
 def BNDSCViewLoadImageContainingAddress(
 		cache: ctypes.POINTER(BNSharedCache), 
-		address: int
+		address: int, 
+		skipObjC: bool
 		) -> bool:
-	return _BNDSCViewLoadImageContainingAddress(cache, address)
+	return _BNDSCViewLoadImageContainingAddress(cache, address, skipObjC)
 
 
 # -------------------------------------------------------
@@ -547,15 +549,17 @@ _BNDSCViewLoadImageWithInstallName.restype = ctypes.c_bool
 _BNDSCViewLoadImageWithInstallName.argtypes = [
 		ctypes.POINTER(BNSharedCache),
 		ctypes.c_char_p,
+		ctypes.c_bool,
 	]
 
 
 # noinspection PyPep8Naming
 def BNDSCViewLoadImageWithInstallName(
 		cache: ctypes.POINTER(BNSharedCache), 
-		name: Optional[str]
+		name: Optional[str], 
+		skipObjC: bool
 		) -> bool:
-	return _BNDSCViewLoadImageWithInstallName(cache, cstr(name))
+	return _BNDSCViewLoadImageWithInstallName(cache, cstr(name), skipObjC)
 
 
 # -------------------------------------------------------
