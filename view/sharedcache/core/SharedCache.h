@@ -603,6 +603,7 @@ namespace SharedCacheCore {
 		explicit SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> rawView);
 		virtual ~SharedCache();
 
+private:
 		std::optional<SharedCacheMachOHeader> LoadHeaderForAddress(
 			std::shared_ptr<VM> vm, uint64_t address, std::string installName);
 		void InitializeHeader(
@@ -611,6 +612,8 @@ namespace SharedCacheCore {
 			uint64_t textBase, const std::string& currentText, size_t cursor, uint32_t endGuard);
 		std::vector<Ref<Symbol>> ParseExportTrie(
 			std::shared_ptr<MMappedFileAccessor> linkeditFile, SharedCacheMachOHeader header);
+
+		Ref<TypeLibrary> TypeLibraryForImage(const std::string& installName);
 
 		const State& State() const { return *m_state; }
 		struct State& MutableState() { AssertMutable(); return *m_state; }

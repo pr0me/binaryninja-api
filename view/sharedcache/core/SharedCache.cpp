@@ -82,6 +82,8 @@ struct SharedCache::State
 
 struct SharedCache::ViewSpecificState {
 	std::mutex typeLibraryMutex;
+	std::unordered_map<std::string, Ref<TypeLibrary>> typeLibraries;
+
 	std::mutex viewOperationsThatInfluenceMetadataMutex;
 
 	std::atomic<BNDSCViewLoadProgress> progress;
@@ -1906,21 +1908,7 @@ bool SharedCache::LoadImageWithInstallName(std::string installName, bool skipObj
 		return false;
 	}
 
-	std::unique_lock typelibLock(m_viewSpecificState->typeLibraryMutex);
-	auto typeLib = m_dscView->GetTypeLibrary(header.installName);
-
-	if (!typeLib)
-	{
-		auto typeLibs = m_dscView->GetDefaultPlatform()->GetTypeLibrariesByName(header.installName);
-		if (!typeLibs.empty())
-		{
-			typeLib = typeLibs[0];
-			m_dscView->AddTypeLibrary(typeLib);
-			m_logger->LogInfo("shared-cache: adding type library for '%s': %s (%s)",
-				targetImage->installName.c_str(), typeLib->GetName().c_str(), typeLib->GetGuid().c_str());
-		}
-	}
-	typelibLock.unlock();
+	auto typeLib = TypeLibraryForImage(header.installName);
 
 	SaveToDSCView();
 
@@ -2955,6 +2943,24 @@ std::string SharedCache::SerializedImageHeaderForName(std::string name)
 	return "";
 }
 
+Ref<TypeLibrary> SharedCache::TypeLibraryForImage(const std::string& installName) {
+	std::lock_guard lock(m_viewSpecificState->typeLibraryMutex);
+	if (auto it = m_viewSpecificState->typeLibraries.find(installName); it != m_viewSpecificState->typeLibraries.end()) {
+		return it->second;
+	}
+
+	auto typeLib = m_dscView->GetTypeLibrary(installName);
+	if (!typeLib) {
+		auto typeLibs = m_dscView->GetDefaultPlatform()->GetTypeLibrariesByName(installName);
+		if (!typeLibs.empty()) {
+			typeLib = typeLibs[0];
+			m_dscView->AddTypeLibrary(typeLib);
+		}
+	}
+
+	m_viewSpecificState->typeLibraries[installName] = typeLib;
+	return typeLib;
+}
 
 void SharedCache::FindSymbolAtAddrAndApplyToAddr(
 	uint64_t symbolLocation, uint64_t targetLocation, bool triggerReanalysis)
@@ -2999,18 +3005,7 @@ void SharedCache::FindSymbolAtAddrAndApplyToAddr(
 		}
 		auto exportList = SharedCache::ParseExportTrie(mapping, *header);
 		std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> exportMapping;
-		std::unique_lock lock(m_viewSpecificState->typeLibraryMutex);
-		auto typeLib = m_dscView->GetTypeLibrary(header->installName);
-		if (!typeLib)
-		{
-			auto typeLibs = m_dscView->GetDefaultPlatform()->GetTypeLibrariesByName(header->installName);
-			if (!typeLibs.empty())
-			{
-				typeLib = typeLibs[0];
-				m_dscView->AddTypeLibrary(typeLib);
-			}
-		}
-		lock.unlock();
+		auto typeLib = TypeLibraryForImage(header->installName);
 		id = m_dscView->BeginUndoActions();
 		m_dscView->BeginBulkModifySymbols();
 		for (const auto& sym : exportList)
