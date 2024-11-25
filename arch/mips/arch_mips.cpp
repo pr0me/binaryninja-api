@@ -3001,13 +3001,44 @@ public:
 		}
 		case R_MIPS_HI16:
 		{
-			dest64[0] = swap64((inst64 & 0xffff0000ffffffff) | (((target + 0x8000) << 16) & 0xffff00000000 ));
+			// Find the first _LO16 in the list of relocations
+			BNRelocationInfo* cur = info.next;
+			while (cur && (cur->nativeType != R_MIPS_LO16))
+				cur = cur->next;
+
+			if (cur)
+			{
+				uint32_t inst2 = *(uint32_t*)(cur->relocationDataCache);
+				Instruction instruction;
+				memset(&instruction, 0, sizeof(instruction));
+				if (mips_decompose(&inst2, sizeof(uint32_t), &instruction, MIPS_32, cur->address, arch->GetEndianness(), DECOMPOSE_FLAGS_PSEUDO_OP))
+					break;
+
+				int32_t immediate = swap(inst2) & 0xffff;
+
+				// ADDIU and LW has a signed immediate we have to subtract
+				if (instruction.operation == MIPS_ADDIU)
+					immediate = instruction.operands[2].immediate;
+				else if (instruction.operation == MIPS_LW)
+					immediate = instruction.operands[1].immediate;
+				uint32_t ahl = ((inst & 0xffff) << 16) + immediate;
+
+				// ((AHL + S) – (short)(AHL + S)) >> 16
+				dest32[0] = swap((uint32_t)(
+					(inst & ~0xffff) |
+					(((ahl + target) - (short)(ahl + target)) >> 16)
+				));
+			}
+			else
+			{
+				LogError("No corresponding R_MIPS_LO16 relocation for R_MIPS_HI16 relocation");
+			}
 			break;
 		}
 		case R_MIPS_LO16:
 		{
-			uint64_t ahl = (((inst64 & 0xffff00000000) >> 32) + target) & 0xffff;
-			dest64[0] = swap64((inst64 & 0xffff0000ffffffff) | ((ahl << 32) & 0xffff00000000) );
+			uint32_t ahl = ((inst & 0xffff) + target) & 0xffff;
+			dest32[0] = swap((inst & ~0xffff) | (ahl & 0xffff));
 			break;
 		}
 		case R_MIPS_26:
@@ -3084,6 +3115,19 @@ public:
 			case R_MIPS_HI16:
 				result[i].dataRelocation = false;
 				result[i].pcRelative = false;
+				// MIPS_HI16 relocations can have multiple MIPS_LO16 relocations following them
+				for (size_t j = i + 1; j < result.size(); j++)
+				{
+					if (result[j].nativeType == R_MIPS_LO16 && result[j].symbolIndex == result[i].symbolIndex)
+					{
+						result[j].type = StandardRelocationType;
+						result[j].size = 4;
+						result[j].pcRelative = false;
+						result[j].dataRelocation = false;
+						result[i].next = new BNRelocationInfo(result[j]);
+						break;
+					}
+				}
 				break;
 			case R_MIPS_LO16:
 				result[i].pcRelative = false;
