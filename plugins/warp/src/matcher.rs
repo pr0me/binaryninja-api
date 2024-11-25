@@ -411,7 +411,7 @@ impl MatcherSettings {
             "title" : "Trivial Function Length",
             "type" : "number",
             "default" : Self::TRIVIAL_FUNCTION_LEN_DEFAULT,
-            "description" : "Functions below this length will be required to match on constraints.",
+            "description" : "Functions below this length in bytes will be required to match on constraints.",
             "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]
         });
         bn_settings.register_setting_json(
