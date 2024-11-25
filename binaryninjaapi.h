@@ -4949,7 +4949,7 @@ namespace BinaryNinja {
 
 
 		/*! GetOriginalBase queries for the original image base in the BinaryView, unaffected by any rebasing operations
-		    \deprecated This API has been deprecated in favor of GetOriginalImageBase in 4.0.xxxx
+		    \deprecated This API has been deprecated in favor of GetOriginalImageBase in 4.1.5902
 
 		    \return the original image base of the BinaryView
 		*/
@@ -4958,7 +4958,7 @@ namespace BinaryNinja {
 		/*! SetOriginalBase sets the original image base in the BinaryView, unaffected by any rebasing operations.
 		 * This is only intended to be used by Binary View implementations to provide this value. Regular users should
 		 * NOT change this value.
-		    \deprecated This API has been deprecated in favor of SetOriginalImageBase in 4.0.xxxx
+		    \deprecated This API has been deprecated in favor of SetOriginalImageBase in 4.1.5902
 
 		    \param base the original image base of the binary view
 		*/
@@ -6689,7 +6689,7 @@ namespace BinaryNinja {
 		std::vector<std::string> GetUniqueSectionNames(const std::vector<std::string>& names);
 
 		/*! Get the list of allocated ranges
-		   \deprecated This API has been deprecated in favor of GetMappedAddressRanges in 4.0.xxxx
+		   \deprecated This API has been deprecated in favor of GetMappedAddressRanges in 4.1.5902
 
 			\return The list of allocated ranges
 		*/

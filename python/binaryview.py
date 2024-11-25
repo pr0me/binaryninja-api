@@ -2892,12 +2892,12 @@ class BinaryView:
 
 	@property
 	def original_base(self) -> int:
-		"""Original image base of the binary Deprecated: 4.0.xxxx Use original_image_base instead."""
+		"""Original image base of the binary. Deprecated: 4.1.5902 Use `original_image_base` instead."""
 		return core.BNGetOriginalImageBase(self.handle)
 
 	@original_base.setter
 	def original_base(self, base: int) -> None:
-		"""Set original image base of the binary. Only intended for binary view implementations. Deprecated: 4.0.xxxx Use original_image_base instead."""
+		"""Set original image base of the binary. Only intended for binary view implementations. Deprecated: 4.1.5902 Use `original_image_base` instead."""
 		return core.BNSetOriginalImageBase(self.handle, base)
 
 	@property
@@ -3308,7 +3308,7 @@ class BinaryView:
 
 	@property
 	def allocated_ranges(self) -> List['variable.AddressRange']:
-		"""List of valid address ranges for this view (read-only) Deprecated: 4.0.xxxx Use mapped_address_ranges instead."""
+		"""List of valid address ranges for this view (read-only) Deprecated: 4.1.5902 Use mapped_address_ranges instead."""
 		count = ctypes.c_ulonglong(0)
 		range_list = core.BNGetAllocatedRanges(self.handle, count)
 		assert range_list is not None, "core.BNGetAllocatedRanges returned None"
