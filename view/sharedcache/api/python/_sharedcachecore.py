@@ -582,6 +582,44 @@ def BNDSCViewLoadSectionAtAddress(
 
 
 # -------------------------------------------------------
+# _BNDSCViewProcessAllObjCSections
+
+_BNDSCViewProcessAllObjCSections = core.BNDSCViewProcessAllObjCSections
+_BNDSCViewProcessAllObjCSections.restype = None
+_BNDSCViewProcessAllObjCSections.argtypes = [
+		ctypes.POINTER(BNSharedCache),
+	]
+
+
+# noinspection PyPep8Naming
+def BNDSCViewProcessAllObjCSections(
+		cache: ctypes.POINTER(BNSharedCache)
+		) -> None:
+	return _BNDSCViewProcessAllObjCSections(cache)
+
+
+# -------------------------------------------------------
+# _BNDSCViewProcessObjCSectionsForImageWithInstallName
+
+_BNDSCViewProcessObjCSectionsForImageWithInstallName = core.BNDSCViewProcessObjCSectionsForImageWithInstallName
+_BNDSCViewProcessObjCSectionsForImageWithInstallName.restype = None
+_BNDSCViewProcessObjCSectionsForImageWithInstallName.argtypes = [
+		ctypes.POINTER(BNSharedCache),
+		ctypes.c_char_p,
+		ctypes.c_bool,
+	]
+
+
+# noinspection PyPep8Naming
+def BNDSCViewProcessObjCSectionsForImageWithInstallName(
+		cache: ctypes.POINTER(BNSharedCache), 
+		name: Optional[str], 
+		deallocName: bool
+		) -> None:
+	return _BNDSCViewProcessObjCSectionsForImageWithInstallName(cache, cstr(name), deallocName)
+
+
+# -------------------------------------------------------
 # _BNFreeSharedCacheReference
 
 _BNFreeSharedCacheReference = core.BNFreeSharedCacheReference

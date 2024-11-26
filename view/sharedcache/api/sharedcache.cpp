@@ -55,6 +55,17 @@ namespace SharedCacheAPI {
 		return result;
 	}
 
+	void SharedCache::ProcessObjCSectionsForImageWithInstallName(std::string installName)
+	{
+		char* str = BNAllocString(installName.c_str());
+		BNDSCViewProcessObjCSectionsForImageWithInstallName(m_object, str, true);
+	}
+
+	void SharedCache::ProcessAllObjCSections()
+	{
+		BNDSCViewProcessAllObjCSections(m_object);
+	}
+
 	std::vector<DSCMemoryRegion> SharedCache::GetLoadedMemoryRegions()
 	{
 		size_t count;

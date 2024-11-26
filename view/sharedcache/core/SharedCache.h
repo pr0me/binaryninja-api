@@ -574,6 +574,8 @@ namespace SharedCacheCore {
 		bool LoadImageWithInstallName(std::string installName, bool skipObjC);
 		bool LoadSectionAtAddress(uint64_t address);
 		bool LoadImageContainingAddress(uint64_t address, bool skipObjC);
+		void ProcessObjCSectionsForImageWithInstallName(std::string installName);
+		void ProcessAllObjCSections();
 		std::string NameForAddress(uint64_t address);
 		std::string ImageNameForAddress(uint64_t address);
 		std::vector<std::string> GetAvailableImages();

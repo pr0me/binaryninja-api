@@ -261,6 +261,9 @@ namespace SharedCacheAPI {
 		bool LoadSectionAtAddress(uint64_t addr);
 		bool LoadImageContainingAddress(uint64_t addr, bool skipObjC = false);
 		std::vector<std::string> GetAvailableImages();
+	
+		void ProcessObjCSectionsForImageWithInstallName(std::string installName);
+		void ProcessAllObjCSections();
 
 		std::vector<DSCSymbol> LoadAllSymbolsAndWait();
 

@@ -117,6 +117,12 @@ class SharedCache:
 	def load_image_containing_address(self, addr, skipObjC = False):
 		return sccore.BNDSCViewLoadImageContainingAddress(self.handle, addr, skipObjC)
 
+	def process_objc_sections_for_image_with_install_name(self, installName):
+		return sccore.BNDSCViewProcessObjCSectionsForImageWithInstallName(self.handle, installName, False)
+
+	def process_all_objc_sections(self):
+		return sccore.BNDSCViewProcessAllObjCSections(self.handle)
+
 	@property
 	def caches(self):
 		count = ctypes.c_ulonglong()

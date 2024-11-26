@@ -1727,6 +1727,81 @@ bool SharedCache::LoadSectionAtAddress(uint64_t address)
 	return true;
 }
 
+static void GetObjCSettings(Ref<BinaryView> view, bool* processObjCMetadata, bool* processCFStrings)
+{
+	auto settings = view->GetLoadSettings(VIEW_NAME);
+	*processCFStrings = true;
+	*processObjCMetadata = true;
+	if (settings && settings->Contains("loader.dsc.processCFStrings"))
+		*processCFStrings = settings->Get<bool>("loader.dsc.processCFStrings", view);
+	if (settings && settings->Contains("loader.dsc.processObjC"))
+		*processObjCMetadata = settings->Get<bool>("loader.dsc.processObjC", view);
+}
+
+static void ProcessObjCSectionsForImageWithName(std::string baseName, std::shared_ptr<VM> vm, std::shared_ptr<DSCObjC::DSCObjCProcessor> objc, bool processCFStrings, bool processObjCMetadata, Ref<Logger> logger)
+{
+	try
+	{
+		if (processObjCMetadata)
+			objc->ProcessObjCData(vm, baseName);
+		if (processCFStrings)
+			objc->ProcessCFStrings(vm, baseName);
+	}
+	catch (const std::exception& ex)
+	{
+		logger->LogWarn("Error processing ObjC data for image %s: %s", baseName.c_str(), ex.what());
+	}
+	catch (...)
+	{
+		logger->LogWarn("Error processing ObjC data for image %s", baseName.c_str());
+	}
+}
+
+void SharedCache::ProcessObjCSectionsForImageWithInstallName(std::string installName)
+{
+	bool processCFStrings;
+	bool processObjCMetadata;
+	GetObjCSettings(m_dscView, &processCFStrings, &processObjCMetadata);
+
+	if (!processObjCMetadata && !processCFStrings)
+		return;
+
+	auto objc = std::make_shared<DSCObjC::DSCObjCProcessor>(m_dscView, this, false);
+	auto vm = GetVMMap();
+
+	ProcessObjCSectionsForImageWithName(base_name(installName), vm, objc, processCFStrings, processObjCMetadata, m_logger);
+}
+
+void SharedCache::ProcessAllObjCSections()
+{
+	bool processCFStrings;
+	bool processObjCMetadata;
+	GetObjCSettings(m_dscView, &processCFStrings, &processObjCMetadata);
+
+	if (!processObjCMetadata && !processCFStrings)
+		return;
+
+	auto objc = std::make_shared<DSCObjC::DSCObjCProcessor>(m_dscView, this, false);
+	auto vm = GetVMMap();
+
+	std::set<uint64_t> processedImageHeaders;
+	for (auto region : GetMappedRegions())
+	{
+		if (!region.loaded)
+			continue;
+		
+		// Don't repeat the same images multiple times
+		auto header = HeaderForAddress(region.start);
+		if (!header)
+			continue;
+		if (processedImageHeaders.find(header->textBase) != processedImageHeaders.end())
+			continue;
+		processedImageHeaders.insert(header->textBase);
+
+		ProcessObjCSectionsForImageWithName(header->identifierPrefix, vm, objc, processCFStrings, processObjCMetadata, m_logger);
+	}
+}
+
 bool SharedCache::LoadImageWithInstallName(std::string installName, bool skipObjC)
 {
 	auto settings = m_dscView->GetLoadSettings(VIEW_NAME);
@@ -1839,29 +1914,11 @@ bool SharedCache::LoadImageWithInstallName(std::string installName, bool skipObj
 
 	if (!skipObjC)
 	{
-		try
-		{
-			auto objc = std::make_unique<DSCObjC::DSCObjCProcessor>(m_dscView, this, false);
+		bool processCFStrings;
+		bool processObjCMetadata;
+		GetObjCSettings(m_dscView, &processCFStrings, &processObjCMetadata);
 
-			bool processCFStrings = true;
-			bool processObjCMetadata = true;
-			if (settings && settings->Contains("loader.dsc.processCFStrings"))
-				processCFStrings = settings->Get<bool>("loader.dsc.processCFStrings", m_dscView);
-			if (settings && settings->Contains("loader.dsc.processObjC"))
-				processObjCMetadata = settings->Get<bool>("loader.dsc.processObjC", m_dscView);
-			if (processObjCMetadata)
-				objc->ProcessObjCData(vm, h->identifierPrefix);
-			if (processCFStrings)
-				objc->ProcessCFStrings(vm, h->identifierPrefix);
-		}
-		catch (const std::exception& ex)
-		{
-			m_logger->LogWarn("Error processing ObjC data: %s", ex.what());
-		}
-		catch (...)
-		{
-			m_logger->LogWarn("Error processing ObjC data");
-		}
+		ProcessObjCSectionsForImageWithName(h->identifierPrefix, vm, std::make_shared<DSCObjC::DSCObjCProcessor>(m_dscView, this, false), processCFStrings, processObjCMetadata, m_logger);
 	}
 
 	m_dscView->AddAnalysisOption("linearsweep");
@@ -3065,6 +3122,22 @@ extern "C"
 		}
 
 		return false;
+	}
+
+	void BNDSCViewProcessObjCSectionsForImageWithInstallName(BNSharedCache* cache, char* name, bool deallocName)
+	{
+		std::string imageName = std::string(name);
+		if (deallocName)
+			BNFreeString(name);
+
+		if (cache->object)
+			cache->object->ProcessObjCSectionsForImageWithInstallName(imageName);
+	}
+
+	void BNDSCViewProcessAllObjCSections(BNSharedCache* cache)
+	{
+		if (cache->object)
+			cache->object->ProcessAllObjCSections();
 	}
 
 	char** BNDSCViewGetInstallNames(BNSharedCache* cache, size_t* count)
