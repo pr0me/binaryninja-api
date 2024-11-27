@@ -2189,6 +2189,21 @@ class MemoryMap:
 		"""Formatted string of the base memory map, consisting of unresolved auto and user segments (read-only)."""
 		return self.format_description(self.description(base=True))
 
+	def set_logical_memory_map_enabled(self, enabled: bool) -> None:
+		"""
+		Enable or disable the logical memory map.
+
+		When enabled, the memory map will present a simplified, logical view that merges and abstracts virtual memory
+		regions based on criteria such as contiguity and flag consistency. This view is designed to provide a higher-level
+		representation for user analysis, hiding underlying mapping details.
+
+		When disabled, the memory map will revert to displaying the virtual view, which corresponds directly to the individual
+		segments mapped from the raw file without any merging or abstraction.
+
+		:param enabled: True to enable the logical view, False to revert to the virtual view.
+		"""
+		core.BNSetLogicalMemoryMapEnabled(self.handle, enabled)
+
 	def add_memory_region(self, name: str, start: int, source: Union['os.PathLike', str, bytes, bytearray, 'BinaryView', 'databuffer.DataBuffer', 'fileaccessor.FileAccessor'], flags: SegmentFlag = 0) -> bool:
 		"""
 		Adds a memory region into the memory map. There are three types of memory regions that can be added:
@@ -9812,6 +9827,11 @@ to a the type "tagRECT" found in the typelibrary "winX64common"
 
 	@property
 	def memory_map(self):
+		"""
+		``memory_map`` returns the MemoryMap object for the current BinaryView. The `MemoryMap` object is a proxy object
+		that provides a high-level view of the memory map, allowing you to query and manipulate memory regions. This proxy
+		ensures that the memory map always reflects the latest state of the core `MemoryMap` object in the underlying `BinaryView`.
+		"""
 		return MemoryMap(handle=self.handle)
 
 	def stringify_unicode_data(

@@ -6914,6 +6914,11 @@ namespace BinaryNinja {
 		MemoryMap(BNBinaryView* view): m_object(view) {}
 		~MemoryMap() = default;
 
+		void SetLogicalMemoryMapEnabled(bool enabled)
+		{
+			BNSetLogicalMemoryMapEnabled(m_object, enabled);
+		}
+
 		bool AddBinaryMemoryRegion(const std::string& name, uint64_t start, Ref<BinaryView> source, uint32_t flags = 0)
 		{
 			return BNAddBinaryMemoryRegion(m_object, name.c_str(), start, source->GetObject(), flags);
