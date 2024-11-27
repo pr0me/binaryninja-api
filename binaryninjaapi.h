@@ -10171,6 +10171,10 @@ namespace BinaryNinja {
 		DisassemblySettings(BNDisassemblySettings* settings);
 		DisassemblySettings* Duplicate();
 
+		static Ref<DisassemblySettings> GetDefaultSettings();
+		static Ref<DisassemblySettings> GetDefaultGraphSettings();
+		static Ref<DisassemblySettings> GetDefaultLinearSettings();
+
 		bool IsOptionSet(BNDisassemblyOption option) const;
 		void SetOption(BNDisassemblyOption option, bool state = true);
 
@@ -13694,6 +13698,82 @@ namespace BinaryNinja {
 		std::set<SSAVariable> GetSSAVariables();
 	};
 
+	struct LineFormatterSettings
+	{
+		Ref<HighLevelILFunction> highLevelIL;
+		size_t desiredLineLength;
+		size_t minimumContentLength;
+		size_t tabWidth;
+		std::string languageName;
+		std::string commentStartString;
+		std::string commentEndString;
+		std::string annotationStartString;
+		std::string annotationEndString;
+
+		/*! Gets the default line formatter settings for High Level IL code.
+
+		    \param settings The settings for reformatting.
+		    \param func High Level IL function to be reformatted.
+		    \return Settings for reformatting.
+		*/
+		static LineFormatterSettings GetDefault(DisassemblySettings* settings, HighLevelILFunction* func);
+
+		/*! Gets the default line formatter settings for a language representation function.
+
+		    \param settings The settings for reformatting.
+		    \param func Language representation function to be reformatted.
+		    \return Settings for reformatting.
+		*/
+		static LineFormatterSettings GetLanguageRepresentationSettings(
+			DisassemblySettings* settings, LanguageRepresentationFunction* func);
+
+		static LineFormatterSettings FromAPIObject(const BNLineFormatterSettings* settings);
+		BNLineFormatterSettings ToAPIObject() const;
+	};
+
+	class LineFormatter : public StaticCoreRefCountObject<BNLineFormatter>
+	{
+		std::string m_nameForRegister;
+
+		static BNDisassemblyTextLine* FormatLinesCallback(void* ctxt, BNDisassemblyTextLine* inLines, size_t inCount,
+			const BNLineFormatterSettings* settings, size_t* outCount);
+		static void FreeLinesCallback(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
+
+	public:
+		LineFormatter(const std::string& name);
+		LineFormatter(BNLineFormatter* formatter);
+
+		/*! Registers the line formatter.
+
+		    \param formatter The line formatter to register.
+		*/
+		static void Register(LineFormatter* formatter);
+
+		static std::vector<Ref<LineFormatter>> GetList();
+		static Ref<LineFormatter> GetByName(const std::string& name);
+		static Ref<LineFormatter> GetDefault();
+
+		/*! Reformats the given list of lines. Returns a new list of lines containing the reformatted code.
+
+		    \param lines The lines to reformat.
+		    \param settings The settings for reformatting.
+		    \return A new list of reformatted lines.
+		*/
+		virtual std::vector<DisassemblyTextLine> FormatLines(
+			const std::vector<DisassemblyTextLine>& lines, const LineFormatterSettings& settings) = 0;
+	};
+
+	class CoreLineFormatter : public LineFormatter
+	{
+	public:
+		CoreLineFormatter(BNLineFormatter* formatter);
+
+		std::vector<DisassemblyTextLine> FormatLines(
+			const std::vector<DisassemblyTextLine>& lines, const LineFormatterSettings& settings) override;
+	};
+
+	class LanguageRepresentationFunctionType;
+
 	/*! LanguageRepresentationFunction represents a single function in a registered high level language.
 
 	    \ingroup highlevelil
@@ -13703,7 +13783,8 @@ namespace BinaryNinja {
 	        BNFreeLanguageRepresentationFunction>
 	{
 	public:
-		LanguageRepresentationFunction(Architecture* arch, Function* func, HighLevelILFunction* highLevelIL);
+		LanguageRepresentationFunction(LanguageRepresentationFunctionType* type, Architecture* arch, Function* func,
+			HighLevelILFunction* highLevelIL);
 		LanguageRepresentationFunction(BNLanguageRepresentationFunction* func);
 
 		/*! Gets the lines of tokens for a given High Level IL instruction.
@@ -13742,6 +13823,7 @@ namespace BinaryNinja {
 		*/
 		BNHighlightColor GetHighlight(BasicBlock* block);
 
+		Ref<LanguageRepresentationFunctionType> GetLanguage() const;
 		Ref<Architecture> GetArchitecture() const;
 		Ref<Function> GetFunction() const;
 		Ref<HighLevelILFunction> GetHighLevelILFunction() const;
@@ -13890,6 +13972,13 @@ namespace BinaryNinja {
 		*/
 		virtual Ref<TypeParser> GetTypeParser() { return nullptr; }
 
+		/*! Returns the line formatter for formatting code in this language. If NULL is returned, the default
+		    formatter will be used.
+
+		    \return The optional formatter for formatting code in this language.
+		*/
+		virtual Ref<LineFormatter> GetLineFormatter() { return nullptr; }
+
 		/*! Returns a list of lines representing a function prototype in this language. If no lines are returned, the
 		    default C-style prototype will be used.
 
@@ -13916,6 +14005,7 @@ namespace BinaryNinja {
 		static bool IsValidCallback(void* ctxt, BNBinaryView* view);
 		static BNTypePrinter* GetTypePrinterCallback(void* ctxt);
 		static BNTypeParser* GetTypeParserCallback(void* ctxt);
+		static BNLineFormatter* GetLineFormatterCallback(void* ctxt);
 		static BNDisassemblyTextLine* GetFunctionTypeTokensCallback(
 			void* ctxt, BNFunction* func, BNDisassemblySettings* settings, size_t* count);
 		static void FreeLinesCallback(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
@@ -13930,6 +14020,7 @@ namespace BinaryNinja {
 		bool IsValid(BinaryView* view) override;
 		Ref<TypePrinter> GetTypePrinter() override;
 		Ref<TypeParser> GetTypeParser() override;
+		Ref<LineFormatter> GetLineFormatter() override;
 		std::vector<DisassemblyTextLine> GetFunctionTypeTokens(
 			Function* func, DisassemblySettings* settings = nullptr) override;
 	};

@@ -37,14 +37,14 @@
 // Current ABI version for linking to the core. This is incremented any time
 // there are changes to the API that affect linking, including new functions,
 // new types, or modifications to existing functions or types.
-#define BN_CURRENT_CORE_ABI_VERSION 88
+#define BN_CURRENT_CORE_ABI_VERSION 89
 
 // Minimum ABI version that is supported for loading of plugins. Plugins that
 // are linked to an ABI version less than this will not be able to load and
 // will require rebuilding. The minimum version is increased when there are
 // incompatible changes that break binary compatibility, such as changes to
 // existing types or functions.
-#define BN_MINIMUM_CORE_ABI_VERSION 86
+#define BN_MINIMUM_CORE_ABI_VERSION 89
 
 #ifdef __GNUC__
 	#ifdef BINARYNINJACORE_LIBRARY
@@ -302,6 +302,7 @@ extern "C"
 	typedef struct BNDemangler BNDemangler;
 	typedef struct BNFirmwareNinja BNFirmwareNinja;
 	typedef struct BNFirmwareNinjaReferenceNode BNFirmwareNinjaReferenceNode;
+	typedef struct BNLineFormatter BNLineFormatter;
 
 	//! Console log levels
 	typedef enum BNLogLevel
@@ -727,6 +728,7 @@ extern "C"
 		HighLevelILLinearDisassembly = 65,
 		WaitForIL = 66,
 		IndentHLILBody = 67,
+		DisableLineFormatting = 68,
 
 		// Debugging options
 		ShowFlagUsage = 128,
@@ -3439,6 +3441,7 @@ extern "C"
 		bool (*isValid)(void* ctxt, BNBinaryView* view);
 		BNTypePrinter* (*getTypePrinter)(void* ctxt);
 		BNTypeParser* (*getTypeParser)(void* ctxt);
+		BNLineFormatter* (*getLineFormatter)(void* ctxt);
 		BNDisassemblyTextLine* (*getFunctionTypeTokens)(
 			void* ctxt, BNFunction* func, BNDisassemblySettings* settings, size_t* count);
 		void (*freeLines)(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
@@ -3537,6 +3540,28 @@ extern "C"
 		size_t total;
 		size_t unique;
 	} BNFirmwareNinjaDeviceAccesses;
+
+	typedef struct BNLineFormatterSettings
+	{
+		BNHighLevelILFunction* highLevelIL;
+		size_t desiredLineLength;
+		size_t minimumContentLength;
+		size_t tabWidth;
+		char* languageName;
+		char* commentStartString;
+		char* commentEndString;
+		char* annotationStartString;
+		char* annotationEndString;
+	} BNLineFormatterSettings;
+
+	typedef struct BNCustomLineFormatter
+	{
+		void* context;
+		BNDisassemblyTextLine* (*formatLines)(void* ctxt, BNDisassemblyTextLine* inLines, size_t inCount,
+			const BNLineFormatterSettings* settings, size_t* outCount);
+		void (*freeLines)(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
+	} BNCustomLineFormatter;
+
 
 	BINARYNINJACOREAPI char* BNAllocString(const char* contents);
 	BINARYNINJACOREAPI char* BNAllocStringWithLength(const char* contents, size_t len);
@@ -5453,6 +5478,9 @@ extern "C"
 
 	// Disassembly settings
 	BINARYNINJACOREAPI BNDisassemblySettings* BNCreateDisassemblySettings(void);
+	BINARYNINJACOREAPI BNDisassemblySettings* BNDefaultDisassemblySettings(void);
+	BINARYNINJACOREAPI BNDisassemblySettings* BNDefaultGraphDisassemblySettings(void);
+	BINARYNINJACOREAPI BNDisassemblySettings* BNDefaultLinearDisassemblySettings(void);
 	BINARYNINJACOREAPI BNDisassemblySettings* BNNewDisassemblySettingsReference(BNDisassemblySettings* settings);
 	BINARYNINJACOREAPI BNDisassemblySettings* BNDuplicateDisassemblySettings(BNDisassemblySettings* settings);
 	BINARYNINJACOREAPI void BNFreeDisassemblySettings(BNDisassemblySettings* settings);
@@ -6143,15 +6171,19 @@ extern "C"
 		BNLanguageRepresentationFunctionType* type, BNBinaryView* view);
 	BINARYNINJACOREAPI BNTypePrinter* BNGetLanguageRepresentationFunctionTypePrinter(BNLanguageRepresentationFunctionType* type);
 	BINARYNINJACOREAPI BNTypeParser* BNGetLanguageRepresentationFunctionTypeParser(BNLanguageRepresentationFunctionType* type);
+	BINARYNINJACOREAPI BNLineFormatter* BNGetLanguageRepresentationFunctionTypeLineFormatter(
+		BNLanguageRepresentationFunctionType* type);
 	BINARYNINJACOREAPI BNDisassemblyTextLine* BNGetLanguageRepresentationFunctionTypeFunctionTypeTokens(
 		BNLanguageRepresentationFunctionType* type, BNFunction* func, BNDisassemblySettings* settings, size_t* count);
 
 	BINARYNINJACOREAPI BNLanguageRepresentationFunction* BNCreateCustomLanguageRepresentationFunction(
-		BNArchitecture* arch, BNFunction* func, BNHighLevelILFunction* highLevelIL,
-		BNCustomLanguageRepresentationFunction* callbacks);
+		BNLanguageRepresentationFunctionType* type, BNArchitecture* arch, BNFunction* func,
+		BNHighLevelILFunction* highLevelIL, BNCustomLanguageRepresentationFunction* callbacks);
 	BINARYNINJACOREAPI BNLanguageRepresentationFunction* BNNewLanguageRepresentationFunctionReference(
 		BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI void BNFreeLanguageRepresentationFunction(BNLanguageRepresentationFunction* func);
+	BINARYNINJACOREAPI BNLanguageRepresentationFunctionType* BNGetLanguageRepresentationType(
+		BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI BNArchitecture* BNGetLanguageRepresentationArchitecture(BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI BNFunction* BNGetLanguageRepresentationOwnerFunction(BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI BNHighLevelILFunction* BNGetLanguageRepresentationILFunction(BNLanguageRepresentationFunction* func);
@@ -8056,6 +8088,25 @@ extern "C"
 	BINARYNINJACOREAPI void BNFreeFirmwareNinjaReferenceNode(BNFirmwareNinjaReferenceNode* node);
 	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode* BNNewFirmwareNinjaReferenceNodeReference(BNFirmwareNinjaReferenceNode* node);
 	BINARYNINJACOREAPI void BNFreeFirmwareNinjaReferenceNodes(BNFirmwareNinjaReferenceNode** nodes, size_t count);
+
+	// Line formatters
+	BINARYNINJACOREAPI BNLineFormatter* BNRegisterLineFormatter(const char* name, BNCustomLineFormatter* callbacks);
+	BINARYNINJACOREAPI BNLineFormatter** BNGetLineFormatterList(size_t* count);
+	BINARYNINJACOREAPI void BNFreeLineFormatterList(BNLineFormatter** formatters);
+	BINARYNINJACOREAPI BNLineFormatter* BNGetLineFormatterByName(const char* name);
+	BINARYNINJACOREAPI BNLineFormatter* BNGetDefaultLineFormatter();
+
+	BINARYNINJACOREAPI char* BNGetLineFormatterName(BNLineFormatter* formatter);
+
+	BINARYNINJACOREAPI BNDisassemblyTextLine* BNFormatLines(BNLineFormatter* formatter, BNDisassemblyTextLine* inLines,
+		size_t inCount, const BNLineFormatterSettings* settings, size_t* outCount);
+
+	BINARYNINJACOREAPI BNLineFormatterSettings* BNGetDefaultLineFormatterSettings(
+		BNDisassemblySettings* settings, BNHighLevelILFunction* func);
+	BINARYNINJACOREAPI BNLineFormatterSettings* BNGetLanguageRepresentationLineFormatterSettings(
+		BNDisassemblySettings* settings, BNLanguageRepresentationFunction* func);
+	BINARYNINJACOREAPI void BNFreeLineFormatterSettings(BNLineFormatterSettings* settings);
+
 #ifdef __cplusplus
 }
 #endif
