@@ -2788,15 +2788,18 @@ impl FunctionRecognizer for RiscVELFPLTRecognizer {
         // Look for the following code pattern:
         // t3 = plt
         // t3 = [t3 + pltoffset] || t3 = [t3]
+        // temp0 = t3 (optional)
         // t1 = next instruction
-        // jump(t3)
+        // jump(t3 || temp0)
 
         if llil.instruction_count() < 4 {
             return false;
         }
 
+        let mut next_llil_instr = llil.basic_blocks().iter().next().unwrap().iter();
+
         // Match instruction that fetches PC-relative PLT address range
-        let auipc = llil.instruction_from_idx(0).info();
+        let auipc = next_llil_instr.next().unwrap().info();
         let (auipc_dest, plt_base) = match auipc {
             InstrInfo::SetReg(r) => {
                 let value = match r.source_expr().info() {
@@ -2809,8 +2812,8 @@ impl FunctionRecognizer for RiscVELFPLTRecognizer {
         };
 
         // Match load instruction that loads the imported address
-        let load = llil.instruction_from_idx(1).info();
-        let (mut entry, target_reg) = match load {
+        let load = next_llil_instr.next().unwrap().info();
+        let (mut entry, mut target_reg) = match load {
             InstrInfo::SetReg(r) => match r.source_expr().info() {
                 ExprInfo::Load(l) => {
                     let target_reg = r.dest_reg();
@@ -2858,8 +2861,24 @@ impl FunctionRecognizer for RiscVELFPLTRecognizer {
             return false;
         }
 
+        // (OPTIONAL) Check if we are storing in temp0, adjust target reg if so
+        let mut temp_reg_inst = next_llil_instr.next().unwrap().info();
+        match &temp_reg_inst {
+            InstrInfo::SetReg(r) if llil.instruction_count() >= 5 => {
+                match r.source_expr().info() {
+                    ExprInfo::Reg(op) if target_reg == op.source_reg() => {
+                        // Update the target_reg to the temp reg.
+                        target_reg = r.dest_reg();
+                        temp_reg_inst = next_llil_instr.next().unwrap().info()
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        };
+
         // Match instruction that stores the next instruction address into a register
-        let next_pc_inst = llil.instruction_from_idx(2).info();
+        let next_pc_inst = temp_reg_inst;
         let (next_pc_dest, next_pc, cur_pc) = match next_pc_inst {
             InstrInfo::SetReg(r) => {
                 let value = match r.source_expr().info() {
@@ -2875,7 +2894,7 @@ impl FunctionRecognizer for RiscVELFPLTRecognizer {
         }
 
         // Match tail call at the end and make sure it is going to the import
-        let jump = llil.instruction_from_idx(3).info();
+        let jump = next_llil_instr.next().unwrap().info();
         match jump {
             InstrInfo::TailCall(j) => {
                 match j.target().info() {
