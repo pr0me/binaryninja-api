@@ -1242,6 +1242,8 @@ impl<D: 'static + RiscVDisassembler + Send + Sync> architecture::Architecture fo
                     (1, _, _) => il.call(target).append(), // indirect call
                     (0, _, _) => il.jump(target).append(), // indirect jump
                     (_, _, _) => {
+                        // store the target in a temporary register so we don't clobber it when rd == rs1
+                        il.set_reg(max_width, llil::Register::Temp(0), target).append();
                         // indirect jump with storage of next address to non-`ra` register
                         il.set_reg(
                             max_width,
@@ -1249,7 +1251,7 @@ impl<D: 'static + RiscVDisassembler + Send + Sync> architecture::Architecture fo
                             il.const_ptr(addr.wrapping_add(inst_len)),
                         )
                         .append();
-                        il.jump(target).append();
+                        il.jump(il.reg(max_width, llil::Register::Temp(0))).append();
                     }
                 }
             }
