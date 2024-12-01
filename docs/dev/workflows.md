@@ -520,9 +520,6 @@ The **Workflow Machine** is the core engine that manages and executes workflows.
 
 There is an API to interact directly with the Workflow Machine, allowing you to issue commands, query state, and control activity eligibility.
 
-!!! note
-	This API is only available in **Commercial** and above product editions.
-
 ### WorkflowMachine CLI Commands
 
 You can interact with the `WorkflowMachine` using the CLI for debugging purposes:
