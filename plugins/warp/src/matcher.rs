@@ -64,7 +64,11 @@ impl Matcher {
         // Get core signatures for the given platform
         let install_dir = binaryninja::install_directory().unwrap();
         #[cfg(target_os = "macos")]
-        let root_core_sig_dir = install_dir.parent().unwrap().join("Resources").join("signatures");
+        let root_core_sig_dir = install_dir
+            .parent()
+            .unwrap()
+            .join("Resources")
+            .join("signatures");
         #[cfg(not(target_os = "macos"))]
         let root_core_sig_dir = install_dir.join("signatures");
         let plat_core_sig_dir = root_core_sig_dir.join(&platform_name);

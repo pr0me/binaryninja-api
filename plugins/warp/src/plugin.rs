@@ -1,5 +1,3 @@
-use log::LevelFilter;
-use warp::signature::function::constraints::FunctionConstraint;
 use crate::cache::{
     register_cache_destructor, ViewID, FUNCTION_CACHE, GUID_CACHE, MATCHED_FUNCTION_CACHE,
 };
@@ -15,6 +13,8 @@ use binaryninja::logger::Logger;
 use binaryninja::rc::Ref;
 use binaryninja::tags::TagType;
 use binaryninja::ObjectDestructor;
+use log::LevelFilter;
+use warp::signature::function::constraints::FunctionConstraint;
 use warp::signature::function::Function as WarpFunction;
 
 mod copy;
