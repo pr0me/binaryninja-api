@@ -4,11 +4,6 @@
 // do the amo max/min instructions
 // Platform api
 
-use std::borrow::Cow;
-use std::fmt;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use log::LevelFilter;
 use binaryninja::relocation::{Relocation, RelocationHandlerExt};
 use binaryninja::{
     add_optional_plugin_dependency, architecture,
@@ -37,12 +32,17 @@ use binaryninja::{
     symbol::{Symbol, SymbolType},
     types::{max_confidence, min_confidence, Conf, NameAndType, Type},
 };
+use log::LevelFilter;
+use std::borrow::Cow;
+use std::fmt;
+use std::hash::Hash;
+use std::marker::PhantomData;
 
+use binaryninja::logger::Logger;
 use riscv_dis::{
     FloatReg, FloatRegType, Instr, IntRegType, Op, RegFile, Register as RiscVRegister,
     RiscVDisassembler, RoundMode,
 };
-use binaryninja::logger::Logger;
 
 enum RegType {
     Integer(u32),
@@ -571,11 +571,7 @@ impl<D: RiscVDisassembler> architecture::Intrinsic for RiscVIntrinsic<D> {
                 )]
             }
             Intrinsic::Fence => {
-                vec![NameAndType::new(
-                    "",
-                    &Type::int(4, false),
-                    min_confidence(),
-                )]
+                vec![NameAndType::new("", &Type::int(4, false), min_confidence())]
             }
         }
     }
@@ -978,10 +974,7 @@ impl<D: 'static + RiscVDisassembler + Send + Sync> architecture::Architecture fo
                     Text,
                 ));
             } else {
-                res.push(InstructionTextToken::new(
-                    ",",
-                    OperandSeparator,
-                ));
+                res.push(InstructionTextToken::new(",", OperandSeparator));
                 res.push(InstructionTextToken::new(" ", Text));
             }
 
@@ -989,18 +982,12 @@ impl<D: 'static + RiscVDisassembler + Send + Sync> architecture::Architecture fo
                 Operand::R(r) => {
                     let reg = self::Register::from(r);
 
-                    res.push(InstructionTextToken::new(
-                        &reg.name(),
-                        Register,
-                    ));
+                    res.push(InstructionTextToken::new(&reg.name(), Register));
                 }
                 Operand::F(r) => {
                     let reg = self::Register::from(r);
 
-                    res.push(InstructionTextToken::new(
-                        &reg.name(),
-                        Register,
-                    ));
+                    res.push(InstructionTextToken::new(&reg.name(), Register));
                 }
                 Operand::I(i) => {
                     match op {
@@ -1033,10 +1020,7 @@ impl<D: 'static + RiscVDisassembler + Send + Sync> architecture::Architecture fo
                 Operand::M(i, b) => {
                     let reg = self::Register::from(b);
 
-                    res.push(InstructionTextToken::new(
-                        "",
-                        BeginMemoryOperand,
-                    ));
+                    res.push(InstructionTextToken::new("", BeginMemoryOperand));
                     res.push(InstructionTextToken::new(
                         &if i < 0 {
                             format!("-0x{:x}", -i)
@@ -1047,15 +1031,9 @@ impl<D: 'static + RiscVDisassembler + Send + Sync> architecture::Architecture fo
                     ));
 
                     res.push(InstructionTextToken::new("(", Brace));
-                    res.push(InstructionTextToken::new(
-                        &reg.name(),
-                        Register,
-                    ));
+                    res.push(InstructionTextToken::new(&reg.name(), Register));
                     res.push(InstructionTextToken::new(")", Brace));
-                    res.push(InstructionTextToken::new(
-                        "",
-                        EndMemoryOperand,
-                    ));
+                    res.push(InstructionTextToken::new("", EndMemoryOperand));
                 }
                 Operand::RM(r) => {
                     res.push(InstructionTextToken::new(r.name(), Register));
