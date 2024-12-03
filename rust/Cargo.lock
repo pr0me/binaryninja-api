@@ -513,15 +513,14 @@ dependencies = [
 
 [[package]]
 name = "idb-rs"
-version = "0.1.4"
-source = "git+https://github.com/Vector35/idb-rs#3317c6c1c2e94949365b7aee1b76c10b0cff23fc"
+version = "0.1.5"
+source = "git+https://github.com/Vector35/idb-rs#ce6a16395970d21eceea61a3105ea7a5f718cc53"
 dependencies = [
  "anyhow",
  "bincode",
  "clap",
  "flate2",
  "serde",
- "serde_repr",
 ]
 
 [[package]]
@@ -958,17 +957,6 @@ name = "serde_derive"
 version = "1.0.205"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "692d6f5ac90220161d6774db30c662202721e64aed9058d2c394f451261420c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.52",
-]
-
-[[package]]
-name = "serde_repr"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
 dependencies = [
  "proc-macro2",
  "quote",

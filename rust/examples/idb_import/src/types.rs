@@ -137,11 +137,7 @@ impl<F: Fn(usize, usize) -> Result<(), ()>> TranslateIDBTypes<'_, F> {
             b"Unkown" | b"uint8_t" => Some(TranslateTypeResult::Translated(Type::int(1, false))),
             b"IUnkown" | b"int8_t" => Some(TranslateTypeResult::Translated(Type::int(1, true))),
             b"SHORT" | b"USHORT" => Some(TranslateTypeResult::Translated(Type::int(
-                self.til
-                    .sizes
-                    .map(|x| x.size_short.get())
-                    .unwrap_or(2)
-                    .into(),
+                self.til.size_short.get() as usize,
                 name == b"SHORT",
             ))),
             b"int16_t" => Some(TranslateTypeResult::Translated(Type::int(2, true))),
@@ -558,11 +554,13 @@ pub fn translate_ephemeral_type(debug_file: &BinaryView, ty: &TILType) -> Transl
             cm: 0,
             def_align: 1,
             symbols: vec![],
-            type_ordinal_numbers: None,
+            type_ordinal_alias: None,
             types: vec![],
             size_i: 4.try_into().unwrap(),
             size_b: 1.try_into().unwrap(),
-            sizes: None,
+            size_short: 2.try_into().unwrap(),
+            size_long: 4.try_into().unwrap(),
+            size_long_long: 8.try_into().unwrap(),
             size_long_double: None,
             macros: None,
             is_universal: false,

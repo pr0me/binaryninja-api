@@ -23,8 +23,7 @@ impl CustomDebugInfoParser for IDBDebugInfoParser {
         if let Some(project_file) = view.file().get_project_file() {
             project_file.name().as_str().ends_with(".i64")
                 || project_file.name().as_str().ends_with(".idb")
-        }
-        else {
+        } else {
             view.file().filename().as_str().ends_with(".i64")
                 || view.file().filename().as_str().ends_with(".idb")
         }
@@ -52,8 +51,7 @@ impl CustomDebugInfoParser for TILDebugInfoParser {
     fn is_valid(&self, view: &BinaryView) -> bool {
         if let Some(project_file) = view.file().get_project_file() {
             project_file.name().as_str().ends_with(".til")
-        }
-        else {
+        } else {
             view.file().filename().as_str().ends_with(".til")
         }
     }
@@ -337,7 +335,9 @@ fn parse_id0_section_info(
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn CorePluginInit() -> bool {
-    Logger::new("IDB Import").with_level(LevelFilter::Error).init();
+    Logger::new("IDB Import")
+        .with_level(LevelFilter::Error)
+        .init();
     DebugInfoParser::register("IDB Parser", IDBDebugInfoParser);
     DebugInfoParser::register("TIL Parser", TILDebugInfoParser);
     true
