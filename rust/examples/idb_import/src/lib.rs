@@ -200,7 +200,7 @@ pub fn import_til_section(
         if let TranslateTypeResult::Translated(bn_ty)
         | TranslateTypeResult::PartiallyTranslated(bn_ty, _) = &ty.ty
         {
-            if !debug_info.add_type(&String::from_utf8_lossy(&ty.name), &bn_ty, &[/* TODO */]) {
+            if !debug_info.add_type(&String::from_utf8_lossy(&ty.name), bn_ty, &[/* TODO */]) {
                 error!(
                     "Unable to add type `{}`",
                     &String::from_utf8_lossy(&ty.name)
@@ -214,7 +214,7 @@ pub fn import_til_section(
         if let TranslateTypeResult::Translated(bn_ty)
         | TranslateTypeResult::PartiallyTranslated(bn_ty, _) = &ty.ty
         {
-            if !debug_info.add_type(&String::from_utf8_lossy(&ty.name), &bn_ty, &[/* TODO */]) {
+            if !debug_info.add_type(&String::from_utf8_lossy(&ty.name), bn_ty, &[/* TODO */]) {
                 error!(
                     "Unable to fix type `{}`",
                     &String::from_utf8_lossy(&ty.name)
@@ -255,7 +255,7 @@ fn parse_id0_section_info(
 
         let bnty = ty
             .as_ref()
-            .and_then(|ty| match translate_ephemeral_type(debug_file, &ty) {
+            .and_then(|ty| match translate_ephemeral_type(debug_file, ty) {
                 TranslateTypeResult::Translated(result) => Some(result),
                 TranslateTypeResult::PartiallyTranslated(result, None) => {
                     warn!("Unable to fully translate the type at {addr:#x}");

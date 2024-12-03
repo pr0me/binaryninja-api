@@ -161,7 +161,7 @@ impl<F: Fn(usize, usize) -> Result<(), ()>> TranslateIDBTypes<'_, F> {
             }
             TranslateTypeResult::PartiallyTranslated(og_ty, error) => {
                 TranslateTypeResult::PartiallyTranslated(
-                    Type::named_type_from_type(&String::from_utf8_lossy(&ty.name), &og_ty),
+                    Type::named_type_from_type(&String::from_utf8_lossy(&ty.name), og_ty),
                     error
                         .as_ref()
                         .map(|x| BnTypeError::Typedef(Box::new(x.clone())))
@@ -169,7 +169,7 @@ impl<F: Fn(usize, usize) -> Result<(), ()>> TranslateIDBTypes<'_, F> {
                 )
             }
             TranslateTypeResult::Translated(og_ty) => TranslateTypeResult::Translated(
-                Type::named_type_from_type(&String::from_utf8_lossy(&ty.name), &og_ty),
+                Type::named_type_from_type(&String::from_utf8_lossy(&ty.name), og_ty),
             ),
         }
     }
@@ -262,7 +262,7 @@ impl<F: Fn(usize, usize) -> Result<(), ()>> TranslateIDBTypes<'_, F> {
     }
 
     fn translate_array(&self, array: &TILArray) -> TranslateTypeResult {
-        match self.translate_type(&*array.elem_type) {
+        match self.translate_type(&array.elem_type) {
             TranslateTypeResult::NotYet => TranslateTypeResult::NotYet,
             TranslateTypeResult::Translated(ty) => {
                 TranslateTypeResult::Translated(Type::array(&ty, array.nelem.into()))
@@ -520,7 +520,7 @@ impl<F: Fn(usize, usize) -> Result<(), ()>> TranslateIDBTypes<'_, F> {
             // updated after alBasicers are finished
             TILType::Union(TILUnion::Ref { ref_type, .. })
             | TILType::Struct(TILStruct::Ref { ref_type, .. })
-            | TILType::Enum(TILEnum::Ref { ref_type, .. }) => self.translate_pointer(&**ref_type),
+            | TILType::Enum(TILEnum::Ref { ref_type, .. }) => self.translate_pointer(ref_type),
             TILType::Pointer(ty) => self.translate_pointer(&ty.typ),
             TILType::Function(fun) => self.translate_function(fun),
 
@@ -573,11 +573,11 @@ pub fn translate_ephemeral_type(debug_file: &BinaryView, ty: &TILType) -> Transl
     translator.translate_type(ty)
 }
 
-pub fn translate_til_types<'a>(
+pub fn translate_til_types(
     arch: CoreArchitecture,
-    til: &'a TILSection,
+    til: &TILSection,
     progress: impl Fn(usize, usize) -> Result<(), ()>,
-) -> Result<Vec<TranslatesIDBType<'a>>> {
+) -> Result<Vec<TranslatesIDBType>> {
     let total = til.symbols.len() + til.types.len();
     let mut types = Vec::with_capacity(total);
     let mut types_by_ord = HashMap::with_capacity(total);
@@ -672,9 +672,8 @@ pub fn translate_til_types<'a>(
             }
 
             // count the number of finished types
-            match &translator.types[i].ty {
-                TranslateTypeResult::Translated(_) => num_translated += 1,
-                _ => {}
+            if let TranslateTypeResult::Translated(_) = &translator.types[i].ty {
+                num_translated += 1
             }
         }
 
