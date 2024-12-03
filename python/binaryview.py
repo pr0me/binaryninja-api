@@ -2206,30 +2206,32 @@ class MemoryMap:
 
 	def add_memory_region(self, name: str, start: int, source: Union['os.PathLike', str, bytes, bytearray, 'BinaryView', 'databuffer.DataBuffer', 'fileaccessor.FileAccessor'], flags: SegmentFlag = 0) -> bool:
 		"""
-		Adds a memory region into the memory map. There are three types of memory regions that can be added:
-		- BinaryMemoryRegion(*** Unimplemented ***): Creates a memory region from a loadable binary format and provides persistence across sessions.
-		- DataMemoryRegion: Creates a memory region from a flat file or bytes and provide persistence across sessions.
-		- RemoteMemoryRegion: Creates a memory region from a proxy callback interface. This region is ephemeral and not saved across sessions.
+		Adds a memory region to the memory map. Depending on the source parameter, the memory region is created as one of the following types:
 
-		The type of memory region added depends on the source parameter:
-		- `os.PathLike`, `str`, : Treats the source as a file path which is read and loaded into memory as a DataMemoryRegion.
-		- `bytes`, `bytearray`: Directly loads these byte formats into memory as a DataMemoryRegion.
-		- `databuffer.DataBuffer`: Directly loads a data buffer into memory as a DataMemoryRegion.
-		- `fileaccessor.FileAccessor`: Utilizes a file accessor to establish a RemoteMemoryRegion, managing data fetched from a remote source.
+		- **BinaryMemoryRegion** (***Unimplemented***): Represents a memory region loaded from a binary format, providing persistence across sessions.
+		- **DataMemoryRegion**: Represents a memory region loaded from flat files or raw bytes, providing persistence across sessions.
+		- **RemoteMemoryRegion**: Represents a memory region managed via a proxy callback interface. This region is ephemeral and not persisted across sessions.
+
+		The type of memory region created is determined by the `source` parameter:
+		- `os.PathLike` or `str`: Treated as a file path to be loaded into memory as a `DataMemoryRegion`.
+		- `bytes` or `bytearray`: Directly loaded into memory as a `DataMemoryRegion`.
+		- `databuffer.DataBuffer`: Loaded as a `DataMemoryRegion`.
+		- `fileaccessor.FileAccessor`: Creates a `RemoteMemoryRegion` that fetches data via a remote source.
+		- `BinaryView`: (Not yet implemented) Intended for future exploration.
+
+		.. note:: If no flags are specified and the new memory region overlaps with one or more existing regions, the overlapping portions of the new region will inherit the flags of the respective underlying regions.
 
 		Parameters:
-			name (str): A unique name of the memory region.
-			start (int): The start address in memory where the region will be loaded.
+			name (str): A unique name for the memory region.
+			start (int): The starting address in memory for the region.
 			source (Union[os.PathLike, str, bytes, bytearray, BinaryView, databuffer.DataBuffer, fileaccessor.FileAccessor]): The source from which the memory is loaded.
+			flags (SegmentFlag, optional): Flags to apply to the memory region. Defaults to 0 (no flags).
 
 		Returns:
-			bool: True if the memory region was successfully added, False otherwise.
+			bool: `True` if the memory region was successfully added, `False` otherwise.
 
 		Raises:
-			NotImplementedError: If the source type is not supported.
-
-		Notes:
-			If parts of the new memory region do not overlap with existing segments, new segments will be automatically created for each non-overlapping area, each with the SegmentFlag.SegmentReadable flag set.
+			NotImplementedError: If the specified `source` type is unsupported.
 		"""
 		if isinstance(source, os.PathLike):
 			source = str(source)
