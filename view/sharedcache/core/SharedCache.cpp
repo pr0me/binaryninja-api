@@ -3323,404 +3323,148 @@ void InitDSCViewType()
 
 namespace SharedCacheCore {
 
-void Serialize(SerializationContext& context, std::string_view name, const mach_header_64& b)
+void SharedCache::Store(SerializationContext& context) const
 {
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	bArr.PushBack(b.magic, context.allocator);
-	bArr.PushBack(b.cputype, context.allocator);
-	bArr.PushBack(b.cpusubtype, context.allocator);
-	bArr.PushBack(b.filetype, context.allocator);
-	bArr.PushBack(b.ncmds, context.allocator);
-	bArr.PushBack(b.sizeofcmds, context.allocator);
-	bArr.PushBack(b.flags, context.allocator);
-	bArr.PushBack(b.reserved, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
+	Serialize(context, "metadataVersion", METADATA_VERSION);
 
-void Deserialize(DeserializationContext& context, std::string_view name, mach_header_64& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	b.magic = bArr[0].GetUint();
-	b.cputype = bArr[1].GetUint();
-	b.cpusubtype = bArr[2].GetUint();
-	b.filetype = bArr[3].GetUint();
-	b.ncmds = bArr[4].GetUint();
-	b.sizeofcmds = bArr[5].GetUint();
-	b.flags = bArr[6].GetUint();
-	b.reserved = bArr[7].GetUint();
-}
+	MSS(m_viewState);
+	MSS_CAST(m_cacheFormat, uint8_t);
+	MSS(m_imageStarts);
+	MSS(m_baseFilePath);
 
-void Serialize(SerializationContext& context, std::string_view name, const symtab_command& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	bArr.PushBack(b.cmd, context.allocator);
-	bArr.PushBack(b.cmdsize, context.allocator);
-	bArr.PushBack(b.symoff, context.allocator);
-	bArr.PushBack(b.nsyms, context.allocator);
-	bArr.PushBack(b.stroff, context.allocator);
-	bArr.PushBack(b.strsize, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, symtab_command& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	b.cmd = bArr[0].GetUint();
-	b.cmdsize = bArr[1].GetUint();
-	b.symoff = bArr[2].GetUint();
-	b.nsyms = bArr[3].GetUint();
-	b.stroff = bArr[4].GetUint();
-	b.strsize = bArr[5].GetUint();
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const dysymtab_command& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	bArr.PushBack(b.cmd, context.allocator);
-	bArr.PushBack(b.cmdsize, context.allocator);
-	bArr.PushBack(b.ilocalsym, context.allocator);
-	bArr.PushBack(b.nlocalsym, context.allocator);
-	bArr.PushBack(b.iextdefsym, context.allocator);
-	bArr.PushBack(b.nextdefsym, context.allocator);
-	bArr.PushBack(b.iundefsym, context.allocator);
-	bArr.PushBack(b.nundefsym, context.allocator);
-	bArr.PushBack(b.tocoff, context.allocator);
-	bArr.PushBack(b.ntoc, context.allocator);
-	bArr.PushBack(b.modtaboff, context.allocator);
-	bArr.PushBack(b.nmodtab, context.allocator);
-	bArr.PushBack(b.extrefsymoff, context.allocator);
-	bArr.PushBack(b.nextrefsyms, context.allocator);
-	bArr.PushBack(b.indirectsymoff, context.allocator);
-	bArr.PushBack(b.nindirectsyms, context.allocator);
-	bArr.PushBack(b.extreloff, context.allocator);
-	bArr.PushBack(b.nextrel, context.allocator);
-	bArr.PushBack(b.locreloff, context.allocator);
-	bArr.PushBack(b.nlocrel, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, dysymtab_command& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	b.cmd = bArr[0].GetUint();
-	b.cmdsize = bArr[1].GetUint();
-	b.ilocalsym = bArr[2].GetUint();
-	b.nlocalsym = bArr[3].GetUint();
-	b.iextdefsym = bArr[4].GetUint();
-	b.nextdefsym = bArr[5].GetUint();
-	b.iundefsym = bArr[6].GetUint();
-	b.nundefsym = bArr[7].GetUint();
-	b.tocoff = bArr[8].GetUint();
-	b.ntoc = bArr[9].GetUint();
-	b.modtaboff = bArr[10].GetUint();
-	b.nmodtab = bArr[11].GetUint();
-	b.extrefsymoff = bArr[12].GetUint();
-	b.nextrefsyms = bArr[13].GetUint();
-	b.indirectsymoff = bArr[14].GetUint();
-	b.nindirectsyms = bArr[15].GetUint();
-	b.extreloff = bArr[16].GetUint();
-	b.nextrel = bArr[17].GetUint();
-	b.locreloff = bArr[18].GetUint();
-	b.nlocrel = bArr[19].GetUint();
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const dyld_info_command& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	bArr.PushBack(b.cmd, context.allocator);
-	bArr.PushBack(b.cmdsize, context.allocator);
-	bArr.PushBack(b.rebase_off, context.allocator);
-	bArr.PushBack(b.rebase_size, context.allocator);
-	bArr.PushBack(b.bind_off, context.allocator);
-	bArr.PushBack(b.bind_size, context.allocator);
-	bArr.PushBack(b.weak_bind_off, context.allocator);
-	bArr.PushBack(b.weak_bind_size, context.allocator);
-	bArr.PushBack(b.lazy_bind_off, context.allocator);
-	bArr.PushBack(b.lazy_bind_size, context.allocator);
-	bArr.PushBack(b.export_off, context.allocator);
-	bArr.PushBack(b.export_size, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, dyld_info_command& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	b.cmd = bArr[0].GetUint();
-	b.cmdsize = bArr[1].GetUint();
-	b.rebase_off = bArr[2].GetUint();
-	b.rebase_size = bArr[3].GetUint();
-	b.bind_off = bArr[4].GetUint();
-	b.bind_size = bArr[5].GetUint();
-	b.weak_bind_off = bArr[6].GetUint();
-	b.weak_bind_size = bArr[7].GetUint();
-	b.lazy_bind_off = bArr[8].GetUint();
-	b.lazy_bind_size = bArr[9].GetUint();
-	b.export_off = bArr[10].GetUint();
-	b.export_size = bArr[11].GetUint();
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const routines_command_64& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	bArr.PushBack(b.cmd, context.allocator);
-	bArr.PushBack(b.cmdsize, context.allocator);
-	bArr.PushBack(b.init_address, context.allocator);
-	bArr.PushBack(b.init_module, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, routines_command_64& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	b.cmd = bArr[0].GetUint();
-	b.cmdsize = bArr[1].GetUint();
-	b.init_address = bArr[2].GetUint();
-	b.init_module = bArr[3].GetUint();
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const function_starts_command& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	bArr.PushBack(b.cmd, context.allocator);
-	bArr.PushBack(b.cmdsize, context.allocator);
-	bArr.PushBack(b.funcoff, context.allocator);
-	bArr.PushBack(b.funcsize, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, function_starts_command& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	b.cmd = bArr[0].GetUint();
-	b.cmdsize = bArr[1].GetUint();
-	b.funcoff = bArr[2].GetUint();
-	b.funcsize = bArr[3].GetUint();
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const std::vector<section_64>& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	for (auto& s : b)
+	Serialize(context, "headers");
+	context.writer.StartArray();
+	for (auto& [k, v] : m_headers)
 	{
-		rapidjson::Value sArr(rapidjson::kArrayType);
-		std::string sectNameStr;
-		char sectName[16];
-		memcpy(sectName, s.sectname, 16);
-		sectName[15] = 0;
-		sectNameStr = std::string(sectName);
-		sArr.PushBack(
-			rapidjson::Value(sectNameStr.c_str(), context.allocator), context.allocator);
-		std::string segNameStr;
-		char segName[16];
-		memcpy(segName, s.segname, 16);
-		segName[15] = 0;
-		segNameStr = std::string(segName);
-		sArr.PushBack(
-			rapidjson::Value(segNameStr.c_str(), context.allocator), context.allocator);
-		sArr.PushBack(s.addr, context.allocator);
-		sArr.PushBack(s.size, context.allocator);
-		sArr.PushBack(s.offset, context.allocator);
-		sArr.PushBack(s.align, context.allocator);
-		sArr.PushBack(s.reloff, context.allocator);
-		sArr.PushBack(s.nreloc, context.allocator);
-		sArr.PushBack(s.flags, context.allocator);
-		sArr.PushBack(s.reserved1, context.allocator);
-		sArr.PushBack(s.reserved2, context.allocator);
-		sArr.PushBack(s.reserved3, context.allocator);
-		bArr.PushBack(sArr, context.allocator);
+		context.writer.StartObject();
+		v.Store(context);
+		context.writer.EndObject();
 	}
-	context.doc.AddMember(key, bArr, context.allocator);
-}
+	context.writer.EndArray();
 
-void Deserialize(DeserializationContext& context, std::string_view name, std::vector<section_64>& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	for (auto& s : bArr)
+	Serialize(context, "exportInfos");
+	context.writer.StartArray();
+	for (const auto& pair1 : m_exportInfos)
 	{
-		section_64 sec;
-		auto s2 = s.GetArray();
-		std::string sectNameStr = s2[0].GetString();
-		memset(sec.sectname, 0, 16);
-		memcpy(sec.sectname, sectNameStr.c_str(), sectNameStr.size());
-		std::string segNameStr = s2[1].GetString();
-		memset(sec.segname, 0, 16);
-		memcpy(sec.segname, segNameStr.c_str(), segNameStr.size());
-		sec.addr = s2[2].GetUint64();
-		sec.size = s2[3].GetUint64();
-		sec.offset = s2[4].GetUint();
-		sec.align = s2[5].GetUint();
-		sec.reloff = s2[6].GetUint();
-		sec.nreloc = s2[7].GetUint();
-		sec.flags = s2[8].GetUint();
-		sec.reserved1 = s2[9].GetUint();
-		sec.reserved2 = s2[10].GetUint();
-		sec.reserved3 = s2[11].GetUint();
-		b.push_back(sec);
+		context.writer.StartObject();
+		Serialize(context, "key", pair1.first);
+		Serialize(context, "value");
+		context.writer.StartArray();
+		for (const auto& pair2 : pair1.second)
+		{
+			context.writer.StartObject();
+			Serialize(context, "key", pair2.first);
+			Serialize(context, "val1", pair2.second.first);
+			Serialize(context, "val2", pair2.second.second);
+			context.writer.EndObject();
+		}
+		context.writer.EndArray();
+		context.writer.EndObject();
 	}
+	context.writer.EndArray();
+
+	Serialize(context, "backingCaches", m_backingCaches);
+	Serialize(context, "stubIslands", m_stubIslandRegions);
+	Serialize(context, "images", m_images);
+	Serialize(context, "regionsMappedIntoMemory", m_regionsMappedIntoMemory);
+	Serialize(context, "dyldDataSections", m_dyldDataRegions);
+	Serialize(context, "nonImageRegions", m_nonImageRegions);
 }
 
-void Serialize(SerializationContext& context, std::string_view name, const linkedit_data_command& b)
+void SharedCache::Load(DeserializationContext& context)
 {
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	bArr.PushBack(b.cmd, context.allocator);
-	bArr.PushBack(b.cmdsize, context.allocator);
-	bArr.PushBack(b.dataoff, context.allocator);
-	bArr.PushBack(b.datasize, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, linkedit_data_command& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	b.cmd = bArr[0].GetUint();
-	b.cmdsize = bArr[1].GetUint();
-	b.dataoff = bArr[2].GetUint();
-	b.datasize = bArr[3].GetUint();
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const segment_command_64& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	std::string segNameStr;
-	char segName[16];
-	memcpy(segName, b.segname, 16);
-	segName[15] = 0;
-	segNameStr = std::string(segName);
-	bArr.PushBack(rapidjson::Value(segNameStr.c_str(), context.allocator), context.allocator);
-	bArr.PushBack(b.vmaddr, context.allocator);
-	bArr.PushBack(b.vmsize, context.allocator);
-	bArr.PushBack(b.fileoff, context.allocator);
-	bArr.PushBack(b.filesize, context.allocator);
-	bArr.PushBack(b.maxprot, context.allocator);
-	bArr.PushBack(b.initprot, context.allocator);
-	bArr.PushBack(b.nsects, context.allocator);
-	bArr.PushBack(b.flags, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, segment_command_64& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	std::string segNameStr = bArr[0].GetString();
-	memset(b.segname, 0, 16);
-	memcpy(b.segname, segNameStr.c_str(), segNameStr.size());
-	b.vmaddr = bArr[1].GetUint64();
-	b.vmsize = bArr[2].GetUint64();
-	b.fileoff = bArr[3].GetUint64();
-	b.filesize = bArr[4].GetUint64();
-	b.maxprot = bArr[5].GetUint();
-	b.initprot = bArr[6].GetUint();
-	b.nsects = bArr[7].GetUint();
-	b.flags = bArr[8].GetUint();
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const std::vector<segment_command_64>& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	for (auto& s : b)
+	if (context.doc.HasMember("metadataVersion"))
 	{
-		rapidjson::Value sArr(rapidjson::kArrayType);
-		std::string segNameStr;
-		char segName[16];
-		memcpy(segName, s.segname, 16);
-		segName[15] = 0;
-		segNameStr = std::string(segName);
-		sArr.PushBack(
-			rapidjson::Value(segNameStr.c_str(), context.allocator), context.allocator);
-		sArr.PushBack(s.vmaddr, context.allocator);
-		sArr.PushBack(s.vmsize, context.allocator);
-		sArr.PushBack(s.fileoff, context.allocator);
-		sArr.PushBack(s.filesize, context.allocator);
-		sArr.PushBack(s.maxprot, context.allocator);
-		sArr.PushBack(s.initprot, context.allocator);
-		sArr.PushBack(s.nsects, context.allocator);
-		sArr.PushBack(s.flags, context.allocator);
-		bArr.PushBack(sArr, context.allocator);
+		if (context.doc["metadataVersion"].GetUint() != METADATA_VERSION)
+		{
+			m_logger->LogError("Shared Cache metadata version mismatch");
+			return;
+		}
 	}
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, std::vector<segment_command_64>& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	for (auto& s : bArr)
+	else
 	{
-		segment_command_64 sec;
-		auto s2 = s.GetArray();
-		std::string segNameStr = s2[0].GetString();
-		memset(sec.segname, 0, 16);
-		memcpy(sec.segname, segNameStr.c_str(), segNameStr.size());
-		sec.vmaddr = s2[1].GetUint64();
-		sec.vmsize = s2[2].GetUint64();
-		sec.fileoff = s2[3].GetUint64();
-		sec.filesize = s2[4].GetUint64();
-		sec.maxprot = s2[5].GetUint();
-		sec.initprot = s2[6].GetUint();
-		sec.nsects = s2[7].GetUint();
-		sec.flags = s2[8].GetUint();
-		b.push_back(sec);
+		m_logger->LogError("Shared Cache metadata version missing");
+		return;
 	}
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const build_version_command& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	bArr.PushBack(b.cmd, context.allocator);
-	bArr.PushBack(b.cmdsize, context.allocator);
-	bArr.PushBack(b.platform, context.allocator);
-	bArr.PushBack(b.minos, context.allocator);
-	bArr.PushBack(b.sdk, context.allocator);
-	bArr.PushBack(b.ntools, context.allocator);
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, build_version_command& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	b.cmd = bArr[0].GetUint();
-	b.cmdsize = bArr[1].GetUint();
-	b.platform = bArr[2].GetUint();
-	b.minos = bArr[3].GetUint();
-	b.sdk = bArr[4].GetUint();
-	b.ntools = bArr[5].GetUint();
-}
-
-void Serialize(SerializationContext& context, std::string_view name, const std::vector<build_tool_version>& b)
-{
-	rapidjson::Value key(name.data(), context.allocator);
-	rapidjson::Value bArr(rapidjson::kArrayType);
-	for (auto& s : b)
+	m_viewState = MSL_CAST(m_viewState, uint8_t, DSCViewState);
+	m_cacheFormat = MSL_CAST(m_cacheFormat, uint8_t, SharedCacheFormat);
+	m_headers.clear();
+	for (auto& startAndHeader : context.doc["headers"].GetArray())
 	{
-		rapidjson::Value sArr(rapidjson::kArrayType);
-		sArr.PushBack(s.tool, context.allocator);
-		sArr.PushBack(s.version, context.allocator);
-		bArr.PushBack(sArr, context.allocator);
+		SharedCacheMachOHeader header;
+		header.LoadFromValue(startAndHeader);
+		m_headers[header.textBase] = header;
 	}
-	context.doc.AddMember(key, bArr, context.allocator);
-}
-
-void Deserialize(DeserializationContext& context, std::string_view name, std::vector<build_tool_version>& b)
-{
-	auto bArr = context.doc[name.data()].GetArray();
-	for (auto& s : bArr)
+	MSL(m_imageStarts);
+	MSL(m_baseFilePath);
+	m_exportInfos.clear();
+	for (const auto& obj1 : context.doc["exportInfos"].GetArray())
 	{
-		build_tool_version sec;
-		auto s2 = s.GetArray();
-		sec.tool = s2[0].GetUint();
-		sec.version = s2[1].GetUint();
-		b.push_back(sec);
+		std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> innerVec;
+		for (const auto& obj2 : obj1["value"].GetArray())
+		{
+			std::pair<BNSymbolType, std::string> innerPair = {
+				(BNSymbolType)obj2["val1"].GetUint64(), obj2["val2"].GetString()};
+			innerVec.push_back({obj2["key"].GetUint64(), innerPair});
+		}
+
+		m_exportInfos[obj1["key"].GetUint64()] = innerVec;
 	}
+	m_symbolInfos.clear();
+	for (auto& symbolInfo : context.doc["symbolInfos"].GetArray())
+	{
+		std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> symbolInfoVec;
+		for (auto& symbolInfoPair : symbolInfo.GetArray())
+		{
+			symbolInfoVec.push_back({symbolInfoPair[0].GetUint64(),
+				{(BNSymbolType)symbolInfoPair[1].GetUint(), symbolInfoPair[2].GetString()}});
+		}
+		m_symbolInfos[symbolInfo[0].GetUint64()] = std::move(symbolInfoVec);
+	}
+	m_backingCaches.clear();
+	for (auto& bcV : context.doc["backingCaches"].GetArray())
+	{
+		BackingCache bc;
+		bc.LoadFromValue(bcV);
+		m_backingCaches.push_back(std::move(bc));
+	}
+	m_images.clear();
+	for (auto& imgV : context.doc["images"].GetArray())
+	{
+		CacheImage img;
+		img.LoadFromValue(imgV);
+		m_images.push_back(std::move(img));
+	}
+	m_regionsMappedIntoMemory.clear();
+	for (auto& rV : context.doc["regionsMappedIntoMemory"].GetArray())
+	{
+		MemoryRegion r;
+		r.LoadFromValue(rV);
+		m_regionsMappedIntoMemory.push_back(std::move(r));
+	}
+	m_stubIslandRegions.clear();
+	for (auto& siV : context.doc["stubIslands"].GetArray())
+	{
+		MemoryRegion si;
+		si.LoadFromValue(siV);
+		m_stubIslandRegions.push_back(std::move(si));
+	}
+	m_dyldDataRegions.clear();
+	for (auto& siV : context.doc["dyldDataSections"].GetArray())
+	{
+		MemoryRegion si;
+		si.LoadFromValue(siV);
+		m_dyldDataRegions.push_back(std::move(si));
+	}
+	m_nonImageRegions.clear();
+	for (auto& siV : context.doc["nonImageRegions"].GetArray())
+	{
+		MemoryRegion si;
+		si.LoadFromValue(siV);
+		m_nonImageRegions.push_back(std::move(si));
+	}
+
+	m_metadataValid = true;
 }
 
-} // namespace SharedCacheCore
+}  // namespace SharedCacheCore

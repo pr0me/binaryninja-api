@@ -8,32 +8,6 @@
 using namespace BinaryNinja;
 
 namespace SharedCacheAPI {
-
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const mach_header_64& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, mach_header_64& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const symtab_command& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, symtab_command& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const dysymtab_command& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, dysymtab_command& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const dyld_info_command& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, dyld_info_command& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const routines_command_64& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, routines_command_64& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const function_starts_command& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, function_starts_command& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const std::vector<section_64>& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, std::vector<section_64>& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const linkedit_data_command& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, linkedit_data_command& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const segment_command_64& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, segment_command_64& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const std::vector<segment_command_64>& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, std::vector<segment_command_64>& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const build_version_command& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, build_version_command& b);
-	void Serialize(SharedCacheCore::SerializationContext&, std::string_view name, const std::vector<build_tool_version>& b);
-	void Deserialize(SharedCacheCore::DeserializationContext&, std::string_view name, std::vector<build_tool_version>& b);
-
 	template<class T>
 	class SCRefCountObject {
 		void AddRefInternal() { m_refs.fetch_add(1); }

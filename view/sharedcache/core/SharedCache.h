@@ -16,31 +16,6 @@ DECLARE_SHAREDCACHE_API_OBJECT(BNSharedCache, SharedCache);
 
 namespace SharedCacheCore {
 
-	void Serialize(SerializationContext&, std::string_view name, const mach_header_64& b);
-	void Deserialize(DeserializationContext&, std::string_view name, mach_header_64& b);
-	void Serialize(SerializationContext&, std::string_view name, const symtab_command& b);
-	void Deserialize(DeserializationContext&, std::string_view name, symtab_command& b);
-	void Serialize(SerializationContext&, std::string_view name, const dysymtab_command& b);
-	void Deserialize(DeserializationContext&, std::string_view name, dysymtab_command& b);
-	void Serialize(SerializationContext&, std::string_view name, const dyld_info_command& b);
-	void Deserialize(DeserializationContext&, std::string_view name, dyld_info_command& b);
-	void Serialize(SerializationContext&, std::string_view name, const routines_command_64& b);
-	void Deserialize(DeserializationContext&, std::string_view name, routines_command_64& b);
-	void Serialize(SerializationContext&, std::string_view name, const function_starts_command& b);
-	void Deserialize(DeserializationContext&, std::string_view name, function_starts_command& b);
-	void Serialize(SerializationContext&, std::string_view name, const std::vector<section_64>& b);
-	void Deserialize(DeserializationContext&, std::string_view name, std::vector<section_64>& b);
-	void Serialize(SerializationContext&, std::string_view name, const linkedit_data_command& b);
-	void Deserialize(DeserializationContext&, std::string_view name, linkedit_data_command& b);
-	void Serialize(SerializationContext&, std::string_view name, const segment_command_64& b);
-	void Deserialize(DeserializationContext&, std::string_view name, segment_command_64& b);
-	void Serialize(SerializationContext&, std::string_view name, const std::vector<segment_command_64>& b);
-	void Deserialize(DeserializationContext&, std::string_view name, std::vector<segment_command_64>& b);
-	void Serialize(SerializationContext&, std::string_view name, const build_version_command& b);
-	void Deserialize(DeserializationContext&, std::string_view name, build_version_command& b);
-	void Serialize(SerializationContext&, std::string_view name, const std::vector<build_tool_version>& b);
-	void Deserialize(DeserializationContext&, std::string_view name, std::vector<build_tool_version>& b);
-
 	enum DSCViewState
 	{
 		DSCViewStateUnloaded,
@@ -92,13 +67,13 @@ namespace SharedCacheCore {
 		{
 			MSS(installName);
 			MSS(headerLocation);
-			rapidjson::Value key("regions", context.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
+			Serialize(context, "regions");
+			context.writer.StartArray();
 			for (auto& region : regions)
 			{
-				bArr.PushBack(rapidjson::Value(region.AsString().c_str(), context.allocator), context.allocator);
+				Serialize(context, region.AsString());
 			}
-			context.doc.AddMember(key, bArr, context.allocator);
+			context.writer.EndArray();
 		}
 
 		void Load(DeserializationContext& context)
@@ -552,176 +527,8 @@ namespace SharedCacheCore {
 			iOS16CacheFormat,
 		};
 
-		void Store(SerializationContext& context) const
-		{
-			context.doc.AddMember("metadataVersion", METADATA_VERSION, context.allocator);
-
-			MSS(m_viewState);
-			MSS_CAST(m_cacheFormat, uint8_t);
-			MSS(m_imageStarts);
-			MSS(m_baseFilePath);
-			rapidjson::Value headers(rapidjson::kArrayType);
-			for (auto& [k, v] : m_headers)
-			{
-				headers.PushBack(v.AsDocument(), context.allocator);
-			}
-			context.doc.AddMember("headers", headers, context.allocator);
-			// std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> m_exportInfos
-			// std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> exportInfos;
-			rapidjson::Document exportInfos(rapidjson::kArrayType);
-
-			for (const auto& pair1 : m_exportInfos)
-			{
-				rapidjson::Value subObj(rapidjson::kObjectType);
-				rapidjson::Value subArr(rapidjson::kArrayType);
-				for (const auto& pair2 : pair1.second)
-				{
-					rapidjson::Value subSubObj(rapidjson::kObjectType);
-					subSubObj.AddMember("key", pair2.first, context.allocator);
-					subSubObj.AddMember("val1", pair2.second.first, context.allocator);
-					subSubObj.AddMember("val2", pair2.second.second, context.allocator);
-					subArr.PushBack(subSubObj, context.allocator);
-				}
-
-				subObj.AddMember("key", pair1.first, context.allocator);
-				subObj.AddMember("value", subArr, context.allocator);
-
-				exportInfos.PushBack(subObj, context.allocator);
-			}
-			context.doc.AddMember("exportInfos", exportInfos, context.allocator);
-
-			rapidjson::Value backingCaches(rapidjson::kArrayType);
-			for (auto& bc : m_backingCaches)
-			{
-				backingCaches.PushBack(bc.AsDocument(), context.allocator);
-			}
-			context.doc.AddMember("backingCaches", backingCaches, context.allocator);
-			rapidjson::Value stubIslands(rapidjson::kArrayType);
-			for (auto& si : m_stubIslandRegions)
-			{
-				stubIslands.PushBack(si.AsDocument(), context.allocator);
-			}
-			rapidjson::Value images(rapidjson::kArrayType);
-			for (auto& img : m_images)
-			{
-				images.PushBack(img.AsDocument(), context.allocator);
-			}
-			context.doc.AddMember("images", images, context.allocator);
-			rapidjson::Value regionsMappedIntoMemory(rapidjson::kArrayType);
-			for (auto& r : m_regionsMappedIntoMemory)
-			{
-				regionsMappedIntoMemory.PushBack(r.AsDocument(), context.allocator);
-			}
-			context.doc.AddMember("regionsMappedIntoMemory", regionsMappedIntoMemory, context.allocator);
-			context.doc.AddMember("stubIslands", stubIslands, context.allocator);
-			rapidjson::Value dyldDataSections(rapidjson::kArrayType);
-			for (auto& si : m_dyldDataRegions)
-			{
-				dyldDataSections.PushBack(si.AsDocument(), context.allocator);
-			}
-			context.doc.AddMember("dyldDataSections", dyldDataSections, context.allocator);
-			rapidjson::Value nonImageRegions(rapidjson::kArrayType);
-			for (auto& si : m_nonImageRegions)
-			{
-				nonImageRegions.PushBack(si.AsDocument(), context.allocator);
-			}
-			context.doc.AddMember("nonImageRegions", nonImageRegions, context.allocator);
-		}
-
-		void Load(DeserializationContext& context)
-		{
-			if (context.doc.HasMember("metadataVersion"))
-			{
-				if (context.doc["metadataVersion"].GetUint() != METADATA_VERSION)
-				{
-					m_logger->LogError("Shared Cache metadata version mismatch");
-					return;
-				}
-			}
-			else
-			{
-				m_logger->LogError("Shared Cache metadata version missing");
-				return;
-			}
-			m_viewState = MSL_CAST(m_viewState, uint8_t, DSCViewState);
-			m_cacheFormat = MSL_CAST(m_cacheFormat, uint8_t, SharedCacheFormat);
-			m_headers.clear();
-			for (auto& startAndHeader : context.doc["headers"].GetArray())
-			{
-				SharedCacheMachOHeader header;
-				header.LoadFromValue(startAndHeader);
-				m_headers[header.textBase] = header;
-			}
-			MSL(m_imageStarts);
-			MSL(m_baseFilePath);
-			m_exportInfos.clear();
-			for (const auto& obj1 : context.doc["exportInfos"].GetArray())
-			{
-				std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> innerVec;
-				for (const auto& obj2 : obj1["value"].GetArray())
-				{
-					std::pair<BNSymbolType, std::string> innerPair = { (BNSymbolType)obj2["val1"].GetUint64(), obj2["val2"].GetString() };
-					innerVec.push_back({ obj2["key"].GetUint64(), innerPair });
-				}
-
-				m_exportInfos[obj1["key"].GetUint64()] = innerVec;
-			}
-			m_symbolInfos.clear();
-			for (auto& symbolInfo : context.doc["symbolInfos"].GetArray())
-			{
-				std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> symbolInfoVec;
-				for (auto& symbolInfoPair : symbolInfo.GetArray())
-				{
-					symbolInfoVec.push_back({symbolInfoPair[0].GetUint64(),
-						{(BNSymbolType)symbolInfoPair[1].GetUint(), symbolInfoPair[2].GetString()}});
-				}
-				m_symbolInfos[symbolInfo[0].GetUint64()] = std::move(symbolInfoVec);
-			}
-			m_backingCaches.clear();
-			for (auto& bcV : context.doc["backingCaches"].GetArray())
-			{
-				BackingCache bc;
-				bc.LoadFromValue(bcV);
-				m_backingCaches.push_back(std::move(bc));
-			}
-			m_images.clear();
-			for (auto& imgV : context.doc["images"].GetArray())
-			{
-				CacheImage img;
-				img.LoadFromValue(imgV);
-				m_images.push_back(std::move(img));
-			}
-			m_regionsMappedIntoMemory.clear();
-			for (auto& rV : context.doc["regionsMappedIntoMemory"].GetArray())
-			{
-				MemoryRegion r;
-				r.LoadFromValue(rV);
-				m_regionsMappedIntoMemory.push_back(std::move(r));
-			}
-			m_stubIslandRegions.clear();
-			for (auto& siV : context.doc["stubIslands"].GetArray())
-			{
-				MemoryRegion si;
-				si.LoadFromValue(siV);
-				m_stubIslandRegions.push_back(std::move(si));
-			}
-			m_dyldDataRegions.clear();
-			for (auto& siV : context.doc["dyldDataSections"].GetArray())
-			{
-				MemoryRegion si;
-				si.LoadFromValue(siV);
-				m_dyldDataRegions.push_back(std::move(si));
-			}
-			m_nonImageRegions.clear();
-			for (auto& siV : context.doc["nonImageRegions"].GetArray())
-			{
-				MemoryRegion si;
-				si.LoadFromValue(siV);
-				m_nonImageRegions.push_back(std::move(si));
-			}
-
-			m_metadataValid = true;
-		}
+		void Store(SerializationContext& context) const;
+		void Load(DeserializationContext& context);
 
 	private:
 		Ref<Logger> m_logger;
