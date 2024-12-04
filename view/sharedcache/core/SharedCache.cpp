@@ -3475,7 +3475,14 @@ void SharedCache::Load(DeserializationContext& context)
 	m_metadataValid = true;
 }
 
+#if defined(__GNUC__) || defined(__clang__)
 __attribute__((always_inline)) void SharedCache::AssertMutable() const
+#elif defined(_MSC_VER)
+__forceinline void SharedCache::AssertMutable() const
+#else
+#error "Unsupported compiler"
+#endif
+
 {
 	if (m_stateIsShared)
 	{
