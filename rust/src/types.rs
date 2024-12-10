@@ -2582,6 +2582,75 @@ unsafe impl CoreArrayProviderInner for QualifiedNameAndType {
     }
 }
 
+impl fmt::Debug for QualifiedNameAndType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Ok(lock) = TYPE_DEBUG_BV.lock() {
+            if let Some(bv) = &*lock {
+                let container = unsafe { BNGetAnalysisTypeContainer(bv.handle) };
+
+                let printer = if f.alternate() {
+                    unsafe { BNGetTypePrinterByName(c"_DebugTypePrinter".as_ptr()) }
+                } else {
+                    unsafe { BNGetTypePrinterByName(c"CoreTypePrinter".as_ptr()) }
+                };
+                if printer.is_null() {
+                    return Err(fmt::Error);
+                }
+
+                let mut name = self.name().clone();
+
+                let mut lines: *mut BNTypeDefinitionLine = null_mut();
+                let mut count: usize = 0;
+
+                unsafe {
+                    BNGetTypePrinterTypeLines(
+                        printer,
+                        self.type_object().as_ref().handle,
+                        container,
+                        &mut name.0,
+                        64,
+                        false,
+                        BNTokenEscapingType::NoTokenEscapingType,
+                        &mut lines,
+                        &mut count,
+                    )
+                };
+                unsafe {
+                    BNFreeTypeContainer(container);
+                }
+
+                if lines.is_null() {
+                    return Err(fmt::Error);
+                }
+
+                let line_slice: &[BNTypeDefinitionLine] =
+                    unsafe { slice::from_raw_parts(lines, count) };
+
+                for (i, line) in line_slice.iter().enumerate() {
+                    if i > 0 {
+                        writeln!(f)?;
+                    }
+
+                    let tokens: &[BNInstructionTextToken] =
+                        unsafe { slice::from_raw_parts(line.tokens, line.count) };
+
+                    for token in tokens {
+                        let text: *const c_char = token.text;
+                        let str = unsafe { CStr::from_ptr(text) };
+                        write!(f, "{}", str.to_string_lossy())?;
+                    }
+                }
+
+                unsafe {
+                    BNFreeTypeDefinitionLineList(lines, count);
+                }
+                return Ok(());
+            }
+        }
+        Err(fmt::Error)
+    }
+}
+
 //////////////////////////
 // QualifiedNameTypeAndId
 
