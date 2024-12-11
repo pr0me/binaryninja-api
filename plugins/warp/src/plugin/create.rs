@@ -44,7 +44,11 @@ impl Command for CreateSignatureFile {
                     .par_iter()
                     .inspect(|_| {
                         done_functions.fetch_add(1, Relaxed);
-                        background_task.set_progress_text(format!("Generating signatures... ({}/{})", done_functions.load(Relaxed), total_functions))
+                        background_task.set_progress_text(format!(
+                            "Generating signatures... ({}/{})",
+                            done_functions.load(Relaxed),
+                            total_functions
+                        ))
                     })
                     .filter(is_function_named)
                     .filter(|f| !f.analysis_skipped())

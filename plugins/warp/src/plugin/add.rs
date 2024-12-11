@@ -17,10 +17,12 @@ impl FunctionCommand for AddFunctionSignature {
                 log::error!("Could not get low level IL for function.");
                 return;
             };
-            
-            let Some(save_file) =
-                binaryninja::interaction::get_save_filename_input("Use Signature File", "*.sbin", "user.sbin")
-            else {
+
+            let Some(save_file) = binaryninja::interaction::get_save_filename_input(
+                "Use Signature File",
+                "*.sbin",
+                "user.sbin",
+            ) else {
                 return;
             };
 
@@ -34,7 +36,7 @@ impl FunctionCommand for AddFunctionSignature {
                 };
                 data = file_data;
             };
-            
+
             // Now add our function to the data.
             data.functions.push(cached_function(&func, &llil));
 
