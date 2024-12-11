@@ -97,14 +97,14 @@ pub fn get_open_filename_input(prompt: &str, extension: &str) -> Option<PathBuf>
     Some(PathBuf::from(string.as_str()))
 }
 
-pub fn get_save_filename_input(prompt: &str, title: &str, default_name: &str) -> Option<PathBuf> {
+pub fn get_save_filename_input(prompt: &str, extension: &str, default_name: &str) -> Option<PathBuf> {
     let mut value: *mut libc::c_char = std::ptr::null_mut();
 
     let result = unsafe {
         BNGetSaveFileNameInput(
             &mut value,
             prompt.into_bytes_with_nul().as_ptr() as *mut _,
-            title.into_bytes_with_nul().as_ptr() as *mut _,
+            extension.into_bytes_with_nul().as_ptr() as *mut _,
             default_name.into_bytes_with_nul().as_ptr() as *mut _,
         )
     };
