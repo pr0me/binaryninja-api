@@ -24,6 +24,7 @@
 	#define NOMINMAX
 #endif
 	#include <windows.h>
+	#define FMT_UNICODE 0
 #endif
 #include <cstddef>
 #include <string>
