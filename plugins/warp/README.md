@@ -15,7 +15,7 @@ Duplicate functions will be removed to save space, any input will always produce
 > Assuming you have the following:
 > - A compatible Binary Ninja with headless usage (see [this documentation](https://docs.binary.ninja/dev/batch.html#batch-processing-and-other-automation-tips) for more information)
 > - Clang
-> - Rust (currently tested for 1.77.0)
+> - Rust (currently tested for 1.83.0)
 > - Set `DEP_BINARYNINJACORE_PATH` env variable to your install directory (see [here](https://docs.binary.ninja/guide/#binary-path) for more details)
 
 1. Clone this repository (`git clone https://github.com/Vector35/binaryninja-api/tree/dev`)
