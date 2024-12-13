@@ -26,6 +26,8 @@ pub static TYPE_REF_CACHE: OnceLock<DashMap<ViewID, TypeRefCache>> = OnceLock::n
 
 pub fn register_cache_destructor() {
     pub static mut CACHE_DESTRUCTOR: CacheDestructor = CacheDestructor;
+    #[allow(static_mut_refs)]
+    // SAFETY: This can be done as the backing data is an opaque ZST.
     unsafe { CACHE_DESTRUCTOR.register() };
 }
 
