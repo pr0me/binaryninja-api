@@ -4,7 +4,6 @@ use crate::user_signature_dir;
 use binaryninja::binaryview::BinaryView;
 use binaryninja::command::FunctionCommand;
 use binaryninja::function::Function;
-use std::io::Write;
 use std::thread;
 
 pub struct AddFunctionSignature;

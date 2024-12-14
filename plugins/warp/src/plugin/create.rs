@@ -75,7 +75,7 @@ impl Command for CreateSignatureFile {
             // If we did need to save signature files to a project than this would need to change.
             let Some(save_file) = rfd::FileDialog::new()
                 .add_filter("Signature Files", &["sbin"])
-                .set_file_name(format!("{}.sbin", view.file().filename().to_string()))
+                .set_file_name(format!("{}.sbin", view.file().filename()))
                 .set_directory(signature_dir)
                 .save_file()
             else {
