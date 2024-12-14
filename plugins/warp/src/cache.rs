@@ -28,7 +28,9 @@ pub fn register_cache_destructor() {
     pub static mut CACHE_DESTRUCTOR: CacheDestructor = CacheDestructor;
     #[allow(static_mut_refs)]
     // SAFETY: This can be done as the backing data is an opaque ZST.
-    unsafe { CACHE_DESTRUCTOR.register() };
+    unsafe {
+        CACHE_DESTRUCTOR.register()
+    };
 }
 
 pub fn cached_function_match<F>(function: &BNFunction, f: F) -> Option<Function>

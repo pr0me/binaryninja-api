@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use binaryninja::architecture::{
     Architecture, ImplicitRegisterExtend, Register as BNRegister, RegisterInfo,
 };
@@ -11,6 +10,7 @@ use binaryninja::llil::{
     VisitorAction,
 };
 use binaryninja::rc::Ref as BNRef;
+use std::path::PathBuf;
 use warp::signature::basic_block::BasicBlockGUID;
 use warp::signature::function::constraints::FunctionConstraints;
 use warp::signature::function::{Function, FunctionGUID};
@@ -31,10 +31,7 @@ pub fn core_signature_dir() -> PathBuf {
     let install_dir = binaryninja::install_directory().unwrap();
     // macOS core dir is separate from the install dir.
     #[cfg(target_os = "macos")]
-    let core_dir = install_dir
-        .parent()
-        .unwrap()
-        .join("Resources");
+    let core_dir = install_dir.parent().unwrap().join("Resources");
     #[cfg(not(target_os = "macos"))]
     let core_dir = install_dir;
     core_dir.join("signatures")

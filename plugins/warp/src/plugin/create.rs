@@ -1,5 +1,6 @@
 use crate::cache::{cached_function, cached_type_references};
 use crate::matcher::invalidate_function_matcher_cache;
+use crate::user_signature_dir;
 use binaryninja::binaryview::{BinaryView, BinaryViewExt};
 use binaryninja::command::Command;
 use binaryninja::function::Function;
@@ -9,7 +10,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::thread;
 use std::time::Instant;
-use crate::user_signature_dir;
 
 pub struct CreateSignatureFile;
 
@@ -77,10 +77,11 @@ impl Command for CreateSignatureFile {
                 .add_filter("Signature Files", &["sbin"])
                 .set_file_name(format!("{}.sbin", view.file().filename().to_string()))
                 .set_directory(signature_dir)
-                .save_file() else {
+                .save_file()
+            else {
                 return;
             };
-            
+
             match std::fs::write(&save_file, data.to_bytes()) {
                 Ok(_) => {
                     log::info!("Signature file saved successfully.");
