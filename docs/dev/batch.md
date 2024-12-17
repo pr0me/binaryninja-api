@@ -115,7 +115,7 @@ We can customize our analysis a lot more granularly than that though. In [`load`
 
 ### On-Disk License
 
-If manually installing a named license on Commercial, Ultimate, or Headless, make sure that your license file is copied to the [appropriate location](https://docs.binary.ninja/guide/index.html#user-folder) (``~/.binaryninja/license.dat on Linux), or see the next section for an alternative.
+If manually installing a named license on Commercial, Ultimate, or Headless, make sure that your license file is copied to the [appropriate location](https://docs.binary.ninja/guide/index.html#user-folder) (`~/.binaryninja/license.dat` on Linux), or see the next section for an alternative.
 
 If using a floating license, you can use the [example code](https://api.binary.ninja/binaryninja.enterprise-module.html#binaryninja.enterprise.LicenseCheckout) to check out a license on the fly.
 
