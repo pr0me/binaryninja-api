@@ -249,6 +249,7 @@ class BINARYNINJAUIAPI LinearView : public QAbstractScrollArea, public View, pub
 	bool cacheNextLines();
 	void updateCache();
 	void updateBounds();
+	void updateHighlight();
 	void refreshAtCurrentLocation(bool cursorFixup = false);
 	bool navigateToAddress(uint64_t addr, bool center, bool updateHighlight, bool navByRef = false);
 	bool navigateToLine(
