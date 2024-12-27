@@ -37,7 +37,7 @@
 // Current ABI version for linking to the core. This is incremented any time
 // there are changes to the API that affect linking, including new functions,
 // new types, or modifications to existing functions or types.
-#define BN_CURRENT_CORE_ABI_VERSION 89
+#define BN_CURRENT_CORE_ABI_VERSION 90
 
 // Minimum ABI version that is supported for loading of plugins. Plugins that
 // are linked to an ABI version less than this will not be able to load and
@@ -303,6 +303,7 @@ extern "C"
 	typedef struct BNFirmwareNinja BNFirmwareNinja;
 	typedef struct BNFirmwareNinjaReferenceNode BNFirmwareNinjaReferenceNode;
 	typedef struct BNLineFormatter BNLineFormatter;
+	typedef struct BNRenderLayer BNRenderLayer;
 
 	//! Console log levels
 	typedef enum BNLogLevel
@@ -3562,6 +3563,29 @@ extern "C"
 		void (*freeLines)(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
 	} BNCustomLineFormatter;
 
+	typedef struct BNRenderLayerCallbacks
+	{
+		void* context;
+		void (*applyToFlowGraph)(void* ctxt, BNFlowGraph* graph);
+		void (*applyToLinearViewObject)(
+			void* ctxt,
+			BNLinearViewObject* obj,
+			BNLinearViewObject* prev,
+			BNLinearViewObject* next,
+			BNLinearDisassemblyLine* inLines,
+			size_t inLineCount,
+			BNLinearDisassemblyLine** outLines,
+			size_t* outLineCount
+		);
+		void (*freeLines)(void* ctxt, BNLinearDisassemblyLine* lines, size_t count);
+	} BNRenderLayerCallbacks;
+
+	typedef enum BNRenderLayerDefaultEnableState
+	{
+		DisabledByDefaultRenderLayerDefaultEnableState,
+		EnabledByDefaultRenderLayerDefaultEnableState,
+		AlwaysEnabledRenderLayerDefaultEnableState,
+	} BNRenderLayerDefaultEnableState;
 
 	BINARYNINJACOREAPI char* BNAllocString(const char* contents);
 	BINARYNINJACOREAPI char* BNAllocStringWithLength(const char* contents, size_t len);
@@ -5127,6 +5151,10 @@ extern "C"
 	BINARYNINJACOREAPI BNLinearDisassemblyLine* BNGetLinearViewCursorLines(BNLinearViewCursor* cursor, size_t* count);
 	BINARYNINJACOREAPI int BNCompareLinearViewCursors(BNLinearViewCursor* a, BNLinearViewCursor* b);
 
+	BINARYNINJACOREAPI BNRenderLayer** BNGetLinearViewCursorRenderLayers(BNLinearViewCursor* cursor, size_t* count);
+	BINARYNINJACOREAPI void BNAddLinearViewCursorRenderLayer(BNLinearViewCursor* cursor, BNRenderLayer* layer);
+	BINARYNINJACOREAPI void BNRemoveLinearViewCursorRenderLayer(BNLinearViewCursor* cursor, BNRenderLayer* layer);
+
 	BINARYNINJACOREAPI void BNDefineDataVariable(BNBinaryView* view, uint64_t addr, BNTypeWithConfidence* type);
 	BINARYNINJACOREAPI void BNDefineUserDataVariable(BNBinaryView* view, uint64_t addr, BNTypeWithConfidence* type);
 	BINARYNINJACOREAPI void BNUndefineDataVariable(BNBinaryView* view, uint64_t addr, bool blacklist);
@@ -5550,13 +5578,20 @@ extern "C"
 	BINARYNINJACOREAPI BNFlowGraphNode** BNGetFlowGraphNodesInRegion(
 	    BNFlowGraph* graph, int left, int top, int right, int bottom, size_t* count);
 	BINARYNINJACOREAPI void BNFreeFlowGraphNodeList(BNFlowGraphNode** nodes, size_t count);
+	BINARYNINJACOREAPI size_t BNGetFlowGraphNodeCount(BNFlowGraph* graph);
 	BINARYNINJACOREAPI bool BNFlowGraphHasNodes(BNFlowGraph* graph);
 	BINARYNINJACOREAPI size_t BNAddFlowGraphNode(BNFlowGraph* graph, BNFlowGraphNode* node);
+	BINARYNINJACOREAPI void BNReplaceFlowGraphNode(BNFlowGraph* graph, size_t i, BNFlowGraphNode* newNode);
+	BINARYNINJACOREAPI void BNClearFlowGraphNodes(BNFlowGraph* graph);
 
 	BINARYNINJACOREAPI int BNGetFlowGraphWidth(BNFlowGraph* graph);
 	BINARYNINJACOREAPI int BNGetFlowGraphHeight(BNFlowGraph* graph);
 	BINARYNINJACOREAPI void BNFlowGraphSetWidth(BNFlowGraph* graph, int width);
 	BINARYNINJACOREAPI void BNFlowGraphSetHeight(BNFlowGraph* graph, int height);
+
+	BINARYNINJACOREAPI BNRenderLayer** BNGetFlowGraphRenderLayers(BNFlowGraph* graph, size_t* count);
+	BINARYNINJACOREAPI void BNAddFlowGraphRenderLayer(BNFlowGraph* graph, BNRenderLayer* layer);
+	BINARYNINJACOREAPI void BNRemoveFlowGraphRenderLayer(BNFlowGraph* graph, BNRenderLayer* layer);
 
 	BINARYNINJACOREAPI BNFlowGraphNode* BNCreateFlowGraphNode(BNFlowGraph* graph);
 	BINARYNINJACOREAPI BNFlowGraphNode* BNNewFlowGraphNodeReference(BNFlowGraphNode* node);
@@ -8107,6 +8142,26 @@ extern "C"
 	BINARYNINJACOREAPI BNLineFormatterSettings* BNGetLanguageRepresentationLineFormatterSettings(
 		BNDisassemblySettings* settings, BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI void BNFreeLineFormatterSettings(BNLineFormatterSettings* settings);
+
+	// Render Layers
+	BINARYNINJACOREAPI BNRenderLayer* BNRegisterRenderLayer(const char* name, BNRenderLayerCallbacks* callbacks, BNRenderLayerDefaultEnableState enableState);
+	BINARYNINJACOREAPI BNRenderLayer** BNGetRenderLayerList(size_t* count);
+	BINARYNINJACOREAPI void BNFreeRenderLayerList(BNRenderLayer** renderLayers);
+	BINARYNINJACOREAPI BNRenderLayer* BNGetRenderLayerByName(const char* name);
+	BINARYNINJACOREAPI char* BNGetRenderLayerName(BNRenderLayer* renderLayer);
+	BINARYNINJACOREAPI BNRenderLayerDefaultEnableState BNGetRenderLayerDefaultEnableState(BNRenderLayer* renderLayer);
+
+	BINARYNINJACOREAPI void BNApplyRenderLayerToFlowGraph(BNRenderLayer* renderLayer, BNFlowGraph* graph);
+	BINARYNINJACOREAPI void BNApplyRenderLayerToLinearViewObject(
+		BNRenderLayer* renderLayer,
+		BNLinearViewObject* obj,
+		BNLinearViewObject* prev,
+		BNLinearViewObject* next,
+		BNLinearDisassemblyLine* inLines,
+		size_t inLineCount,
+		BNLinearDisassemblyLine** outLines,
+		size_t* outLineCount
+	);
 
 #ifdef __cplusplus
 }

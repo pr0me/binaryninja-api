@@ -4073,7 +4073,9 @@ namespace BinaryNinja {
 		Ref<BasicBlock> block;
 		DisassemblyTextLine contents;
 
-		static LinearDisassemblyLine FromAPIObject(BNLinearDisassemblyLine* line);
+		BNLinearDisassemblyLine GetAPIObject() const;
+		static LinearDisassemblyLine FromAPIObject(const BNLinearDisassemblyLine* line);
+		static void FreeAPIObject(BNLinearDisassemblyLine* line);
 	};
 
 	class NamedTypeReference;
@@ -10414,17 +10416,23 @@ namespace BinaryNinja {
 		*/
 		bool IsILBlock() const;
 
+		/*! Whether the basic block contains Low Level IL
+
+			\return Whether the basic block contains Low Level IL
+		*/
+		bool IsLowLevelILBlock() const;
+
 		/*! Whether the basic block contains Medium Level IL
 
 			\return Whether the basic block contains Medium Level IL
 		*/
-		bool IsLowLevelILBlock() const;
+		bool IsMediumLevelILBlock() const;
 
 		/*! Whether the basic block contains High Level IL
 
 			\return Whether the basic block contains High Level IL
 		*/
-		bool IsMediumLevelILBlock() const;
+		bool IsHighLevelILBlock() const;
 
 		/*! Get the Low Level IL Function for this basic block
 
@@ -11443,6 +11451,12 @@ namespace BinaryNinja {
 		*/
 		Ref<FlowGraphNode> GetNode(size_t i);
 
+		/*! Get the total number of nodes in the graph
+
+			\return Node count
+		 */
+		size_t GetNodeCount() const;
+
 		/*! Whether the FlowGraph has any nodes added
 
 			\return Whether the FlowGraph has any nodes added
@@ -11451,12 +11465,29 @@ namespace BinaryNinja {
 
 		/*! Add a node to this flowgraph
 
+			\note After the graph has completed layout, this function has no effect.
+
 			\param node Node to be added.
 			\return Index of the node
 		*/
 		size_t AddNode(FlowGraphNode* node);
 
+		/*! Replace an existing node in the graph with a new node.
+			Any existing edges referencing the old node will be updated to point to
+			the new node.
 
+			\note After the graph has completed layout, this function has no effect.
+
+			\param i Index of the node to replace
+			\param newNode New node with which to replace the old node
+		 */
+		void ReplaceNode(size_t i, FlowGraphNode* newNode);
+
+		/*! Clear all the nodes in the graph
+
+			\note After the graph has completed layout, this function has no effect.
+		 */
+		void ClearNodes();
 
 		/*! Flow graph width
 
@@ -11548,6 +11579,26 @@ namespace BinaryNinja {
 
 		void SetOption(BNFlowGraphOption option, bool value = true);
 		bool IsOptionSet(BNFlowGraphOption option);
+
+		/*! Get the list of Render Layers which will be applied to this Flow Graph,
+			after it calls PopulateNodes.
+
+			\return List of Render Layers
+		 */
+		std::vector<class RenderLayer*> GetRenderLayers() const;
+
+		/*! Add a Render Layer to be applied to this Flow Graph. Note that layers will
+			be applied in the order in which they are added.
+
+			\param layer Render Layer to add
+		 */
+		void AddRenderLayer(class RenderLayer* layer);
+
+		/*! Remove a Render Layer from being applied to this Flow Graph
+
+			\param layer Render Layer to remove
+		 */
+		void RemoveRenderLayer(class RenderLayer* layer);
 	};
 
 	/*!
@@ -17101,6 +17152,26 @@ namespace BinaryNinja {
 
 		Ref<LinearViewCursor> Duplicate();
 
+		/*! Get the list of Render Layers which will be applied to this cursor, at the
+			end of calls to GetLines.
+
+			\return List of Render Layers
+		 */
+		std::vector<class RenderLayer*> GetRenderLayers() const;
+
+		/*! Add a Render Layer to be applied to this cursor. Note that layers will
+			be applied in the order in which they are added.
+
+			\param layer Render Layer to add
+		 */
+		void AddRenderLayer(class RenderLayer* layer);
+
+		/*! Remove a Render Layer from being applied to this cursor
+
+			\param layer Render Layer to remove
+		 */
+		void RemoveRenderLayer(class RenderLayer* layer);
+
 		static int Compare(LinearViewCursor* a, LinearViewCursor* b);
 	};
 
@@ -19006,6 +19077,244 @@ namespace BinaryNinja {
 		*/
 		static void AddNamesForOuterStructureMembers(
 			BinaryView* data, Type* type, const HighLevelILInstruction& var, std::vector<std::string>& nameList);
+	};
+
+	/*! RenderLayer is a plugin class that allows you to customize the presentation of
+		Linear and Graph view output, adding, changing, or removing lines before they are
+		presented in the UI.
+	 */
+	class RenderLayer: public StaticCoreRefCountObject<BNRenderLayer>
+	{
+		std::string m_nameForRegister;
+		static std::unordered_map<BNRenderLayer*, RenderLayer*> g_registeredInstances;
+
+	protected:
+		explicit RenderLayer(const std::string& name);
+		RenderLayer(BNRenderLayer* layer);
+		virtual ~RenderLayer() = default;
+		static void ApplyToFlowGraphCallback(void* ctxt, BNFlowGraph* graph);
+		static void ApplyToLinearViewObjectCallback(
+			void* ctxt,
+			BNLinearViewObject* obj,
+			BNLinearViewObject* prev,
+			BNLinearViewObject* next,
+			BNLinearDisassemblyLine* inLines,
+			size_t inLineCount,
+			BNLinearDisassemblyLine** outLines,
+			size_t* outLineCount
+		);
+		static void FreeLinesCallback(void* ctxt, BNLinearDisassemblyLine* lines, size_t count);
+
+	public:
+		/*! Register a custom Render Layer.
+
+			\param layer Render Layer to register
+			\param enableState Whether the layer should be enabled by default
+		*/
+		static void Register(RenderLayer* layer, BNRenderLayerDefaultEnableState enableState = DisabledByDefaultRenderLayerDefaultEnableState);
+
+		/*! Get the list of all currently registered Render Layers.
+
+			\return List of Render Layers
+		*/
+		static std::vector<Ref<RenderLayer>> GetList();
+
+		/*! Look up a Render Layer by its name
+
+			\param name Name of Render Layer
+			\return Render Layer, if it exists. Otherwise, nullptr.
+		*/
+		static Ref<RenderLayer> GetByName(const std::string& name);
+
+		/*! Get the name of a Render Layer
+
+			\return Render Layer's name
+		*/
+		std::string GetName() const;
+
+		/*! Get whether the Render Layer is enabled by default
+
+			\return Default enable state
+		 */
+		BNRenderLayerDefaultEnableState GetDefaultEnableState() const;
+
+		/*! Apply this Render Layer to a single Basic Block of Disassembly lines.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the block.
+
+			\note This function will only handle Disassembly lines, and not any ILs.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToDisassemblyBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		)
+		{
+			(void)block;
+			(void)lines;
+		}
+
+		/*! Apply this Render Layer to a single Basic Block of Low Level IL lines.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the block.
+
+			\note This function will only handle Lifted IL/LLIL/LLIL(SSA) lines.
+			You can use the block's `function_graph_type` property to determine which is being handled.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToLowLevelILBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		)
+		{
+			(void)block;
+			(void)lines;
+		}
+
+		/*! Apply this Render Layer to a single Basic Block of Medium Level IL lines.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the block.
+
+			\note This function will only handle MLIL/MLIL(SSA)/Mapped MLIL/Mapped MLIL(SSA) lines.
+			You can use the block's `function_graph_type` property to determine which is being handled.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToMediumLevelILBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		)
+		{
+			(void)block;
+			(void)lines;
+		}
+
+		/*! Apply this Render Layer to a single Basic Block of High Level IL lines.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the block.
+
+			\note This function will only handle HLIL/HLIL(SSA)/Language Representation lines.
+			You can use the block's `function_graph_type` property to determine which is being handled.
+
+			\warning This function will NOT apply to High Level IL bodies as displayed
+			in Linear View! Those are handled by `ApplyToHighLevelILBody` instead as they
+			do not have a Basic Block associated with them.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToHighLevelILBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		)
+		{
+			(void)block;
+			(void)lines;
+		}
+
+		/*! Apply this Render Layer to the entire body of a High Level IL function.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the function.
+
+			\warning This function only applies to Linear View, and not to Graph View!
+			If you want to handle Graph View too, you will need to use `ApplyToHighLevelILBlock`
+			and handle the lines one block at a time.
+
+			\param function Function containing those lines
+			\param lines Lines of text for the function, to be modified by this function
+		 */
+		virtual void ApplyToHighLevelILBody(
+			Ref<Function> function,
+			std::vector<LinearDisassemblyLine>& lines
+		)
+		{
+			(void)function;
+			(void)lines;
+		}
+
+		/*! Apply to lines generated by Linear View that are not part of a function.
+			It is up to your implementation to figure out which type of Linear View Object
+			lines these are, and what to do with them.
+
+			\param obj Linear View Object being rendered
+			\param prev Linear View Object located directly above this one
+			\param next Linear View Object located directly below this one
+			\param lines Lines rendered by `obj`, to be modified by this function
+		 */
+		virtual void ApplyToMiscLinearLines(
+			Ref<LinearViewObject> obj,
+			Ref<LinearViewObject> prev,
+			Ref<LinearViewObject> next,
+			std::vector<LinearDisassemblyLine>& lines
+		)
+		{
+			(void)obj;
+			(void)prev;
+			(void)next;
+			(void)lines;
+		}
+
+		/*! Apply to lines generated by a Basic Block, of any type. If not overridden, this
+			function will call the appropriate ApplyToXLevelILBlock function.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		);
+
+		/*! Apply this Render Layer to a Flow Graph, potentially modifying its nodes,
+			their edges, their lines, and their lines' content.
+
+			\note If you override this function, you will need to call the parent
+			implementation if you want to use the higher level ApplyToXLevelILBlock
+			functionality.
+
+			\param graph Graph to modify
+		*/
+		virtual void ApplyToFlowGraph(Ref<FlowGraph> graph);
+
+		/*! Apply this Render Layer to the lines produced by a LinearViewObject for rendering
+			in Linear View, potentially modifying the lines and their contents.
+
+			\note If you override this function, you will need to call the parent
+			implementation if you want to use the higher level ApplyToXLevelILBlock
+			functionality.
+
+			\param obj Linear View Object being rendered
+			\param prev Linear View Object located directly above this one
+			\param next Linear View Object located directly below this one
+			\param lines Lines originally rendered by the Linear View Object
+			\return Updated set of lines to display in Linear View
+		*/
+		virtual void ApplyToLinearViewObject(
+			Ref<LinearViewObject> obj,
+			Ref<LinearViewObject> prev,
+			Ref<LinearViewObject> next,
+			std::vector<LinearDisassemblyLine>& lines
+		);
+	};
+
+	class CoreRenderLayer: public RenderLayer
+	{
+	public:
+		CoreRenderLayer(BNRenderLayer* layer);
+		virtual ~CoreRenderLayer() = default;
+
+		virtual void ApplyToFlowGraph(Ref<FlowGraph> graph) override;
+		virtual void ApplyToLinearViewObject(
+			Ref<LinearViewObject> obj,
+			Ref<LinearViewObject> prev,
+			Ref<LinearViewObject> next,
+			std::vector<LinearDisassemblyLine>& lines
+		) override;
 	};
 }  // namespace BinaryNinja
 
