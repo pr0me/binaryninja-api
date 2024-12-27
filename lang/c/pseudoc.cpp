@@ -177,28 +177,11 @@ BNSymbolDisplayResult PseudoCFunction::AppendPointerTextToken(const HighLevelILI
 
 string PseudoCFunction::GetSizeToken(size_t size, bool isSigned)
 {
-	char sizeStr[32];
-
-	switch (size)
-	{
-		case 0:
-			return {};
-		case 1:
-			return (isSigned ? "int8_t" : "uint8_t");
-		case 2:
-			return (isSigned ? "int16_t" : "uint16_t");
-		case 4:
-			return (isSigned ? "int32_t" : "uint32_t");
-		case 8:
-			return (isSigned ? "int64_t" : "uint64_t");
-		case 10:
-			return (isSigned ? "int80_t" : "uint80_t");
-		case 16:
-			return (isSigned ? "int128_t" : "uint128_t");
-	}
-
-	snprintf(sizeStr, sizeof(sizeStr), "%sint%" PRIuPTR "_t", isSigned ? "" : "u", size);
-	return {sizeStr};
+	return TypePrinter::GetDefault()->GetTypeString(
+		Type::IntegerType(size, isSigned),
+		nullptr,
+		QualifiedName()
+	);
 }
 
 
@@ -538,7 +521,12 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 	{
 		tokens.AppendOpenParen();
 		tokens.AppendOpenParen();
-		for (auto& token: instr.GetType()->GetTokens(GetArchitecture()->GetStandalonePlatform()))
+		auto typeTokens = TypePrinter::GetDefault()->GetTypeTokens(
+			instr.GetType(),
+			GetArchitecture()->GetStandalonePlatform(),
+			QualifiedName()
+		);
+		for (auto& token: typeTokens)
 		{
 			tokens.Append(token);
 		}
@@ -1055,11 +1043,11 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto platform = GetHighLevelILFunction()->GetFunction()->GetPlatform();
 			const auto prevTypeTokens =
 					variableType ?
-					variableType->GetTokensBeforeName(platform, variableType.GetConfidence()) :
+					TypePrinter::GetDefault()->GetTypeTokensBeforeName(variableType, platform, variableType.GetConfidence()) :
 					vector<InstructionTextToken>{};
 			const auto postTypeTokens =
 					variableType ?
-					variableType->GetTokensAfterName(platform, variableType.GetConfidence()) :
+					TypePrinter::GetDefault()->GetTypeTokensAfterName(variableType, platform, variableType.GetConfidence()) :
 					vector<InstructionTextToken>{};
 
 			// Check to see if the variable appears live
@@ -1121,11 +1109,11 @@ void PseudoCFunction::GetExprTextInternal(const HighLevelILInstruction& instr, H
 			const auto platform = GetHighLevelILFunction()->GetFunction()->GetPlatform();
 			const auto prevTypeTokens =
 					variableType ?
-					variableType->GetTokensBeforeName(platform, variableType.GetConfidence()) :
+					TypePrinter::GetDefault()->GetTypeTokensBeforeName(variableType, platform, variableType.GetConfidence()) :
 					vector<InstructionTextToken>{};
 			const auto postTypeTokens =
 					variableType ?
-					variableType->GetTokensAfterName(platform, variableType.GetConfidence()) :
+					TypePrinter::GetDefault()->GetTypeTokensAfterName(variableType, platform, variableType.GetConfidence()) :
 					vector<InstructionTextToken>{};
 
 			if (variableType)
