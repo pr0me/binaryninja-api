@@ -576,7 +576,13 @@ void PseudoRustFunction::GetExprText(const HighLevelILInstruction& instr, HighLe
 	{
 		tokens.AppendOpenParen();
 		tokens.AppendOpenParen();
-		for (auto& token: instr.GetType()->GetTokens(GetArchitecture()->GetStandalonePlatform()))
+		RustTypePrinter printer;
+		auto typeTokens = printer.GetTypeTokens(
+			instr.GetType(),
+			GetArchitecture()->GetStandalonePlatform(),
+			QualifiedName()
+		);
+		for (auto& token: typeTokens)
 		{
 			tokens.Append(token);
 		}
