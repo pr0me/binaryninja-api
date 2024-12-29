@@ -581,6 +581,7 @@ namespace SharedCacheCore {
 		std::vector<std::string> GetAvailableImages();
 
 		std::vector<MemoryRegion> GetMappedRegions() const;
+		bool IsMemoryMapped(uint64_t address);
 
 		std::vector<std::pair<std::string, Ref<Symbol>>> LoadAllSymbolsAndWait();
 

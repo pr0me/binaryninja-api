@@ -3059,6 +3059,11 @@ std::vector<MemoryRegion> SharedCache::GetMappedRegions() const
 	return State().regionsMappedIntoMemory;
 }
 
+bool SharedCache::IsMemoryMapped(uint64_t address)
+{
+	return m_dscView->IsValidOffset(address);
+}
+
 extern "C"
 {
 	BNSharedCache* BNGetSharedCache(BNBinaryView* data)
@@ -3322,11 +3327,13 @@ extern "C"
 				images[i].mappings = (BNDSCImageMemoryMapping*)malloc(sizeof(BNDSCImageMemoryMapping) * header.sections.size());
 				for (size_t j = 0; j < header.sections.size(); j++)
 				{
+					const auto sectionStart = header.sections[j].addr;
 					images[i].mappings[j].rawViewOffset = header.sections[j].offset;
-					images[i].mappings[j].vmAddress = header.sections[j].addr;
+					images[i].mappings[j].vmAddress = sectionStart;
 					images[i].mappings[j].size = header.sections[j].size;
 					images[i].mappings[j].name = BNAllocString(header.sectionNames[j].c_str());
-					images[i].mappings[j].filePath = BNAllocString(vm->MappingAtAddress(header.sections[j].addr).first.filePath.c_str());
+					images[i].mappings[j].filePath = BNAllocString(vm->MappingAtAddress(sectionStart).first.filePath.c_str());
+					images[i].mappings[j].loaded = cache->object->IsMemoryMapped(sectionStart);
 				}
 				i++;
 			}
