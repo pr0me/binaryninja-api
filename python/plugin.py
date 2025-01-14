@@ -37,7 +37,8 @@ from . import mediumlevelil
 from . import highlevelil
 
 
-class PluginCommandContext:	"""
+class PluginCommandContext:
+	"""
 	The ``class PluginCommandContext`` is used to access loaded plugins and their exposed methods with the context of a specific Binary VIew.
 
 	:Example:
@@ -47,7 +48,7 @@ class PluginCommandContext:	"""
 		>>> binexport = PluginCommand.get_valid_list(ctx)["BinExport"]
 		>>> binexport.execute(ctx)
 	"""
-	
+
 	def __init__(self, view):
 		self._view = view
 		self._address = 0
