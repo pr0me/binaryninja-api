@@ -1245,16 +1245,16 @@ void DSCObjCProcessor::ProcessObjCData(std::shared_ptr<VM> vm, std::string baseN
 	m_symbolQueue = new SymbolQueue();
 	auto addrSize = m_data->GetAddressSize();
 
-	m_typeNames.relativePtr = defineTypedef(m_data, {"rptr_t"}, Type::IntegerType(4, true));
-	auto rptr_t = Type::NamedType(m_data, m_typeNames.relativePtr);
-
-	m_typeNames.id = defineTypedef(m_data, {"id"}, Type::PointerType(addrSize, Type::VoidType()));
-	m_typeNames.sel = defineTypedef(m_data, {"SEL"}, Type::PointerType(addrSize, Type::IntegerType(1, false)));
-
-	m_typeNames.BOOL = defineTypedef(m_data, {"BOOL"}, Type::IntegerType(1, false));
-	m_typeNames.nsInteger = defineTypedef(m_data, {"NSInteger"}, Type::IntegerType(addrSize, true));
-	m_typeNames.nsuInteger = defineTypedef(m_data, {"NSUInteger"}, Type::IntegerType(addrSize, false));
-	m_typeNames.cgFloat = defineTypedef(m_data, {"CGFloat"}, Type::FloatType(addrSize));
+	// m_typeNames.relativePtr = );
+	auto rptr_t = Type::NamedType(m_data, defineTypedef(m_data, {"rptr_t"}, Type::IntegerType(4, true)));
+	//
+	// m_typeNames.id = defineTypedef(m_data, {"id"}, Type::PointerType(addrSize, Type::VoidType()));
+	// m_typeNames.sel = defineTypedef(m_data, {"SEL"}, Type::PointerType(addrSize, Type::IntegerType(1, false)));
+	//
+	// m_typeNames.BOOL = defineTypedef(m_data, {"BOOL"}, Type::IntegerType(1, false));
+	// m_typeNames.nsInteger = defineTypedef(m_data, {"NSInteger"}, Type::IntegerType(addrSize, true));
+	// m_typeNames.nsuInteger = defineTypedef(m_data, {"NSUInteger"}, Type::IntegerType(addrSize, false));
+	// m_typeNames.cgFloat = defineTypedef(m_data, {"CGFloat"}, Type::FloatType(addrSize));
 
 	Ref<Type> relativeSelectorPtr;
 	auto reader = VMReader(vm);

@@ -162,13 +162,13 @@ namespace DSCObjC {
 
 	class DSCObjCProcessor {
 		struct Types {
-			QualifiedName relativePtr;
-			QualifiedName id;
-			QualifiedName sel;
-			QualifiedName BOOL;
-			QualifiedName nsInteger;
-			QualifiedName nsuInteger;
-			QualifiedName cgFloat;
+			// QualifiedName relativePtr;
+			// QualifiedName id;
+			// QualifiedName sel;
+			// QualifiedName BOOL;
+			// QualifiedName nsInteger;
+			// QualifiedName nsuInteger;
+			// QualifiedName cgFloat;
 			QualifiedName cfStringFlag;
 			QualifiedName cfString;
 			QualifiedName cfStringUTF16;
