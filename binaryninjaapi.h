@@ -18397,6 +18397,59 @@ namespace BinaryNinja {
 		size_t unique;
 	};
 
+
+	/*! FirmwareNinjaReferenceNode is a class used to build reference trees to memory regions, functions, and data
+		variables. This class is only available in the Ultimate Edition of Binary Ninja.
+
+		\ingroup firmwareninja
+	*/
+	class FirmwareNinjaReferenceNode : public CoreRefCountObject<BNFirmwareNinjaReferenceNode, BNNewFirmwareNinjaReferenceNodeReference, BNFreeFirmwareNinjaReferenceNode>
+	{
+		BNFirmwareNinjaReferenceNode* m_object;
+	public:
+		FirmwareNinjaReferenceNode(BNFirmwareNinjaReferenceNode* node);
+		~FirmwareNinjaReferenceNode();
+
+		/*! Determine if the reference tree node is for a function
+
+			\return true if the reference tree node is for a function, false otherwise
+		 */
+		bool IsFunction();
+
+		/*! Determine if the reference tree node is for a data variable
+
+			\return true if the reference tree node is for a data variable, false otherwise
+		 */
+		bool IsDataVariable();
+
+		/*! Determine if the reference tree node contains child nodes
+
+			\return true if the reference tree node contains child nodes, false otherwise
+		 */
+		bool HasChildren();
+
+		/*! Query the function contained in the reference tree node
+
+			\param function Output function object
+			\return true if the function was queried successfully, false otherwise
+		 */
+		bool GetFunction(Ref<Function>& function);
+
+		/*! Query the data variable contained in the reference tree node
+
+			\param function Output data variable object
+			\return true if the data variable was queried successfully, false otherwise
+		 */
+		bool GetDataVariable(DataVariable& variable);
+
+		/*! Query the child nodes contained in the reference tree node
+
+			\return Vector of child reference tree nodes
+		 */
+		std::vector<Ref<FirmwareNinjaReferenceNode>> GetChildren();
+	};
+
+
 	/*! FirmwareNinja is a class containing features specific to embedded firmware analysis. This class is only
 		available in the Ultimate Edition of Binary Ninja.
 
@@ -18485,6 +18538,47 @@ namespace BinaryNinja {
 		 */
 		std::vector<FirmwareNinjaDeviceAccesses> GetBoardDeviceAccesses(
 			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma);
+
+
+		/*! Returns a tree of reference nodes that reference the memory region represented by the given device
+
+			\param device Firmware Ninja device
+			\param fma Vector of Firmware Ninja function memory accesses information
+			\param value (Optional) only include components that originate with a write of this value to the device
+			\return Root reference node of tree
+		 */
+		Ref<FirmwareNinjaReferenceNode> GetReferenceTree(
+			FirmwareNinjaDevice& device,
+			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma,
+			uint64_t* value = nullptr
+		);
+
+		/*! Returns a tree of reference nodes that reference the memory region represented by the given section
+
+			\param device Firmware Ninja device
+			\param fma Vector of Firmware Ninja function memory accesses information
+			\param value (Optional) only include components that originate with a write of this value to the device
+			\return Root reference node of tree
+		 */
+		Ref<FirmwareNinjaReferenceNode> GetReferenceTree(
+			Section& section,
+			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma,
+			uint64_t* value = nullptr
+		);
+
+
+		/*! Returns a tree of reference nodes that reference the given address
+
+			\param device Firmware Ninja device
+			\param fma Vector of Firmware Ninja function memory accesses information
+			\param value (Optional) only include components that originate with a write of this value to the device
+			\return Root reference node of tree
+		 */
+		Ref<FirmwareNinjaReferenceNode> GetReferenceTree(
+			uint64_t address,
+			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma,
+			uint64_t* value = nullptr
+		);
 	};
 
 

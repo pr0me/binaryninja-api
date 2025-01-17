@@ -37,7 +37,7 @@
 // Current ABI version for linking to the core. This is incremented any time
 // there are changes to the API that affect linking, including new functions,
 // new types, or modifications to existing functions or types.
-#define BN_CURRENT_CORE_ABI_VERSION 87
+#define BN_CURRENT_CORE_ABI_VERSION 88
 
 // Minimum ABI version that is supported for loading of plugins. Plugins that
 // are linked to an ABI version less than this will not be able to load and
@@ -301,6 +301,7 @@ extern "C"
 	typedef struct BNUndoEntry BNUndoEntry;
 	typedef struct BNDemangler BNDemangler;
 	typedef struct BNFirmwareNinja BNFirmwareNinja;
+	typedef struct BNFirmwareNinjaReferenceNode BNFirmwareNinjaReferenceNode;
 
 	//! Console log levels
 	typedef enum BNLogLevel
@@ -3536,7 +3537,6 @@ extern "C"
 		size_t total;
 		size_t unique;
 	} BNFirmwareNinjaDeviceAccesses;
-
 
 	BINARYNINJACOREAPI char* BNAllocString(const char* contents);
 	BINARYNINJACOREAPI char* BNAllocStringWithLength(const char* contents, size_t len);
@@ -8038,12 +8038,24 @@ extern "C"
 	BINARYNINJACOREAPI int BNFirmwareNinjaQueryBoardDevices(BNFirmwareNinja* fn, BNArchitecture* arch, const char* board, BNFirmwareNinjaDevice** devices);
 	BINARYNINJACOREAPI int BNFirmwareNinjaFindSectionsWithEntropy(BNFirmwareNinja* fn, BNFirmwareNinjaSection** sections, float highCodeEntropyThreshold, float lowCodeEntropyThreshold, size_t blockSize, BNFirmwareNinjaSectionAnalysisMode mode);
 	BINARYNINJACOREAPI void BNFirmwareNinjaFreeSections(BNFirmwareNinjaSection *sections, int size);
-	BINARYNINJACOREAPI int BNFirmwareNinjaGetFunctionMemoryAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** mmio, BNProgressFunction progress, void* progressContext);
-	BINARYNINJACOREAPI void BNFirmwareNinjaFreeFunctionMemoryAccesses(BNFirmwareNinjaFunctionMemoryAccesses **mmio, int size);
-	BINARYNINJACOREAPI void BNFirmwareNinjaStoreFunctionMemoryAccessesToMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** mmio, int size);
-	BINARYNINJACOREAPI int BNFirmwareNinjaQueryFunctionMemoryAccessesFromMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** mmio);
-	BINARYNINJACOREAPI int BNFirmwareNinjaGetBoardDeviceAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** mmio, int size, BNFirmwareNinjaDeviceAccesses** accesses, BNArchitecture* arch);
+	BINARYNINJACOREAPI int BNFirmwareNinjaGetFunctionMemoryAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** fma, BNProgressFunction progress, void* progressContext);
+	BINARYNINJACOREAPI void BNFirmwareNinjaFreeFunctionMemoryAccesses(BNFirmwareNinjaFunctionMemoryAccesses **fma, int size);
+	BINARYNINJACOREAPI void BNFirmwareNinjaStoreFunctionMemoryAccessesToMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** fma, int size);
+	BINARYNINJACOREAPI int BNFirmwareNinjaQueryFunctionMemoryAccessesFromMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** fma);
+	BINARYNINJACOREAPI int BNFirmwareNinjaGetBoardDeviceAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** fma, int size, BNFirmwareNinjaDeviceAccesses** accesses, BNArchitecture* arch);
 	BINARYNINJACOREAPI void BNFirmwareNinjaFreeBoardDeviceAccesses(BNFirmwareNinjaDeviceAccesses *accesses, int size);
+	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode* BNFirmwareNinjaGetMemoryRegionReferenceTree(BNFirmwareNinja* fn, uint64_t start, uint64_t end, BNFirmwareNinjaFunctionMemoryAccesses** fma, int size, uint64_t* value);
+	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode* BNFirmwareNinjaGetAddressReferenceTree(BNFirmwareNinja* fn, uint64_t address, BNFirmwareNinjaFunctionMemoryAccesses** fma, int size, uint64_t* value);
+
+	BINARYNINJACOREAPI bool BNFirmwareNinjaReferenceNodeIsFunction(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI bool BNFirmwareNinjaReferenceNodeIsDataVariable(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI bool BNFirmwareNinjaReferenceNodeHasChildren(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI BNFunction* BNFirmwareNinjaReferenceNodeGetFunction(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI BNDataVariable* BNFirmwareNinjaReferenceNodeGetDataVariable(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode** BNFirmwareNinjaReferenceNodeGetChildren(BNFirmwareNinjaReferenceNode* parent, size_t* count);
+	BINARYNINJACOREAPI void BNFreeFirmwareNinjaReferenceNode(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode* BNNewFirmwareNinjaReferenceNodeReference(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI void BNFreeFirmwareNinjaReferenceNodes(BNFirmwareNinjaReferenceNode** nodes, size_t count);
 #ifdef __cplusplus
 }
 #endif
