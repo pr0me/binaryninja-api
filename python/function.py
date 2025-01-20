@@ -135,18 +135,6 @@ class DisassemblySettings:
 			option = DisassemblyOption[option]
 		core.BNSetDisassemblySettingsOption(self.handle, option, state)
 
-	@staticmethod
-	def default_settings() -> 'DisassemblySettings':
-		return DisassemblySettings(core.BNDefaultDisassemblySettings())
-
-	@staticmethod
-	def default_graph_settings() -> 'DisassemblySettings':
-		return DisassemblySettings(core.BNDefaultGraphDisassemblySettings())
-
-	@staticmethod
-	def default_linear_settings() -> 'DisassemblySettings':
-		return DisassemblySettings(core.BNDefaultLinearDisassemblySettings())
-
 
 @dataclass
 class ILReferenceSource:

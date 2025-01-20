@@ -51,8 +51,7 @@ protected:
 		const BinaryNinja::HighLevelILInstruction& instr, BinaryNinja::HighLevelILTokenEmitter& tokens) override;
 
 public:
-	PseudoCFunction(BinaryNinja::LanguageRepresentationFunctionType* type, BinaryNinja::Architecture* arch,
-		BinaryNinja::Function* owner, BinaryNinja::HighLevelILFunction* highLevelILFunction);
+	PseudoCFunction(BinaryNinja::Architecture* arch, BinaryNinja::Function* owner, BinaryNinja::HighLevelILFunction* highLevelILFunction);
 
 	std::string GetAnnotationStartString() const override;
 	std::string GetAnnotationEndString() const override;

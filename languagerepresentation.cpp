@@ -4,8 +4,7 @@
 using namespace BinaryNinja;
 using namespace std;
 
-LanguageRepresentationFunction::LanguageRepresentationFunction(
-	LanguageRepresentationFunctionType* type, Architecture* arch, Function* func, HighLevelILFunction* highLevelIL)
+LanguageRepresentationFunction::LanguageRepresentationFunction(Architecture* arch, Function* func, HighLevelILFunction* highLevelIL)
 {
 	BNCustomLanguageRepresentationFunction callbacks;
 	callbacks.context = this;
@@ -21,8 +20,8 @@ LanguageRepresentationFunction::LanguageRepresentationFunction(
 	callbacks.getAnnotationStartString = GetAnnotationStartStringCallback;
 	callbacks.getAnnotationEndString = GetAnnotationEndStringCallback;
 	AddRefForRegistration();
-	m_object = BNCreateCustomLanguageRepresentationFunction(
-		type->GetObject(), arch->GetObject(), func->GetObject(), highLevelIL->GetObject(), &callbacks);
+	m_object = BNCreateCustomLanguageRepresentationFunction(arch->GetObject(), func->GetObject(),
+		highLevelIL->GetObject(), &callbacks);
 }
 
 
@@ -110,12 +109,6 @@ vector<DisassemblyTextLine> LanguageRepresentationFunction::GetBlockLines(
 BNHighlightColor LanguageRepresentationFunction::GetHighlight(BasicBlock* block)
 {
 	return BNGetLanguageRepresentationFunctionHighlight(m_object, block->GetObject());
-}
-
-
-Ref<LanguageRepresentationFunctionType> LanguageRepresentationFunction::GetLanguage() const
-{
-	return new CoreLanguageRepresentationFunctionType(BNGetLanguageRepresentationType(m_object));
 }
 
 
@@ -319,7 +312,6 @@ void LanguageRepresentationFunctionType::Register(LanguageRepresentationFunction
 	callbacks.isValid = IsValidCallback;
 	callbacks.getTypePrinter = GetTypePrinterCallback;
 	callbacks.getTypeParser = GetTypeParserCallback;
-	callbacks.getLineFormatter = GetLineFormatterCallback;
 	callbacks.getFunctionTypeTokens = GetFunctionTypeTokensCallback;
 	callbacks.freeLines = FreeLinesCallback;
 
@@ -368,16 +360,6 @@ BNTypeParser* LanguageRepresentationFunctionType::GetTypeParserCallback(void* ct
     if (!result)
         return nullptr;
     return result->GetObject();
-}
-
-
-BNLineFormatter* LanguageRepresentationFunctionType::GetLineFormatterCallback(void* ctxt)
-{
-	LanguageRepresentationFunctionType* type = (LanguageRepresentationFunctionType*)ctxt;
-	Ref<LineFormatter> result = type->GetLineFormatter();
-	if (!result)
-		return nullptr;
-	return result->GetObject();
 }
 
 
@@ -487,15 +469,6 @@ Ref<TypeParser> CoreLanguageRepresentationFunctionType::GetTypeParser()
     if (!parser)
         return nullptr;
     return new CoreTypeParser(parser);
-}
-
-
-Ref<LineFormatter> CoreLanguageRepresentationFunctionType::GetLineFormatter()
-{
-	BNLineFormatter* formatter = BNGetLanguageRepresentationFunctionTypeLineFormatter(m_object);
-	if (!formatter)
-		return nullptr;
-	return new CoreLineFormatter(formatter);
 }
 
 

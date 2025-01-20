@@ -36,24 +36,6 @@ DisassemblySettings::DisassemblySettings(BNDisassemblySettings* settings)
 }
 
 
-Ref<DisassemblySettings> DisassemblySettings::GetDefaultSettings()
-{
-	return new DisassemblySettings(BNDefaultDisassemblySettings());
-}
-
-
-Ref<DisassemblySettings> DisassemblySettings::GetDefaultGraphSettings()
-{
-	return new DisassemblySettings(BNDefaultGraphDisassemblySettings());
-}
-
-
-Ref<DisassemblySettings> DisassemblySettings::GetDefaultLinearSettings()
-{
-	return new DisassemblySettings(BNDefaultLinearDisassemblySettings());
-}
-
-
 DisassemblySettings* DisassemblySettings::Duplicate()
 {
 	return new DisassemblySettings(BNDuplicateDisassemblySettings(m_object));

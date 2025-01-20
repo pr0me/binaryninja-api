@@ -26,10 +26,7 @@ from enum import Enum
 
 # Binary Ninja components
 from . import _binaryninjacore as core
-from .enums import (
-	HighLevelILOperation, DataFlowQueryOption, FunctionGraphType, ILInstructionAttribute, StringType,
-	DisassemblyOption
-)
+from .enums import HighLevelILOperation, DataFlowQueryOption, FunctionGraphType, ILInstructionAttribute, StringType
 from . import function
 from . import binaryview
 from . import architecture
@@ -334,9 +331,7 @@ class HighLevelILInstruction(BaseILInstruction):
 		return ILInstruction[instr.operation](func, expr_index, core_instr, as_ast, instr_index)
 
 	def __str__(self):
-		settings = function.DisassemblySettings.default_settings()
-		settings.set_option(DisassemblyOption.DisableLineFormatting)
-		lines = self.get_lines(settings)
+		lines = self.lines
 		if lines is None:
 			return "invalid"
 		result = []
@@ -348,9 +343,7 @@ class HighLevelILInstruction(BaseILInstruction):
 		return '\n'.join(result)
 
 	def __repr__(self):
-		settings = function.DisassemblySettings.default_settings()
-		settings.set_option(DisassemblyOption.DisableLineFormatting)
-		lines = self.get_lines(settings)
+		lines = self.lines
 		continuation = ""
 		if lines is None:
 			first_line = "<invalid>"
@@ -393,14 +386,26 @@ class HighLevelILInstruction(BaseILInstruction):
 	@property
 	def tokens(self) -> TokenList:
 		"""HLIL tokens taken from the HLIL text lines (read-only) -- does not include newlines or indentation, use lines for that information"""
-		settings = function.DisassemblySettings.default_settings()
-		settings.set_option(DisassemblyOption.DisableLineFormatting)
-		return [token for line in self.get_lines(settings) for token in line.tokens]
+		return [token for line in self.lines for token in line.tokens]
 
 	@property
 	def lines(self) -> LinesType:
 		"""HLIL text lines (read-only)"""
-		return self.get_lines()
+		count = ctypes.c_ulonglong()
+		lines = core.BNGetHighLevelILExprText(self.function.handle, self.expr_index, self.as_ast, count, None)
+		assert lines is not None, "core.BNGetHighLevelILExprText returned None"
+		try:
+			for i in range(0, count.value):
+				addr = lines[i].addr
+				if lines[i].instrIndex != 0xffffffffffffffff:
+					il_instr = self.function[lines[i].instrIndex]
+				else:
+					il_instr = None
+				color = highlight.HighlightColor._from_core_struct(lines[i].highlight)
+				tokens = function.InstructionTextToken._from_core_struct(lines[i].tokens, lines[i].count)
+				yield function.DisassemblyTextLine(tokens, addr, il_instr, color)
+		finally:
+			core.BNFreeDisassemblyTextLines(lines, count.value)
 
 	@property
 	def prefix_operands(self) -> List[Union[HighLevelILOperandType, HighLevelILOperationAndSize]]:
@@ -912,26 +917,6 @@ class HighLevelILInstruction(BaseILInstruction):
 	@property
 	def has_side_effects(self) -> bool:
 		return core.BNHighLevelILHasSideEffects(self.function.handle, self.expr_index)
-
-	def get_lines(self, settings: Optional['function.DisassemblySettings'] = None) -> LinesType:
-		"""Gets HLIL text lines with optional settings"""
-		if settings is not None:
-			settings = settings.handle
-		count = ctypes.c_ulonglong()
-		lines = core.BNGetHighLevelILExprText(self.function.handle, self.expr_index, self.as_ast, count, settings)
-		assert lines is not None, "core.BNGetHighLevelILExprText returned None"
-		try:
-			for i in range(0, count.value):
-				addr = lines[i].addr
-				if lines[i].instrIndex != 0xffffffffffffffff:
-					il_instr = self.function[lines[i].instrIndex]
-				else:
-					il_instr = None
-				color = highlight.HighlightColor._from_core_struct(lines[i].highlight)
-				tokens = function.InstructionTextToken._from_core_struct(lines[i].tokens, lines[i].count)
-				yield function.DisassemblyTextLine(tokens, addr, il_instr, color)
-		finally:
-			core.BNFreeDisassemblyTextLines(lines, count.value)
 
 
 @dataclass(frozen=True, repr=False, eq=False)
