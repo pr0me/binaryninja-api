@@ -1252,7 +1252,7 @@ void SharedCache::ParseAndApplySlideInfoForFile(std::shared_ptr<MMappedFileAcces
 					cursor += sizeof(uint16_t);
 					if (delta == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE)
 						continue;
-					
+
 					delta = delta/sizeof(uint64_t); // initial offset is byte based
 					uint64_t loc = mapping.mappingInfo.fileOffset + (pageSize * i);
 					do
@@ -1307,7 +1307,7 @@ void SharedCache::ParseAndApplySlideInfoForFile(std::shared_ptr<MMappedFileAcces
 					cursor += sizeof(uint16_t);
 					if (delta == DYLD_CACHE_SLIDE_V5_PAGE_ATTR_NO_REBASE)
 						continue;
-					
+
 					delta = delta/sizeof(uint64_t); // initial offset is byte based
 					uint64_t loc = mapping.mappingInfo.fileOffset + (pageSize * i);
 					do
@@ -1585,21 +1585,10 @@ bool SharedCache::LoadSectionAtAddress(uint64_t address)
 				ParseAndApplySlideInfoForFile(targetFile);
 				auto reader = VMReader(vm);
 				auto buff = reader.ReadBuffer(stubIsland.start, stubIsland.size);
-				auto rawViewEnd = m_dscView->GetParentView()->GetEnd();
-
-				auto name = stubIsland.prettyName;
-				m_dscView->GetParentView()->GetParentView()->WriteBuffer(
-					m_dscView->GetParentView()->GetParentView()->GetEnd(), buff);
-				m_dscView->GetParentView()->AddAutoSegment(rawViewEnd, stubIsland.size, rawViewEnd, stubIsland.size,
-					SegmentReadable | SegmentExecutable);
-				m_dscView->AddUserSegment(stubIsland.start, stubIsland.size, rawViewEnd, stubIsland.size,
-					SegmentReadable | SegmentExecutable);
-				m_dscView->AddUserSection(name, stubIsland.start, stubIsland.size, ReadOnlyCodeSectionSemantics);
-				m_dscView->WriteBuffer(stubIsland.start, buff);
+				m_dscView->GetMemoryMap()->AddDataMemoryRegion(stubIsland.prettyName, stubIsland.start, buff, SegmentReadable | SegmentExecutable);
+				m_dscView->AddUserSection(stubIsland.prettyName, stubIsland.start, stubIsland.size, ReadOnlyCodeSectionSemantics);
 
 				stubIsland.loaded = true;
-
-				stubIsland.rawViewOffsetIfLoaded = rawViewEnd;
 
 				MutableState().regionsMappedIntoMemory.push_back(stubIsland);
 
@@ -1625,20 +1614,10 @@ bool SharedCache::LoadSectionAtAddress(uint64_t address)
 				ParseAndApplySlideInfoForFile(targetFile);
 				auto reader = VMReader(vm);
 				auto buff = reader.ReadBuffer(dyldData.start, dyldData.size);
-				auto rawViewEnd = m_dscView->GetParentView()->GetEnd();
-
-				auto name = dyldData.prettyName;
-				m_dscView->GetParentView()->GetParentView()->WriteBuffer(
-					m_dscView->GetParentView()->GetParentView()->GetEnd(), buff);
-				m_dscView->GetParentView()->WriteBuffer(rawViewEnd, buff);
-				m_dscView->GetParentView()->AddAutoSegment(rawViewEnd, dyldData.size, rawViewEnd, dyldData.size,
-					SegmentReadable);
-				m_dscView->AddUserSegment(dyldData.start, dyldData.size, rawViewEnd, dyldData.size, SegmentReadable);
-				m_dscView->AddUserSection(name, dyldData.start, dyldData.size, ReadOnlyDataSectionSemantics);
-				m_dscView->WriteBuffer(dyldData.start, buff);
+				m_dscView->GetMemoryMap()->AddDataMemoryRegion(dyldData.prettyName, dyldData.start, buff, SegmentReadable);
+				m_dscView->AddUserSection(dyldData.prettyName, dyldData.start, dyldData.size, ReadOnlyDataSectionSemantics);
 
 				dyldData.loaded = true;
-				dyldData.rawViewOffsetIfLoaded = rawViewEnd;
 
 				MutableState().regionsMappedIntoMemory.push_back(dyldData);
 
@@ -1664,19 +1643,10 @@ bool SharedCache::LoadSectionAtAddress(uint64_t address)
 				ParseAndApplySlideInfoForFile(targetFile);
 				auto reader = VMReader(vm);
 				auto buff = reader.ReadBuffer(region.start, region.size);
-				auto rawViewEnd = m_dscView->GetParentView()->GetEnd();
-
-				auto name = region.prettyName;
-				m_dscView->GetParentView()->GetParentView()->WriteBuffer(
-					m_dscView->GetParentView()->GetParentView()->GetEnd(), buff);
-				m_dscView->GetParentView()->WriteBuffer(rawViewEnd, buff);
-				m_dscView->GetParentView()->AddAutoSegment(rawViewEnd, region.size, rawViewEnd, region.size, region.flags);
-				m_dscView->AddUserSegment(region.start, region.size, rawViewEnd, region.size, region.flags);
-				m_dscView->AddUserSection(name, region.start, region.size, region.flags & SegmentDenyExecute ? ReadOnlyDataSectionSemantics : ReadOnlyCodeSectionSemantics);
-				m_dscView->WriteBuffer(region.start, buff);
+				m_dscView->GetMemoryMap()->AddDataMemoryRegion(region.prettyName, region.start, buff, region.flags);
+				m_dscView->AddUserSection(region.prettyName, region.start, region.size, region.flags & SegmentDenyExecute ? ReadOnlyDataSectionSemantics : ReadOnlyCodeSectionSemantics);
 
 				region.loaded = true;
-				region.rawViewOffsetIfLoaded = rawViewEnd;
 
 				MutableState().regionsMappedIntoMemory.push_back(region);
 
@@ -1694,7 +1664,6 @@ bool SharedCache::LoadSectionAtAddress(uint64_t address)
 	}
 
 	auto id = m_dscView->BeginUndoActions();
-	auto rawViewEnd = m_dscView->GetParentView()->GetEnd();
 	auto reader = VMReader(vm);
 
 	m_logger->LogDebug("Partial loading image %s", targetHeader.installName.c_str());
@@ -1702,17 +1671,9 @@ bool SharedCache::LoadSectionAtAddress(uint64_t address)
 	auto targetFile = vm->MappingAtAddress(targetSegment->start).first.fileAccessor->lock();
 	ParseAndApplySlideInfoForFile(targetFile);
 	auto buff = reader.ReadBuffer(targetSegment->start, targetSegment->size);
-	m_dscView->GetParentView()->GetParentView()->WriteBuffer(
-		m_dscView->GetParentView()->GetParentView()->GetEnd(), buff);
-	m_dscView->GetParentView()->WriteBuffer(rawViewEnd, buff);
-	m_dscView->GetParentView()->AddAutoSegment(
-		rawViewEnd, targetSegment->size, rawViewEnd, targetSegment->size, SegmentReadable);
-	m_dscView->AddUserSegment(
-		targetSegment->start, targetSegment->size, rawViewEnd, targetSegment->size, targetSegment->flags);
-	m_dscView->WriteBuffer(targetSegment->start, buff);
+	m_dscView->GetMemoryMap()->AddDataMemoryRegion(targetSegment->prettyName, targetSegment->start, buff, targetSegment->flags);
 
 	targetSegment->loaded = true;
-	targetSegment->rawViewOffsetIfLoaded = rawViewEnd;
 
 	MutableState().regionsMappedIntoMemory.push_back(*targetSegment);
 
@@ -1793,7 +1754,7 @@ void SharedCache::ProcessAllObjCSections()
 	{
 		if (!region.loaded)
 			continue;
-		
+
 		// Don't repeat the same images multiple times
 		auto header = HeaderForAddress(region.start);
 		if (!header)
@@ -1860,20 +1821,12 @@ bool SharedCache::LoadImageWithInstallName(std::string installName, bool skipObj
 		auto targetFile = vm->MappingAtAddress(region.start).first.fileAccessor->lock();
 		ParseAndApplySlideInfoForFile(targetFile);
 
-		auto rawViewEnd = m_dscView->GetParentView()->GetEnd();
-
 		auto buff = reader.ReadBuffer(region.start, region.size);
-		m_dscView->GetParentView()->GetParentView()->WriteBuffer(rawViewEnd, buff);
-		m_dscView->GetParentView()->WriteBuffer(rawViewEnd, buff);
 
 		region.loaded = true;
-		region.rawViewOffsetIfLoaded = rawViewEnd;
 
 		MutableState().regionsMappedIntoMemory.push_back(region);
-
-		m_dscView->GetParentView()->AddAutoSegment(rawViewEnd, region.size, rawViewEnd, region.size, region.flags);
-		m_dscView->AddUserSegment(region.start, region.size, rawViewEnd, region.size, region.flags);
-		m_dscView->WriteBuffer(region.start, buff);
+		m_dscView->GetMemoryMap()->AddDataMemoryRegion(region.prettyName, region.start, buff, region.flags);
 
 		regionsToLoad.push_back(&region);
 	}
@@ -3032,7 +2985,7 @@ bool SharedCache::SaveToDSCView()
 	{
 		auto data = AsMetadata();
 		m_dscView->StoreMetadata(SharedCacheMetadataTag, data);
-		m_dscView->GetParentView()->GetParentView()->StoreMetadata(SharedCacheMetadataTag, data);
+		m_dscView->GetParentView()->StoreMetadata(SharedCacheMetadataTag, data);
 
 		// By moving our state the to cache we can avoid creating a copy in the case
 		// that no further mutations are made to `this`. If we're not done being mutated,
@@ -3413,19 +3366,15 @@ extern "C"
 }
 
 [[maybe_unused]] DSCViewType* g_dscViewType;
-[[maybe_unused]] DSCRawViewType* g_dscRawViewType;
 
 void InitDSCViewType()
 {
 	MMappedFileAccessor::InitialVMSetup();
 	std::atexit(VMShutdown);
 
-	static DSCRawViewType rawType;
-	BinaryViewType::Register(&rawType);
 	static DSCViewType type;
 	BinaryViewType::Register(&type);
 	g_dscViewType = &type;
-	g_dscRawViewType = &rawType;
 }
 
 namespace SharedCacheCore {
