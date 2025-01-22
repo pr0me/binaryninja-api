@@ -9943,15 +9943,19 @@ namespace BinaryNinja {
 	{
 	  protected:
 		std::function<void(Ref<AnalysisContext> analysisContext)> m_action;
+		std::function<bool(Ref<Activity>, Ref<AnalysisContext>)> m_eligibility;
 
-		static void Run(void* ctxt, BNAnalysisContext* analysisContext);
+		static void RunAction(void* ctxt, BNAnalysisContext* analysisContext);
+		static bool CheckEligibility(void* ctxt, BNActivity* activity, BNAnalysisContext* analysisContext);
 
 	  public:
 		/*!
 			\param configuration a JSON representation of the activity configuration
 			\param action Workflow action, a function taking a Ref<AnalysisContext> as an argument.
+			\param eligibility A function that determines whether the activity is eligible to run
 		*/
-		Activity(const std::string& configuration, const std::function<void(Ref<AnalysisContext>)>& action);
+		Activity(const std::string& configuration, const std::function<void(Ref<AnalysisContext>)>& action,
+			const std::function<bool(Ref<Activity>, Ref<AnalysisContext>)>& eligibility = nullptr);
 		Activity(BNActivity* activity);
 		virtual ~Activity();
 
