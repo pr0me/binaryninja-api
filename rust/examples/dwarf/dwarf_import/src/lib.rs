@@ -468,7 +468,7 @@ fn parse_dwarf(
     // TODO : Make this more robust...some DWOs follow non-DWO conventions
 
     // Figure out if it's the given view or the raw view that has the dwarf info in it
-    let raw_view = &debug_bv.raw_view().unwrap();
+    let raw_view = &debug_bv.raw_view()?;
     let view = if is_dwo_dwarf(debug_bv) || is_non_dwo_dwarf(debug_bv) {
         debug_bv
     } else {
