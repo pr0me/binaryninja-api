@@ -1,7 +1,7 @@
 #include "fileinfo.h"
 #include "fontsettings.h"
 #include "theme.h"
-#include "copyablelable.h"
+#include "copyablelabel.h"
 #include <QClipboard>
 #include <QApplication>
 #include <QToolTip>
