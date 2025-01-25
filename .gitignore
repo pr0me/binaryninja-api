@@ -84,6 +84,8 @@ rust/target/
 rust/binaryninjacore-sys/target/
 rust/examples/*/target/
 rust/examples/dwarf/*/target/
+# Allow the test binaries
+!/rust/fixtures/bin/**
 
 # Debugger docs
 docs/img/debugger
