@@ -16,6 +16,7 @@ members = [
     "plugins/dwarf/shared",
     "plugins/idb_import",
     "plugins/pdb-ng",
+    "plugins/pdb-ng/demo",
     "plugins/warp"
 ]
 
@@ -24,5 +25,15 @@ binaryninja = { path = "rust" }
 binaryninjacore-sys = { path = "rust/binaryninjacore-sys" }
 
 [profile.release]
-lto = true
+lto = "thin"
 debug = "full"
+
+# Disable LTO on demo builds, it will export `rust_eh_personality`
+[profile.release-demo]
+inherits = "release"
+lto = false
+
+# Disable LTO on demo builds, it will export `rust_eh_personality`
+[profile.dev-demo]
+inherits = "dev"
+lto = false

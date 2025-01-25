@@ -476,10 +476,16 @@ pub fn license_count() -> i32 {
 /// If not set the normal license retrieval will occur:
 /// 1. Check the BN_LICENSE environment variable
 /// 2. Check the Binary Ninja user directory for license.dat
+#[cfg(not(feature = "demo"))]
 pub fn set_license<S: BnStrCompatible + Default>(license: Option<S>) {
     let license = license.unwrap_or_default().into_bytes_with_nul();
     let license_slice = license.as_ref();
     unsafe { BNSetLicense(license_slice.as_ptr() as *const c_char) }
+}
+
+#[cfg(feature = "demo")]
+pub fn set_license<S: BnStrCompatible + Default>(_license: Option<S>) {
+    panic!("Cannot set license in demo mode!");
 }
 
 pub fn product() -> BnString {

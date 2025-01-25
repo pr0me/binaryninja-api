@@ -8,6 +8,9 @@ rust-version = "1.83.0"
 [features]
 # This is used when statically linking to prevent exporting CorePluginABIVersion and UiPluginABIVersion.
 no_exports = []
+# Add this if you want to support the demo version of the product.
+# This will disable certain functions that do not exist in the demo build.
+demo = ["no_exports"]
 
 [dependencies]
 log = { version = "0.4", features = ["std"] }

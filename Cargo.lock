@@ -1973,6 +1973,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdb-import-plugin-static"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "binaryninja",
+ "binaryninjacore-sys",
+ "itertools 0.11.0",
+ "log",
+ "pdb",
+ "regex",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

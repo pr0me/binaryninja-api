@@ -910,7 +910,7 @@ pub struct ConnectionOptions {
     pub password: Option<String>,
     /// Provide this if you want to authenticate with a token.
     ///
-    /// If you do not have a token you can use [ConnectionOptions::self].
+    /// If you do not have a token you can use [ConnectionOptions::with_password].
     pub token: Option<String>,
 }
 
