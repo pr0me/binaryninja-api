@@ -1,5 +1,7 @@
 use binaryninja::binary_view::BinaryViewExt;
-use binaryninja::collaboration::{has_collaboration_support, NoNameChangeset, Remote, RemoteFileType, RemoteProject};
+use binaryninja::collaboration::{
+    has_collaboration_support, NoNameChangeset, Remote, RemoteFileType, RemoteProject,
+};
 use binaryninja::headless::Session;
 use binaryninja::symbol::{SymbolBuilder, SymbolType};
 use rstest::*;

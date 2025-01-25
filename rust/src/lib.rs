@@ -115,7 +115,7 @@ pub fn load(file_path: impl AsRef<Path>) -> Option<Ref<BinaryView>> {
 }
 
 /// Equivalent to [`load`] but with a progress callback.
-/// 
+///
 /// NOTE: The progress callback will _only_ be called when loading BNDBs.
 pub fn load_with_progress<P: ProgressCallback>(
     file_path: impl AsRef<Path>,

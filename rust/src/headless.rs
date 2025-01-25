@@ -22,13 +22,13 @@ use thiserror::Error;
 
 use crate::enterprise::release_license;
 use crate::main_thread::{MainThreadAction, MainThreadHandler};
+use crate::progress::ProgressCallback;
 use crate::rc::Ref;
 use binaryninjacore_sys::{BNInitPlugins, BNInitRepoPlugins};
 use std::sync::mpsc::Sender;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use crate::progress::ProgressCallback;
 
 static MAIN_THREAD_HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 
@@ -293,12 +293,16 @@ impl Session {
     ///     println!("{}/{}", progress, total);
     ///     true
     /// };
-    /// 
+    ///
     /// let bv = headless_session
     ///     .load_with_progress("cat.bndb", print_progress)
     ///     .expect("Couldn't open `cat.bndb`");
     /// ```
-    pub fn load_with_progress(&self, file_path: impl AsRef<Path>, progress: impl ProgressCallback) -> Option<Ref<binary_view::BinaryView>> {
+    pub fn load_with_progress(
+        &self,
+        file_path: impl AsRef<Path>,
+        progress: impl ProgressCallback,
+    ) -> Option<Ref<binary_view::BinaryView>> {
         crate::load_with_progress(file_path, progress)
     }
 
@@ -333,7 +337,7 @@ impl Session {
     ///     println!("{}/{}", progress, total);
     ///     true
     /// };
-    /// 
+    ///
     /// let settings: Ref<Metadata> =
     ///     HashMap::from([("analysis.linearSweep.autorun", false.into())]).into();
     /// let headless_session = binaryninja::headless::Session::new().unwrap();
@@ -349,7 +353,12 @@ impl Session {
         options: Option<O>,
         progress: impl ProgressCallback,
     ) -> Option<Ref<binary_view::BinaryView>> {
-        crate::load_with_options_and_progress(file_path, update_analysis_and_wait, options, progress)
+        crate::load_with_options_and_progress(
+            file_path,
+            update_analysis_and_wait,
+            options,
+            progress,
+        )
     }
 }
 

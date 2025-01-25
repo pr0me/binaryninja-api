@@ -37,7 +37,7 @@ use crate::string::{BnStrCompatible, BnString};
 // TODO: the data because they have a greater understanding of where the function is being called from.
 
 /// Check whether the client has collaboration support.
-/// 
+///
 /// Call this if you intend on providing divergent behavior, as otherwise you will likely
 /// crash calling collaboration APIs on unsupported builds of Binary Ninja.
 pub fn has_collaboration_support() -> bool {
