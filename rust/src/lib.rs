@@ -114,6 +114,9 @@ pub fn load(file_path: impl AsRef<Path>) -> Option<Ref<BinaryView>> {
     load_with_progress(file_path, NoProgressCallback)
 }
 
+/// Equivalent to [`load`] but with a progress callback.
+/// 
+/// NOTE: The progress callback will _only_ be called when loading BNDBs.
 pub fn load_with_progress<P: ProgressCallback>(
     file_path: impl AsRef<Path>,
     mut progress: P,
@@ -170,6 +173,9 @@ where
     )
 }
 
+/// Equivalent to [`load_with_options`] but with a progress callback.
+///
+/// NOTE: The progress callback will _only_ be called when loading BNDBs.
 pub fn load_with_options_and_progress<O, P>(
     file_path: impl AsRef<Path>,
     update_analysis_and_wait: bool,
@@ -222,6 +228,7 @@ where
     load_view_with_progress(bv, update_analysis_and_wait, options, NoProgressCallback)
 }
 
+/// Equivalent to [`load_view`] but with a progress callback.
 pub fn load_view_with_progress<O, P>(
     bv: &BinaryView,
     update_analysis_and_wait: bool,
