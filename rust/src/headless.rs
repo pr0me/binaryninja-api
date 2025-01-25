@@ -28,6 +28,7 @@ use std::sync::mpsc::Sender;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use crate::progress::ProgressCallback;
 
 static MAIN_THREAD_HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 
@@ -283,6 +284,24 @@ impl Session {
         crate::load(file_path)
     }
 
+    /// Load the file with a progress callback, the callback will _only_ be called for BNDBs currently.
+    ///
+    /// ```no_run
+    /// let headless_session = binaryninja::headless::Session::new().unwrap();
+    ///
+    /// let print_progress = |progress, total| {
+    ///     println!("{}/{}", progress, total);
+    ///     true
+    /// };
+    /// 
+    /// let bv = headless_session
+    ///     .load_with_progress("cat.bndb", print_progress)
+    ///     .expect("Couldn't open `cat.bndb`");
+    /// ```
+    pub fn load_with_progress(&self, file_path: impl AsRef<Path>, progress: impl ProgressCallback) -> Option<Ref<binary_view::BinaryView>> {
+        crate::load_with_progress(file_path, progress)
+    }
+
     /// ```no_run
     /// use binaryninja::{metadata::Metadata, rc::Ref};
     /// use std::collections::HashMap;
@@ -302,6 +321,35 @@ impl Session {
         options: Option<O>,
     ) -> Option<Ref<binary_view::BinaryView>> {
         crate::load_with_options(file_path, update_analysis_and_wait, options)
+    }
+
+    /// Load the file with options and a progress callback, the callback will _only_ be called for BNDBs currently.
+    ///
+    /// ```no_run
+    /// use binaryninja::{metadata::Metadata, rc::Ref};
+    /// use std::collections::HashMap;
+    ///
+    /// let print_progress = |progress, total| {
+    ///     println!("{}/{}", progress, total);
+    ///     true
+    /// };
+    /// 
+    /// let settings: Ref<Metadata> =
+    ///     HashMap::from([("analysis.linearSweep.autorun", false.into())]).into();
+    /// let headless_session = binaryninja::headless::Session::new().unwrap();
+    ///
+    /// let bv = headless_session
+    ///     .load_with_options_and_progress("cat.bndb", true, Some(settings), print_progress)
+    ///     .expect("Couldn't open `cat.bndb`");
+    /// ```
+    pub fn load_with_options_and_progress<O: IntoJson>(
+        &self,
+        file_path: impl AsRef<Path>,
+        update_analysis_and_wait: bool,
+        options: Option<O>,
+        progress: impl ProgressCallback,
+    ) -> Option<Ref<binary_view::BinaryView>> {
+        crate::load_with_options_and_progress(file_path, update_analysis_and_wait, options, progress)
     }
 }
 
