@@ -1,5 +1,5 @@
 use binaryninja::binary_view::BinaryViewExt;
-use binaryninja::collaboration::{NoNameChangeset, Remote, RemoteFileType, RemoteProject};
+use binaryninja::collaboration::{has_collaboration_support, NoNameChangeset, Remote, RemoteFileType, RemoteProject};
 use binaryninja::headless::Session;
 use binaryninja::symbol::{SymbolBuilder, SymbolType};
 use rstest::*;
@@ -47,11 +47,11 @@ fn temp_project_scope<T: Fn(&RemoteProject)>(remote: &Remote, cb: T) {
 
 #[rstest]
 fn test_connection(_session: &Session) {
-    let remotes = binaryninja::collaboration::known_remotes();
-    if remotes.is_empty() {
-        eprintln!("No known remotes, skipping test...");
+    if !has_collaboration_support() {
+        eprintln!("No collaboration support, skipping test...");
         return;
     }
+    let remotes = binaryninja::collaboration::known_remotes();
     let remote = remotes.iter().next().expect("No known remotes!");
     assert!(remote.connect().is_ok(), "Failed to connect to remote");
     remote
@@ -62,11 +62,11 @@ fn test_connection(_session: &Session) {
 
 #[rstest]
 fn test_project_creation(_session: &Session) {
-    let remotes = binaryninja::collaboration::known_remotes();
-    if remotes.is_empty() {
-        eprintln!("No known remotes, skipping test...");
+    if !has_collaboration_support() {
+        eprintln!("No collaboration support, skipping test...");
         return;
     }
+    let remotes = binaryninja::collaboration::known_remotes();
     let remote = remotes.iter().next().expect("No known remotes!");
     temp_project_scope(&remote, |project| {
         // Create the file than verify it by opening and checking contents.
@@ -142,11 +142,11 @@ fn test_project_creation(_session: &Session) {
 
 #[rstest]
 fn test_project_sync(_session: &Session) {
-    let remotes = binaryninja::collaboration::known_remotes();
-    if remotes.is_empty() {
-        eprintln!("No known remotes, skipping test...");
+    if !has_collaboration_support() {
+        eprintln!("No collaboration support, skipping test...");
         return;
     }
+    let remotes = binaryninja::collaboration::known_remotes();
     let remote = remotes.iter().next().expect("No known remotes!");
     temp_project_scope(&remote, |project| {
         // Open a view so that we can upload it.

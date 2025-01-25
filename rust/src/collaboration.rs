@@ -36,6 +36,16 @@ use crate::string::{BnStrCompatible, BnString};
 // TODO: on what functions need to have been called prior? I feel like we should make the user have to pull
 // TODO: the data because they have a greater understanding of where the function is being called from.
 
+/// Check whether the client has collaboration support.
+/// 
+/// Call this if you intend on providing divergent behavior, as otherwise you will likely
+/// crash calling collaboration APIs on unsupported builds of Binary Ninja.
+pub fn has_collaboration_support() -> bool {
+    let mut count = 0;
+    let value = unsafe { BNCollaborationGetRemotes(&mut count) };
+    !value.is_null()
+}
+
 /// Get the single actively connected Remote (for ux simplification), if any
 pub fn active_remote() -> Option<Ref<Remote>> {
     let value = unsafe { BNCollaborationGetActiveRemote() };
