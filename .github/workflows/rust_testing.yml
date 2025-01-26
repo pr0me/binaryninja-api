@@ -8,12 +8,18 @@ name: Rust Testing
 on:
   workflow_dispatch:
   push:
+    branches:
+      - '**'
     paths:
+      - '**.rs'
+      - '**.toml'
       - 'rust/**'
   # Pull request target allows us to use the bn license and serial for PR's
   # to insure we do not leak the license the workflow is required to be approved manually.
   pull_request_target:
     paths:
+      - '**.rs'
+      - '**.toml'
       - 'rust/**'
 
 jobs:

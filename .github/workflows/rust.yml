@@ -1,11 +1,13 @@
 name: Rust CI
 
-# TODO: The paths need to include all rust projects. Those exist outside the rust directory.
-
 on:
   workflow_dispatch:
   push:
+    branches:
+      - '**'
     paths:
+      - '**.rs'
+      - '**.toml'
       - 'rust/**'
   pull_request:
     paths:
