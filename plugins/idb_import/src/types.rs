@@ -462,7 +462,7 @@ impl<F: Fn(usize, usize) -> Result<(), ()>> TranslateIDBTypes<'_, F> {
     }
 
     fn translate_enum(members: &[(Option<Vec<u8>>, u64)], bytesize: u64) -> Ref<Type> {
-        let eb = EnumerationBuilder::new();
+        let mut eb = EnumerationBuilder::new();
         for (i, (name, bytesize)) in members.iter().enumerate() {
             let name = name
                 .as_ref()

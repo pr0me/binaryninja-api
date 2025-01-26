@@ -470,7 +470,7 @@ pub fn to_bn_type<A: BNArchitecture>(arch: &A, ty: &Type) -> BNRef<BNType> {
             BNType::structure(&builder.finalize())
         }
         TypeClass::Enumeration(c) => {
-            let builder = BNEnumerationBuilder::new();
+            let mut builder = BNEnumerationBuilder::new();
             for member in &c.members {
                 // TODO: Add default name?
                 let member_name = member.name.to_owned().unwrap_or("enum_VAL".into());

@@ -104,7 +104,7 @@ pub(crate) fn handle_enum<R: ReaderType>(
     //  DW_AT_const_value
     //  *DW_AT_description
 
-    let enumeration_builder = EnumerationBuilder::new();
+    let mut enumeration_builder = EnumerationBuilder::new();
 
     let mut tree = unit.entries_tree(Some(entry.offset())).unwrap();
     let mut children = tree.root().unwrap().children();

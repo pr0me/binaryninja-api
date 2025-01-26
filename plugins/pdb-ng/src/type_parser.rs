@@ -1626,7 +1626,7 @@ impl<'a, S: Source<'a> + 'a> PDBParserInstance<'a, S> {
             )))));
         }
 
-        let enumeration = EnumerationBuilder::new();
+        let mut enumeration = EnumerationBuilder::new();
 
         match self.handle_type_index(data.fields, finder)? {
             Some(ParsedType::FieldList(fields)) => {
