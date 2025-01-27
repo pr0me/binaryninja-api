@@ -192,6 +192,10 @@ impl Remote {
     /// Connects to the Remote, loading metadata and optionally acquiring a token.
     ///
     /// Use [Remote::connect_with_opts] if you cannot otherwise automatically connect using enterprise.
+    /// 
+    /// WARNING: This is currently **not** thread safe, if you try and connect/disconnect to a remote on
+    /// multiple threads you will be subject to race conditions. To avoid this wrap the [`Remote`] in
+    /// a synchronization primitive, and pass that to your threads. Or don't try and connect on multiple threads.
     pub fn connect(&self) -> Result<(), ()> {
         // TODO: implement SecretsProvider
         if self.is_enterprise()? && enterprise::is_server_authenticated() {
@@ -234,6 +238,10 @@ impl Remote {
     }
 
     /// Disconnects from the remote.
+    /// 
+    /// WARNING: This is currently **not** thread safe, if you try and connect/disconnect to a remote on
+    /// multiple threads you will be subject to race conditions. To avoid this wrap the [`Remote`] in
+    /// a synchronization primitive, and pass that to your threads. Or don't try and connect on multiple threads.
     pub fn disconnect(&self) -> Result<(), ()> {
         let success = unsafe { BNRemoteDisconnect(self.handle.as_ptr()) };
         success.then_some(()).ok_or(())

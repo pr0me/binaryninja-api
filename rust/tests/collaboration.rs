@@ -6,6 +6,7 @@ use binaryninja::headless::Session;
 use binaryninja::symbol::{SymbolBuilder, SymbolType};
 use rstest::*;
 use std::path::PathBuf;
+use serial_test::serial;
 
 #[fixture]
 #[once]
@@ -14,13 +15,21 @@ fn session() -> Session {
 }
 
 // TODO: This cannot run in CI, as headless does not have collaboration, we should gate this.
+// TODO: Why cant we create_project for the same project name? why does that fail.
 
-fn temp_project_scope<T: Fn(&RemoteProject)>(remote: &Remote, cb: T) {
+// TODO: Remote connection / disconnection is NOT thread safe, the core needs to lock on each.
+// TODO: Because of this we run these tests serially, this isnt _really_ an issue for real code, as
+// TODO: Real code shouldnt be trying to connect to the same remote on multiple threads.
+
+fn temp_project_scope<T: Fn(&RemoteProject)>(remote: &Remote, project_name: &str, cb: T) {
     if !remote.is_connected() {
-        remote.connect().expect("Failed to connect to remote");
+        // TODO: Because connecting is not thread safe we wont check the error here, this is because we might already
+        // TODO: be connecting in some other thread and will error out on this thread. But we _probably_ will
+        // TODO: have connected by the time this errors out. Maybe?
+        let _ = remote.connect();
     }
     let project = remote
-        .create_project("Test Project", "Test project for test purposes")
+        .create_project(project_name, "Test project for test purposes")
         .expect("Failed to create project");
     project.open().expect("Failed to open project");
     assert!(project.is_open(), "Project was not opened");
@@ -48,6 +57,7 @@ fn temp_project_scope<T: Fn(&RemoteProject)>(remote: &Remote, cb: T) {
 }
 
 #[rstest]
+#[serial]
 fn test_connection(_session: &Session) {
     if !has_collaboration_support() {
         eprintln!("No collaboration support, skipping test...");
@@ -63,6 +73,7 @@ fn test_connection(_session: &Session) {
 }
 
 #[rstest]
+#[serial]
 fn test_project_creation(_session: &Session) {
     if !has_collaboration_support() {
         eprintln!("No collaboration support, skipping test...");
@@ -70,7 +81,7 @@ fn test_project_creation(_session: &Session) {
     }
     let remotes = binaryninja::collaboration::known_remotes();
     let remote = remotes.iter().next().expect("No known remotes!");
-    temp_project_scope(&remote, |project| {
+    temp_project_scope(&remote, "test_creation", |project| {
         // Create the file than verify it by opening and checking contents.
         let created_file = project
             .create_file(
@@ -143,6 +154,7 @@ fn test_project_creation(_session: &Session) {
 }
 
 #[rstest]
+#[serial]
 fn test_project_sync(_session: &Session) {
     if !has_collaboration_support() {
         eprintln!("No collaboration support, skipping test...");
@@ -150,7 +162,7 @@ fn test_project_sync(_session: &Session) {
     }
     let remotes = binaryninja::collaboration::known_remotes();
     let remote = remotes.iter().next().expect("No known remotes!");
-    temp_project_scope(&remote, |project| {
+    temp_project_scope(&remote, "test_sync", |project| {
         // Open a view so that we can upload it.
         let out_dir = env!("OUT_DIR").parse::<PathBuf>().unwrap();
         let view = binaryninja::load(out_dir.join("atox.obj")).expect("Failed to create view");

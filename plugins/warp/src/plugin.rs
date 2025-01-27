@@ -39,6 +39,10 @@ fn get_warp_tag_type(view: &BinaryView) -> Ref<TagType> {
 // TODO: Rename to markup_function or something.
 pub fn on_matched_function(function: &Function, matched: &WarpFunction) {
     let view = function.view();
+    // TODO: Using user symbols here is problematic
+    // TODO: For one they queue up a bunch of main thread actions
+    // TODO: Secondly by queueing up those main thread actions if you attempt to save the file
+    // TODO: Before the undo actions are done completing
     view.define_user_symbol(&to_bn_symbol_at_address(
         &view,
         &matched.symbol,

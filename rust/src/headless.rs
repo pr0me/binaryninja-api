@@ -148,26 +148,26 @@ impl Default for InitializationOptions {
 /// This initializes the core with the given [`InitializationOptions`].
 pub fn init_with_opts(options: InitializationOptions) -> Result<(), InitializationError> {
     // If we are the main thread that means there is no main thread, we should register a main thread handler.
-    if options.register_main_thread_handler
-        && is_main_thread()
-        && MAIN_THREAD_HANDLE.lock().unwrap().is_none()
-    {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let main_thread = HeadlessMainThreadSender::new(sender);
+    if options.register_main_thread_handler && is_main_thread() {
+        let mut main_thread_handle = MAIN_THREAD_HANDLE.lock().unwrap();
+        if main_thread_handle.is_none() {
+            let (sender, receiver) = std::sync::mpsc::channel();
+            let main_thread = HeadlessMainThreadSender::new(sender);
 
-        // This thread will act as our main thread.
-        let main_thread_handle = std::thread::Builder::new()
-            .name("HeadlessMainThread".to_string())
-            .spawn(move || {
-                // We must register the main thread within said thread.
-                main_thread.register();
-                while let Ok(action) = receiver.recv() {
-                    action.execute();
-                }
-            })?;
+            // This thread will act as our main thread.
+            let join_handle = std::thread::Builder::new()
+                .name("HeadlessMainThread".to_string())
+                .spawn(move || {
+                    // We must register the main thread within said thread.
+                    main_thread.register();
+                    while let Ok(action) = receiver.recv() {
+                        action.execute();
+                    }
+                })?;
 
-        // Set the static MAIN_THREAD_HANDLER so that we can close the thread on shutdown.
-        *MAIN_THREAD_HANDLE.lock().unwrap() = Some(main_thread_handle);
+            // Set the static MAIN_THREAD_HANDLER so that we can close the thread on shutdown.
+            *main_thread_handle = Some(join_handle);
+        }
     }
 
     match crate::product().as_str() {

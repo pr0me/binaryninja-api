@@ -3,6 +3,7 @@ use binaryninja::headless::Session;
 use binaryninja::symbol::{SymbolBuilder, SymbolType};
 use rstest::*;
 use std::path::PathBuf;
+use binaryninja::main_thread::execute_on_main_thread_and_wait;
 
 #[fixture]
 #[once]
@@ -31,6 +32,10 @@ fn test_binary_saving(_session: &Session) {
     // Verify that we modified the binary
     let modified_contents = view.read_vec(0x1560, 4);
     assert_eq!(modified_contents, [0xff, 0xff, 0xff, 0xff]);
+
+    // HACK: To prevent us from deadlocking in save_to_path we wait for all main thread actions to finish.
+    execute_on_main_thread_and_wait(|| {});
+
     // Save the modified file
     assert!(view.save_to_path(out_dir.join("atox.obj.new")));
     // Verify that the file exists and is modified.

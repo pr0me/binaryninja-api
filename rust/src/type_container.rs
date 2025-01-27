@@ -36,11 +36,10 @@ impl TypeContainer {
         // NOTE: but this is how the C++ and Python bindings operate so i guess its fine?
         // TODO: I really dont get how some of the usage of the TypeContainer doesnt free the underlying container.
         // TODO: So for now we always duplicate the type container
-        // let cloned_ptr = NonNull::new(BNDuplicateTypeContainer(handle.as_ptr()));
-        // Self {
-        //     handle: cloned_ptr.unwrap(),
-        // }
-        Self { handle }
+        let cloned_ptr = NonNull::new(BNDuplicateTypeContainer(handle.as_ptr()));
+        Self {
+            handle: cloned_ptr.unwrap(),
+        }
     }
 
     /// Get an id string for the Type Container. This will be unique within a given
@@ -417,6 +416,7 @@ impl Debug for TypeContainer {
             .field("name", &self.name())
             .field("container_type", &self.container_type())
             .field("is_mutable", &self.is_mutable())
+            .field("type_names", &self.type_names().unwrap().to_vec())
             .finish()
     }
 }

@@ -1580,7 +1580,7 @@ pub trait BinaryViewExt: BinaryViewBase {
         let type_container_ptr =
             NonNull::new(unsafe { BNGetAnalysisUserTypeContainer(self.as_ref().handle) });
         // NOTE: I have no idea how this isn't a UAF, see the note in `TypeContainer::from_raw`
-        unsafe { TypeContainer::from_raw(type_container_ptr.unwrap()) }
+        unsafe { TypeContainer::from_raw(type_container_ptr.unwrap()) }.clone()
     }
 
     /// Type container for auto types in the Binary View.
@@ -1878,12 +1878,26 @@ impl BinaryView {
     }
 
     /// Save the original binary file to the provided `file_path` along with any modifications.
+    ///
+    /// WARNING: Currently there is a possibility to deadlock if the analysis has queued up a main thread action
+    /// that tries to take the [`FileMetadata`] lock of the current view, and is executed while we
+    /// are executing in this function.
+    ///
+    /// To avoid the above issue use [`crate::main_thread::execute_on_main_thread_and_wait`] to verify there
+    /// are no queued up main thread actions.
     pub fn save_to_path(&self, file_path: impl AsRef<Path>) -> bool {
         let file = file_path.as_ref().into_bytes_with_nul();
         unsafe { BNSaveToFilename(self.handle, file.as_ptr() as *mut _) }
     }
 
     /// Save the original binary file to the provided [`FileAccessor`] along with any modifications.
+    ///
+    /// WARNING: Currently there is a possibility to deadlock if the analysis has queued up a main thread action
+    /// that tries to take the [`FileMetadata`] lock of the current view, and is executed while we
+    /// are executing in this function.
+    ///
+    /// To avoid the above issue use [`crate::main_thread::execute_on_main_thread_and_wait`] to verify there
+    /// are no queued up main thread actions.
     pub fn save_to_accessor(&self, file: &mut FileAccessor) -> bool {
         unsafe { BNSaveToFile(self.handle, &mut file.api_object) }
     }

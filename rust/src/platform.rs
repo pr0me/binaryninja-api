@@ -90,7 +90,7 @@ impl Platform {
             if res.is_null() {
                 None
             } else {
-                Some(Ref::new(Self { handle: res }))
+                Some(Self::ref_from_raw(res))
             }
         }
     }
@@ -176,7 +176,7 @@ impl Platform {
         // NOTE: I have no idea how this isn't a UAF, see the note in `TypeContainer::from_raw`
         // TODO: We are cloning here for platforms but we dont need to do this for [BinaryViewExt::type_container]
         // TODO: Why does this require that we, construct a TypeContainer, duplicate the type container, then drop the original.
-        unsafe { TypeContainer::from_raw(type_container_ptr.unwrap()).clone() }
+        unsafe { TypeContainer::from_raw(type_container_ptr.unwrap()) }
     }
 
     pub fn get_type_libraries_by_name<T: BnStrCompatible>(&self, name: T) -> Array<TypeLibrary> {
