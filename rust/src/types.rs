@@ -1563,6 +1563,14 @@ impl StructureBuilder {
         unsafe { BNRemoveStructureBuilderMember(self.handle, index) };
         self
     }
+
+    // TODO: We should add BNGetStructureBuilderAlignedWidth
+    /// Gets the current **unaligned** width of the structure.
+    ///
+    /// This cannot be used to accurately get the width of a non-packed structure.
+    pub fn current_width(&self) -> u64 {
+        unsafe { BNGetStructureBuilderWidth(self.handle) }
+    }
 }
 
 impl From<&Structure> for StructureBuilder {
