@@ -491,9 +491,7 @@ pub fn set_license<S: BnStrCompatible + Default>(license: Option<S>) {
 }
 
 #[cfg(feature = "demo")]
-pub fn set_license<S: BnStrCompatible + Default>(_license: Option<S>) {
-    panic!("Cannot set license in demo mode!");
-}
+pub fn set_license<S: BnStrCompatible + Default>(_license: Option<S>) {}
 
 pub fn product() -> BnString {
     unsafe { BnString::from_raw(BNGetProduct()) }
