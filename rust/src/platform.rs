@@ -399,7 +399,7 @@ impl Debug for Platform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Platform")
             .field("name", &self.name())
-            .field("arch", &self.arch())
+            .field("arch", &self.arch().name())
             .finish()
     }
 }

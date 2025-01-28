@@ -230,7 +230,7 @@ impl ToOwned for TagType {
 unsafe impl Send for TagType {}
 unsafe impl Sync for TagType {}
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct TagReference {
     pub arch: CoreArchitecture,
     pub func: Ref<Function>,
@@ -250,6 +250,17 @@ impl From<&BNTagReference> for TagReference {
             func: unsafe { Function::from_raw(value.func).to_owned() },
             addr: value.addr,
         }
+    }
+}
+
+impl Debug for TagReference {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TagReference")
+            .field("addr", &self.addr)
+            .field("auto_defined", &self.auto_defined)
+            .field("reference_type", &self.reference_type)
+            .field("tag", &self.tag)
+            .finish()
     }
 }
 

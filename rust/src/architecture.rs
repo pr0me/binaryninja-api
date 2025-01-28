@@ -1377,7 +1377,7 @@ impl Drop for CoreArchitectureList {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct CoreArchitecture {
     pub(crate) handle: *mut BNArchitecture,
 }
@@ -1892,6 +1892,20 @@ impl Architecture for CoreArchitecture {
 
     fn handle(&self) -> CoreArchitecture {
         *self
+    }
+}
+
+impl Debug for CoreArchitecture {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CoreArchitecture")
+            .field("name", &self.name())
+            .field("endianness", &self.endianness())
+            .field("address_size", &self.address_size())
+            .field("default_integer_size", &self.default_integer_size())
+            .field("instruction_alignment", &self.instruction_alignment())
+            .field("max_instr_len", &self.max_instr_len())
+            .field("opcode_display_len", &self.opcode_display_len())
+            .finish()
     }
 }
 

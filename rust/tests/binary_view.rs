@@ -1,9 +1,9 @@
 use binaryninja::binary_view::{AnalysisState, BinaryViewBase, BinaryViewExt};
 use binaryninja::headless::Session;
+use binaryninja::main_thread::execute_on_main_thread_and_wait;
 use binaryninja::symbol::{SymbolBuilder, SymbolType};
 use rstest::*;
 use std::path::PathBuf;
-use binaryninja::main_thread::execute_on_main_thread_and_wait;
 
 #[fixture]
 #[once]

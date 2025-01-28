@@ -15,6 +15,7 @@
 //! Interfaces for the various kinds of symbols in a binary.
 
 use std::fmt;
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::ptr;
 
@@ -286,16 +287,18 @@ impl Symbol {
 unsafe impl Send for Symbol {}
 unsafe impl Sync for Symbol {}
 
-impl fmt::Debug for Symbol {
+impl Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "<sym {:?} '{}' @ {:x} (handle: {:?})>",
-            self.sym_type(),
-            self.full_name(),
-            self.address(),
-            self.handle
-        )
+        f.debug_struct("Symbol")
+            .field("type", &self.sym_type())
+            .field("binding", &self.binding())
+            .field("full_name", &self.full_name())
+            .field("short_name", &self.short_name())
+            .field("raw_name", &self.raw_name())
+            .field("address", &self.address())
+            .field("auto_defined", &self.auto_defined())
+            .field("external", &self.external())
+            .finish()
     }
 }
 

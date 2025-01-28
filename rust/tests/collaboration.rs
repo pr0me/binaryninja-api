@@ -5,8 +5,8 @@ use binaryninja::collaboration::{
 use binaryninja::headless::Session;
 use binaryninja::symbol::{SymbolBuilder, SymbolType};
 use rstest::*;
-use std::path::PathBuf;
 use serial_test::serial;
+use std::path::PathBuf;
 
 #[fixture]
 #[once]

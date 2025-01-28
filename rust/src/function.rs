@@ -2375,7 +2375,7 @@ impl Debug for Function {
         // TODO: I am sure there is more we should add to this.
         f.debug_struct("Function")
             .field("start", &self.start())
-            .field("arch", &self.arch())
+            .field("arch", &self.arch().name())
             .field("platform", &self.platform())
             .field("symbol", &self.symbol())
             .field("is_auto", &self.is_auto())
