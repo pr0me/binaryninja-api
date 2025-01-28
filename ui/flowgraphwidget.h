@@ -88,6 +88,7 @@ class BINARYNINJAUIAPI FlowGraphWidget :
 
 		bool operator==(const CursorPosition& other) const;
 		bool operator<(const CursorPosition& other) const;
+		bool operator<=(const CursorPosition& other) const;
 	};
 
 	BinaryViewRef m_data;
