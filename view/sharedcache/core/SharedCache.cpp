@@ -576,31 +576,36 @@ void SharedCache::PerformInitialLoad()
 		}
 
 		// Load .symbols subcache
+		try {
+			auto subCachePath = path + ".symbols";
+			auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
 
-		auto subCachePath = path + ".symbols";
-		auto subCacheFile = MMappedFileAccessor::Open(m_dscView, m_dscView->GetFile()->GetSessionId(), subCachePath)->lock();
+			dyld_cache_header subCacheHeader {};
+			uint64_t headerSize = subCacheFile->ReadUInt32(16);
+			if (headerSize > sizeof(dyld_cache_header))
+			{
+				m_logger->LogDebug("Header size is larger than expected (0x%llx), using default size (0x%llx)", headerSize,
+					sizeof(dyld_cache_header));
+				headerSize = sizeof(dyld_cache_header);
+			}
+			subCacheFile->Read(&subCacheHeader, 0, headerSize);
 
-		dyld_cache_header subCacheHeader {};
-		uint64_t headerSize = subCacheFile->ReadUInt32(16);
-		if (headerSize > sizeof(dyld_cache_header))
-		{
-			m_logger->LogDebug("Header size is larger than expected (0x%llx), using default size (0x%llx)", headerSize,
-				sizeof(dyld_cache_header));
-			headerSize = sizeof(dyld_cache_header);
+			dyld_cache_mapping_info subCacheMapping {};
+			BackingCache subCache;
+
+			for (size_t j = 0; j < subCacheHeader.mappingCount; j++)
+			{
+				subCacheFile->Read(&subCacheMapping, subCacheHeader.mappingOffset + (j * sizeof(subCacheMapping)),
+					sizeof(subCacheMapping));
+				subCache.mappings.push_back(subCacheMapping);
+			}
+
+			MutableState().backingCaches.push_back(std::move(subCache));
 		}
-		subCacheFile->Read(&subCacheHeader, 0, headerSize);
-
-		dyld_cache_mapping_info subCacheMapping {};
-		BackingCache subCache;
-
-		for (size_t j = 0; j < subCacheHeader.mappingCount; j++)
+		catch (...)
 		{
-			subCacheFile->Read(&subCacheMapping, subCacheHeader.mappingOffset + (j * sizeof(subCacheMapping)),
-				sizeof(subCacheMapping));
-			subCache.mappings.push_back(subCacheMapping);
+			m_logger->LogWarn("Failed to locate .symbols subcache. Non-exported symbol information may be missing.");
 		}
-
-		MutableState().backingCaches.push_back(std::move(subCache));
 		break;
 	}
 	case iOS16CacheFormat:

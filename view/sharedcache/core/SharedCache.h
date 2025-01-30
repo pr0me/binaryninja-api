@@ -127,6 +127,22 @@ namespace SharedCacheCore {
 		dyld_cache_mapping_info mappingInfo;
 	};
 
+	struct dyld_cache_slide_info
+	{
+		uint32_t    version;
+		uint32_t    toc_offset;
+		uint32_t    toc_count;
+		uint32_t    entries_offset;
+		uint32_t    entries_count;
+		uint32_t    entries_size;
+		// uint16_t toc[toc_count];
+		// entrybitmap entries[entries_count];
+	};
+
+	struct dyld_cache_slide_info_entry {
+		uint8_t  bits[4096/(8*4)]; // 128-byte bitmap
+	};
+
 	struct PACKED_STRUCT dyld_cache_mapping_and_slide_info
 	{
 		uint64_t address;

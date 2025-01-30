@@ -35,6 +35,15 @@ DSCView::~DSCView()
 enum DSCPlatform {
 	DSCPlatformMacOS = 1,
 	DSCPlatformiOS = 2,
+	DSCPlatformTVOS = 3,
+	DSCPlatformWatchOS = 4,
+	DSCPlatformBridgeOS = 5,			// T1/T2 APL1023/T8012, this is your touchbar/touchid in intel macs. Similar to watchOS.
+	// DSCPlatformMacCatalyst = 6,
+	DSCPlatformiOSSimulator = 7,
+	DSCPlatformTVOSSimulator = 8,
+	DSCPlatformWatchOSSimulator = 9,
+	DSCPlatformVisionOS = 11,			// Apple Vision Pro
+	DSCPlatformVisionOSSimulator = 12	// Apple Vision Pro Simulator
 };
 
 bool DSCView::Init()
@@ -47,21 +56,29 @@ bool DSCView::Init()
 	char magic[17];
 	GetParentView()->Read(&magic, 0, 16);
 	magic[16] = 0;
-	if (platform == DSCPlatformMacOS)
+	switch (platform)
 	{
-		os = "mac";
-	}
-	else if (platform == DSCPlatformiOS)
-	{
-		os = "ios";
-	}
-	else
-	{
-		LogError("Unknown platform: %d", platform);
-		return false;
+		case DSCPlatformMacOS:
+		case DSCPlatformTVOS:
+		case DSCPlatformTVOSSimulator:
+			os = "mac";
+			break;
+		case DSCPlatformiOS:
+		case DSCPlatformiOSSimulator:
+		case DSCPlatformVisionOS:
+		case DSCPlatformVisionOSSimulator:
+			os = "ios";
+			break;
+		// armv7 or slide info v1 (unsupported)
+		case DSCPlatformWatchOS:
+		case DSCPlatformWatchOSSimulator:
+		case DSCPlatformBridgeOS:
+		default:
+			LogError("Unknown platform: %d", platform);
+			return false;
 	}
 
-	if (std::string(magic) == "dyld_v1   arm64" || std::string(magic) == "dyld_v1  arm64e")
+	if (std::string(magic) == "dyld_v1   arm64" || std::string(magic) == "dyld_v1  arm64e" || std::string(magic) == "dyld_v1arm64_32")
 	{
 		arch = "aarch64";
 	}
