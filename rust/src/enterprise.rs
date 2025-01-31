@@ -25,6 +25,10 @@ pub fn checkout_license(duration: Duration) -> Result<(), EnterpriseCheckoutErro
         return Ok(());
     }
 
+    // The disparate core functions we call here might already have mutexes to guard.
+    static CHECKOUT_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _mtx = CHECKOUT_MUTEX.lock().unwrap();
+
     #[allow(clippy::collapsible_if)]
     if !is_server_initialized() {
         // We need to first initialize the server.
