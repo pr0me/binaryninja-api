@@ -17,7 +17,7 @@ fn session() -> Session {
 fn test_render_layer_register(_session: &Session) {
     struct EmptyRenderLayer;
     impl RenderLayer for EmptyRenderLayer {}
-    register_render_layer("Test Render Layer", EmptyRenderLayer);
+    register_render_layer("Test Render Layer", EmptyRenderLayer, Default::default());
     CoreRenderLayer::render_layer_by_name("Test Render Layer").expect("Failed to get render layer");
 }
 
@@ -37,7 +37,8 @@ fn test_render_layer_linear_view(_session: &Session) {
             lines
         }
     }
-    let (_, nop_render_layer) = register_render_layer("Nop Render Layer", NopRenderLayer);
+    let (_, nop_render_layer) =
+        register_render_layer("Nop Render Layer", NopRenderLayer, Default::default());
 
     // Create linear view object stuff
     let settings = DisassemblySettings::new();
@@ -81,7 +82,8 @@ fn test_render_layer_linear_view(_session: &Session) {
             lines
         }
     }
-    let (_, adding_render_layer) = register_render_layer("Add Render Layer", AddRenderLayer);
+    let (_, adding_render_layer) =
+        register_render_layer("Add Render Layer", AddRenderLayer, Default::default());
 
     // Calling lines() again should now have the render layer applied.
     cursor.add_render_layer(&adding_render_layer);

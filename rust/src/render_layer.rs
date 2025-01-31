@@ -11,13 +11,60 @@ use binaryninjacore_sys::*;
 use std::ffi::{c_char, c_void};
 use std::ptr::NonNull;
 
-pub type RenderLayerDefaultEnableState = BNRenderLayerDefaultEnableState;
+/// The state in which the [`RenderLayer`] will be registered with.
+#[repr(u32)]
+pub enum RenderLayerDefaultState {
+    /// Register the [`RenderLayer`] as disabled, the user must then enable it via the UI.
+    ///
+    /// This is the default registration value.
+    Disabled = 0,
+    /// Register the [`RenderLayer`] as enabled, the user must then disable it via the UI.
+    Enabled = 1,
+    /// Use this if you do not want the render layer to be adjustable via the UI.
+    AlwaysEnabled = 2,
+}
+
+impl From<BNRenderLayerDefaultEnableState> for RenderLayerDefaultState {
+    fn from(value: BNRenderLayerDefaultEnableState) -> Self {
+        match value {
+            BNRenderLayerDefaultEnableState::DisabledByDefaultRenderLayerDefaultEnableState => {
+                Self::Disabled
+            }
+            BNRenderLayerDefaultEnableState::EnabledByDefaultRenderLayerDefaultEnableState => {
+                Self::Enabled
+            }
+            BNRenderLayerDefaultEnableState::AlwaysEnabledRenderLayerDefaultEnableState => {
+                Self::AlwaysEnabled
+            }
+        }
+    }
+}
+
+impl From<RenderLayerDefaultState> for BNRenderLayerDefaultEnableState {
+    fn from(value: RenderLayerDefaultState) -> Self {
+        match value {
+            RenderLayerDefaultState::Disabled => {
+                Self::DisabledByDefaultRenderLayerDefaultEnableState
+            }
+            RenderLayerDefaultState::Enabled => Self::EnabledByDefaultRenderLayerDefaultEnableState,
+            RenderLayerDefaultState::AlwaysEnabled => {
+                Self::AlwaysEnabledRenderLayerDefaultEnableState
+            }
+        }
+    }
+}
+
+impl Default for RenderLayerDefaultState {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
 
 /// Register a [`RenderLayer`] with the API.
 pub fn register_render_layer<S: BnStrCompatible, T: RenderLayer>(
     name: S,
     render_layer: T,
-    enable_state: RenderLayerDefaultEnableState,
+    default_state: RenderLayerDefaultState,
 ) -> (&'static mut T, CoreRenderLayer) {
     let render_layer = Box::leak(Box::new(render_layer));
     let mut callback = BNRenderLayerCallbacks {
@@ -30,7 +77,7 @@ pub fn register_render_layer<S: BnStrCompatible, T: RenderLayer>(
         BNRegisterRenderLayer(
             name.into_bytes_with_nul().as_ref().as_ptr() as *const _,
             &mut callback,
-            enable_state,
+            default_state.into(),
         )
     };
     let core = CoreRenderLayer::from_raw(NonNull::new(result).unwrap());
@@ -263,8 +310,9 @@ impl CoreRenderLayer {
         NonNull::new(result).map(Self::from_raw)
     }
 
-    pub fn default_enable_state(&self) -> RenderLayerDefaultEnableState {
-        unsafe { BNGetRenderLayerDefaultEnableState(self.handle.as_ptr()) }
+    pub fn default_state(&self) -> RenderLayerDefaultState {
+        let raw = unsafe { BNGetRenderLayerDefaultEnableState(self.handle.as_ptr()) };
+        RenderLayerDefaultState::from(raw)
     }
 
     pub fn apply_to_flow_graph(&self, graph: &FlowGraph) {
