@@ -64,7 +64,14 @@ class RenderLayer(metaclass=_RenderLayerMetaclass):
 	"""
 
 	name = None
+	"""Name of the Render Layer, to be displayed in the UI."""
+
 	default_enable_state = RenderLayerDefaultEnableState.DisabledByDefaultRenderLayerDefaultEnableState
+	"""
+	Whether the Render Layer is enabled by default in the UI. If set to AlwaysEnabled,
+	the Render Layer will always be enabled and will not be displayed in the UI.
+	"""
+
 	_registered_instances = {}
 	_pending_lines = {}
 
@@ -150,11 +157,10 @@ class RenderLayer(metaclass=_RenderLayerMetaclass):
 			self,
 			block: 'binaryninja.BasicBlock',
 			lines: List['binaryninja.DisassemblyTextLine']
-	):
+	) -> List['binaryninja.DisassemblyTextLine']:
 		"""
 		Apply this Render Layer to a single Basic Block of Disassembly lines.
-		Subclasses should modify the input `lines` list to make modifications to
-		the presentation of the block.
+		Subclasses should return a modified list of lines to be rendered in the UI.
 
 		.. note:: This function will only handle Disassembly lines, and not any ILs.
 
@@ -168,14 +174,13 @@ class RenderLayer(metaclass=_RenderLayerMetaclass):
 			self,
 			block: 'binaryninja.LowLevelILBasicBlock',
 			lines: List['binaryninja.DisassemblyTextLine']
-	):
+	) -> List['binaryninja.DisassemblyTextLine']:
 		"""
 		Apply this Render Layer to a single Basic Block of Low Level IL lines.
-		Subclasses should modify the input `lines` list to make modifications to
-		the presentation of the block.
+		Subclasses should return a modified list of lines to be rendered in the UI.
 
 		.. note:: This function will only handle Lifted IL/LLIL/LLIL(SSA) lines. \
-		You can use the block's `function_graph_type` property to determine which is being handled.
+		You can use the block's ``function_graph_type`` property to determine which is being handled.
 
 		:param block: Basic Block containing those lines
 		:param lines: Original lines of text for the block
@@ -187,14 +192,13 @@ class RenderLayer(metaclass=_RenderLayerMetaclass):
 			self,
 			block: 'binaryninja.MediumLevelILBasicBlock',
 			lines: List['binaryninja.DisassemblyTextLine']
-	):
+	) -> List['binaryninja.DisassemblyTextLine']:
 		"""
 		Apply this Render Layer to a single Basic Block of Medium Level IL lines.
-		Subclasses should modify the input `lines` list to make modifications to
-		the presentation of the block.
+		Subclasses should return a modified list of lines to be rendered in the UI.
 
 		.. note:: This function will only handle MLIL/MLIL(SSA)/Mapped MLIL/Mapped MLIL(SSA) lines. \
-		You can use the block's `function_graph_type` property to determine which is being handled.
+		You can use the block's ``function_graph_type`` property to determine which is being handled.
 
 		:param block: Basic Block containing those lines
 		:param lines: Original lines of text for the block
@@ -206,17 +210,16 @@ class RenderLayer(metaclass=_RenderLayerMetaclass):
 			self,
 			block: 'binaryninja.HighLevelILBasicBlock',
 			lines: List['binaryninja.DisassemblyTextLine']
-	):
+	) -> List['binaryninja.DisassemblyTextLine']:
 		"""
 		Apply this Render Layer to a single Basic Block of High Level IL lines.
-		Subclasses should modify the input `lines` list to make modifications to
-		the presentation of the block.
+		Subclasses should return a modified list of lines to be rendered in the UI.
 
 		.. note:: This function will only handle HLIL/HLIL(SSA)/Language Representation lines. \
-		You can use the block's `function_graph_type` property to determine which is being handled.
+		You can use the block's ``function_graph_type`` property to determine which is being handled.
 
 		.. warning:: This function will NOT apply to High Level IL bodies as displayed \
-		in Linear View! Those are handled by `apply_to_high_level_il_body` instead as they \
+		in Linear View! Those are handled by ``apply_to_high_level_il_body`` instead as they \
 		do not have a Basic Block associated with them.
 
 		:param block: Basic Block containing those lines
@@ -229,14 +232,13 @@ class RenderLayer(metaclass=_RenderLayerMetaclass):
 			self,
 			function: 'binaryninja.Function',
 			lines: List['binaryninja.LinearDisassemblyLine']
-	):
+	) -> List['binaryninja.LinearDisassemblyLine']:
 		"""
 		Apply this Render Layer to the entire body of a High Level IL function.
-		Subclasses should modify the input `lines` list to make modifications to
-		the presentation of the function.
+		Subclasses should return a modified list of lines to be rendered in the UI.
 
 		.. warning:: This function only applies to Linear View, and not to Graph View! \
-		If you want to handle Graph View too, you will need to use `apply_to_high_level_il_block` \
+		If you want to handle Graph View too, you will need to use ``apply_to_high_level_il_block`` \
 		and handle the lines one block at a time.
 
 		:param function: Function containing those lines
@@ -251,11 +253,12 @@ class RenderLayer(metaclass=_RenderLayerMetaclass):
 			prev: Optional['binaryninja.LinearViewObject'],
 			next: Optional['binaryninja.LinearViewObject'],
 			lines: List['binaryninja.LinearDisassemblyLine']
-	):
+	) -> List['binaryninja.DisassemblyTextLine']:
 		"""
 		Apply to lines generated by Linear View that are not part of a function.
 		It is up to your implementation to figure out which type of Linear View Object
 		lines these are, and what to do with them.
+		Subclasses should return a modified list of lines to be rendered in the UI.
 
 		:param obj: Linear View Object being rendered
 		:param prev: Linear View Object located directly above this one
@@ -269,10 +272,11 @@ class RenderLayer(metaclass=_RenderLayerMetaclass):
 			self,
 			block: 'binaryninja.BasicBlock',
 			lines: List['binaryninja.DisassemblyTextLine'],
-	):
+	) -> List['binaryninja.DisassemblyTextLine']:
 		"""
 		Apply to lines generated by a Basic Block, of any type. If not overridden, this
-		function will call the appropriate apply_to_X_level_il_block function.
+		function will call the appropriate ``apply_to_X_level_il_block`` function.
+		Subclasses should return a modified list of lines to be rendered in the UI.
 
 		:param block: Basic Block containing those lines
 		:param lines: Original lines of text for the block

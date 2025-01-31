@@ -19108,6 +19108,10 @@ namespace BinaryNinja {
 	public:
 		/*! Register a custom Render Layer.
 
+			Specify enableState to change whether the layer is enabled by default in the UI.
+			If it is set to AlwaysEnabled, the Render Layer will always be enabled
+			and will not be displayed in the UI.
+
 			\param layer Render Layer to register
 			\param enableState Whether the layer should be enabled by default
 		*/
