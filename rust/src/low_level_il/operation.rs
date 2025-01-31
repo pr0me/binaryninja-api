@@ -585,7 +585,7 @@ where
 // LLIL_REG_STACK_POP
 pub struct RegStackPop;
 
-impl<'func, A, M, F> Operation<'func, A, M, F, RegStackPop>
+impl<A, M, F> Operation<'_, A, M, F, RegStackPop>
 where
     A: Architecture,
     M: FunctionMutability,

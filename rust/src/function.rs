@@ -139,6 +139,12 @@ impl NativeBlock {
     }
 }
 
+impl Default for NativeBlock {
+    fn default() -> Self {
+        NativeBlock::new()
+    }
+}
+
 impl BlockContext for NativeBlock {
     type Instruction = u64;
     type InstructionIndex = u64;

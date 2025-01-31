@@ -40,7 +40,7 @@ pub fn register_render_layer<S: BnStrCompatible, T: RenderLayer>(
 pub trait RenderLayer: Sized {
     /// Apply this Render Layer to a Flow Graph.
     fn apply_to_flow_graph(&self, graph: &mut FlowGraph) {
-        for node in graph.nodes() {
+        for node in &graph.nodes() {
             if let Some(block) = node.basic_block(NativeBlock::new()) {
                 let new_lines = self.apply_to_block(&block, node.lines().to_vec());
                 node.set_lines(new_lines);
@@ -113,7 +113,7 @@ pub trait RenderLayer: Sized {
                 let probe_line = line_block.first()?;
                 Some((probe_line.ty, probe_line.basic_block.to_owned(), line_block))
             })
-            .map(|(line_ty, basic_block, lines)| {
+            .flat_map(|(line_ty, basic_block, lines)| {
                 match line_ty {
                     LinearDisassemblyLineType::CodeDisassemblyLineType => {
                         // Dealing with code lines.
@@ -121,11 +121,10 @@ pub trait RenderLayer: Sized {
                         let function = block.function();
                         let text_lines = lines.into_iter().map(|line| line.contents).collect();
                         let new_text_lines = self.apply_to_block(&block, text_lines);
-                        let new_lines = new_text_lines
+                        new_text_lines
                             .into_iter()
                             .map(|line| text_to_lines(&function, &block, line))
-                            .collect();
-                        new_lines
+                            .collect()
                     }
                     _ => {
                         // Dealing with misc lines.
@@ -138,7 +137,6 @@ pub trait RenderLayer: Sized {
                     }
                 }
             })
-            .flatten()
             .collect()
     }
 
@@ -262,7 +260,7 @@ impl CoreRenderLayer {
     pub fn render_layer_by_name<S: BnStrCompatible>(name: S) -> Option<CoreRenderLayer> {
         let name_raw = name.into_bytes_with_nul();
         let result = unsafe { BNGetRenderLayerByName(name_raw.as_ref().as_ptr() as *const c_char) };
-        NonNull::new(result).map(|x| Self::from_raw(x))
+        NonNull::new(result).map(Self::from_raw)
     }
 
     pub fn default_enable_state(&self) -> RenderLayerDefaultEnableState {

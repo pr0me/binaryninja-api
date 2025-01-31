@@ -264,6 +264,7 @@ impl LinearViewObjectIdentifier {
     }
 }
 
+// TODO: Impl iterator?
 #[derive(Eq)]
 pub struct LinearViewCursor {
     pub(crate) handle: *mut BNLinearViewCursor,
@@ -333,6 +334,9 @@ impl LinearViewCursor {
         unsafe { BNLinearViewCursorPrevious(self.handle) }
     }
 
+    // TODO: This clippy lint is probably right? Just a lot of work and it would
+    // TODO: make this API different from the python and C++ implementations.
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> bool {
         unsafe { BNLinearViewCursorNext(self.handle) }
     }
