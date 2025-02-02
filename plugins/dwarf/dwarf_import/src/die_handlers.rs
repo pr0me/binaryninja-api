@@ -111,16 +111,23 @@ pub(crate) fn handle_enum<R: ReaderType>(
     while let Ok(Some(child)) = children.next() {
         if child.entry().tag() == constants::DW_TAG_enumerator {
             let name = debug_info_builder_context.get_name(dwarf, unit, child.entry())?;
-            let attr = &child
-                .entry()
-                .attr(constants::DW_AT_const_value)
-                .unwrap()
-                .unwrap();
-            if let Some(value) = get_attr_as_u64(attr) {
-                enumeration_builder.insert(name, value);
-            } else {
-                log::error!("Unhandled enum member value type - please report this");
-                return None;
+            match &child.entry().attr(constants::DW_AT_const_value) {
+                Ok(Some(attr)) => {
+                    if let Some(value) = get_attr_as_u64(attr) {
+                        enumeration_builder.insert(name, value);
+                    } else {
+                        // Somehow the child entry is not a const value.
+                        log::error!("Unhandled enum member value type for `{}`", name);
+                    }
+                }
+                Ok(None) => {
+                    // Somehow the child entry does not have a const value.
+                    log::error!("Enum member `{}` has no constant value attribute", name);
+                }
+                Err(e) => {
+                    log::error!("Error parsing next attribute entry for `{}`: {}", name, e);
+                    return None;
+                }
             }
         }
     }
@@ -133,7 +140,7 @@ pub(crate) fn handle_enum<R: ReaderType>(
     Some(Type::enumeration(
         &enumeration_builder.finalize(),
         // TODO: This looks bad, look at the comment in [`Type::width`].
-        width.try_into().unwrap(),
+        width.try_into().expect("Enum cannot be zero width"),
         false,
     ))
 }
