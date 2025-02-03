@@ -326,4 +326,5 @@ void CoreRenderLayer::ApplyToLinearViewObject(
 
 	lines = ParseAPIObjectList<LinearDisassemblyLine>(outLines, outLineCount);
 	FreeAPIObjectList<LinearDisassemblyLine>(inLines, inLineCount);
+	BNFreeLinearDisassemblyLines(outLines, outLineCount);
 }
