@@ -1550,6 +1550,8 @@ namespace BinaryNinja {
 	*/
 	Ref<BinaryView> Load(Ref<ProjectFile> rawData, bool updateAnalysis = true, const std::string& options = "{}", std::function<bool(size_t, size_t)> progress = {});
 
+	Ref<BinaryView> ParseTextFormat(const std::string& filename);
+
 	/*!
 		Deprecated. Use non-metadata version.
 	*/
