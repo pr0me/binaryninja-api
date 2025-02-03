@@ -161,10 +161,9 @@ pub trait RenderLayer: Sized {
                 Some((probe_line.ty, probe_line.basic_block.to_owned(), line_block))
             })
             .flat_map(|(line_ty, basic_block, lines)| {
-                match line_ty {
-                    LinearDisassemblyLineType::CodeDisassemblyLineType => {
+                match (basic_block, line_ty) {
+                    (Some(block), LinearDisassemblyLineType::CodeDisassemblyLineType) => {
                         // Dealing with code lines.
-                        let block = basic_block.expect("Code line has no basic block");
                         let function = block.function();
                         let text_lines = lines.into_iter().map(|line| line.contents).collect();
                         let new_text_lines = self.apply_to_block(&block, text_lines);
