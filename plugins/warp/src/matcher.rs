@@ -1,5 +1,5 @@
 use binaryninja::architecture::Architecture as BNArchitecture;
-use binaryninja::binaryview::{BinaryView, BinaryViewExt};
+use binaryninja::binary_view::{BinaryView, BinaryViewExt};
 use binaryninja::function::Function as BNFunction;
 use binaryninja::platform::Platform;
 use binaryninja::rc::Guard;
@@ -24,6 +24,7 @@ use crate::cache::{
 };
 use crate::convert::to_bn_type;
 use crate::plugin::on_matched_function;
+use crate::{core_signature_dir, user_signature_dir};
 
 pub static PLAT_MATCHER_CACHE: OnceLock<DashMap<PlatformID, Matcher>> = OnceLock::new();
 
@@ -61,24 +62,12 @@ impl Matcher {
     /// Create a matcher from the platforms signature subdirectory.
     pub fn from_platform(platform: BNRef<Platform>) -> Self {
         let platform_name = platform.name().to_string();
-        // Get core signatures for the given platform
-        let install_dir = binaryninja::install_directory().unwrap();
-        #[cfg(target_os = "macos")]
-        let root_core_sig_dir = install_dir
-            .parent()
-            .unwrap()
-            .join("Resources")
-            .join("signatures");
-        #[cfg(not(target_os = "macos"))]
-        let root_core_sig_dir = install_dir.join("signatures");
-        let plat_core_sig_dir = root_core_sig_dir.join(&platform_name);
-        let mut data = get_data_from_dir(&plat_core_sig_dir);
 
-        // Get user signatures for the given platform
-        let user_dir = binaryninja::user_directory().unwrap();
-        let root_user_sig_dir = user_dir.join("signatures");
-        let plat_user_sig_dir = root_user_sig_dir.join(&platform_name);
-        // If the dir has not been created, create it.
+        // Get core and user signatures.
+        // TODO: Separate each file into own bucket for filtering?
+        let plat_core_sig_dir = core_signature_dir().join(&platform_name);
+        let mut data = get_data_from_dir(&plat_core_sig_dir);
+        let plat_user_sig_dir = user_signature_dir().join(&platform_name);
         let user_data = get_data_from_dir(&plat_user_sig_dir);
 
         data.extend(user_data);
@@ -130,7 +119,7 @@ impl Matcher {
             ty: &Type,
         ) {
             let ty_id_str = TypeGUID::from(ty).to_string();
-            if view.get_type_by_id(&ty_id_str).is_some() {
+            if view.type_by_id(&ty_id_str).is_some() {
                 // Type already added.
                 return;
             }
@@ -170,7 +159,7 @@ impl Matcher {
                     if let Some(ref_guid) = c.guid {
                         // NOTE: We do not need to check for cyclic reference here because
                         // NOTE: GUID references are unable to be referenced by themselves.
-                        if view.get_type_by_id(ref_guid.to_string()).is_none() {
+                        if view.type_by_id(ref_guid.to_string()).is_none() {
                             // Add the referrer to the view if it is in the Matcher types
                             if let Some(ref_ty) = matcher.types.get(&ref_guid) {
                                 inner_add_type_to_view(matcher, view, arch, visited_refs, &ref_ty);
@@ -183,7 +172,7 @@ impl Matcher {
                         // Only try and resolve by name if not already visiting.
                         if !resolved
                             && visited_refs.insert(ref_name.to_string())
-                            && view.get_type_by_name(ref_name).is_none()
+                            && view.type_by_name(ref_name).is_none()
                         {
                             // Add the ref to the view if it is in the Matcher types
                             if let Some(ref_ty) = matcher.named_types.get(ref_name) {
@@ -409,7 +398,7 @@ impl MatcherSettings {
     /// NOTE: If you are using this as a library then just modify the MatcherSettings directly
     /// in the matcher instance, that way you don't need to round-trip through Binary Ninja.
     pub fn register() {
-        let bn_settings = binaryninja::settings::Settings::new("");
+        let bn_settings = binaryninja::settings::Settings::new();
 
         let trivial_function_len_props = json!({
             "title" : "Trivial Function Length",
@@ -474,25 +463,24 @@ impl MatcherSettings {
 
     pub fn global() -> Self {
         let mut settings = MatcherSettings::default();
-        let bn_settings = binaryninja::settings::Settings::new("");
+        let bn_settings = binaryninja::settings::Settings::new();
         if bn_settings.contains(Self::TRIVIAL_FUNCTION_LEN_SETTING) {
             settings.trivial_function_len =
-                bn_settings.get_integer(Self::TRIVIAL_FUNCTION_LEN_SETTING, None, None);
+                bn_settings.get_integer(Self::TRIVIAL_FUNCTION_LEN_SETTING);
         }
         if bn_settings.contains(Self::MINIMUM_FUNCTION_LEN_SETTING) {
             settings.minimum_function_len =
-                bn_settings.get_integer(Self::MINIMUM_FUNCTION_LEN_SETTING, None, None);
+                bn_settings.get_integer(Self::MINIMUM_FUNCTION_LEN_SETTING);
         }
         if bn_settings.contains(Self::MAXIMUM_FUNCTION_LEN_SETTING) {
-            match bn_settings.get_integer(Self::MAXIMUM_FUNCTION_LEN_SETTING, None, None) {
+            match bn_settings.get_integer(Self::MAXIMUM_FUNCTION_LEN_SETTING) {
                 0 => settings.maximum_function_len = None,
                 len => settings.maximum_function_len = Some(len),
             }
         }
         if bn_settings.contains(Self::MINIMUM_MATCHED_CONSTRAINTS_SETTING) {
             settings.minimum_matched_constraints =
-                bn_settings.get_integer(Self::MINIMUM_MATCHED_CONSTRAINTS_SETTING, None, None)
-                    as usize;
+                bn_settings.get_integer(Self::MINIMUM_MATCHED_CONSTRAINTS_SETTING) as usize;
         }
         settings
     }

@@ -37,14 +37,14 @@
 // Current ABI version for linking to the core. This is incremented any time
 // there are changes to the API that affect linking, including new functions,
 // new types, or modifications to existing functions or types.
-#define BN_CURRENT_CORE_ABI_VERSION 85
+#define BN_CURRENT_CORE_ABI_VERSION 91
 
 // Minimum ABI version that is supported for loading of plugins. Plugins that
 // are linked to an ABI version less than this will not be able to load and
 // will require rebuilding. The minimum version is increased when there are
 // incompatible changes that break binary compatibility, such as changes to
 // existing types or functions.
-#define BN_MINIMUM_CORE_ABI_VERSION 82
+#define BN_MINIMUM_CORE_ABI_VERSION 89
 
 #ifdef __GNUC__
 	#ifdef BINARYNINJACORE_LIBRARY
@@ -301,6 +301,9 @@ extern "C"
 	typedef struct BNUndoEntry BNUndoEntry;
 	typedef struct BNDemangler BNDemangler;
 	typedef struct BNFirmwareNinja BNFirmwareNinja;
+	typedef struct BNFirmwareNinjaReferenceNode BNFirmwareNinjaReferenceNode;
+	typedef struct BNLineFormatter BNLineFormatter;
+	typedef struct BNRenderLayer BNRenderLayer;
 
 	//! Console log levels
 	typedef enum BNLogLevel
@@ -726,6 +729,7 @@ extern "C"
 		HighLevelILLinearDisassembly = 65,
 		WaitForIL = 66,
 		IndentHLILBody = 67,
+		DisableLineFormatting = 68,
 
 		// Debugging options
 		ShowFlagUsage = 128,
@@ -1854,7 +1858,7 @@ extern "C"
 		uint32_t* (*getFlagsRequiredForSemanticFlagGroup)(void* ctxt, uint32_t semGroup, size_t* count);
 		BNFlagConditionForSemanticClass* (*getFlagConditionsForSemanticFlagGroup)(
 		    void* ctxt, uint32_t semGroup, size_t* count);
-		void (*freeFlagConditionsForSemanticFlagGroup)(void* ctxt, BNFlagConditionForSemanticClass* conditions);
+		void (*freeFlagConditionsForSemanticFlagGroup)(void* ctxt, BNFlagConditionForSemanticClass* conditions, size_t count);
 		uint32_t* (*getFlagsWrittenByFlagWriteType)(void* ctxt, uint32_t writeType, size_t* count);
 		uint32_t (*getSemanticClassForFlagWriteType)(void* ctxt, uint32_t writeType);
 		size_t (*getFlagWriteLowLevelIL)(void* ctxt, BNLowLevelILOperation op, size_t size, uint32_t flagWriteType,
@@ -1862,7 +1866,7 @@ extern "C"
 		size_t (*getFlagConditionLowLevelIL)(
 		    void* ctxt, BNLowLevelILFlagCondition cond, uint32_t semClass, BNLowLevelILFunction* il);
 		size_t (*getSemanticFlagGroupLowLevelIL)(void* ctxt, uint32_t semGroup, BNLowLevelILFunction* il);
-		void (*freeRegisterList)(void* ctxt, uint32_t* regs);
+		void (*freeRegisterList)(void* ctxt, uint32_t* regs, size_t count);
 		void (*getRegisterInfo)(void* ctxt, uint32_t reg, BNRegisterInfo* result);
 		uint32_t (*getStackPointerRegister)(void* ctxt);
 		uint32_t (*getLinkRegister)(void* ctxt);
@@ -2541,7 +2545,7 @@ extern "C"
 		uint32_t* (*getCalleeSavedRegisters)(void* ctxt, size_t* count);
 		uint32_t* (*getIntegerArgumentRegisters)(void* ctxt, size_t* count);
 		uint32_t* (*getFloatArgumentRegisters)(void* ctxt, size_t* count);
-		void (*freeRegisterList)(void* ctxt, uint32_t* regs);
+		void (*freeRegisterList)(void* ctxt, uint32_t* regs, size_t len);
 
 		bool (*areArgumentRegistersSharedIndex)(void* ctxt);
 		bool (*isStackReservedForArgumentRegisters)(void* ctxt);
@@ -3438,6 +3442,7 @@ extern "C"
 		bool (*isValid)(void* ctxt, BNBinaryView* view);
 		BNTypePrinter* (*getTypePrinter)(void* ctxt);
 		BNTypeParser* (*getTypeParser)(void* ctxt);
+		BNLineFormatter* (*getLineFormatter)(void* ctxt);
 		BNDisassemblyTextLine* (*getFunctionTypeTokens)(
 			void* ctxt, BNFunction* func, BNDisassemblySettings* settings, size_t* count);
 		void (*freeLines)(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
@@ -3537,8 +3542,53 @@ extern "C"
 		size_t unique;
 	} BNFirmwareNinjaDeviceAccesses;
 
+	typedef struct BNLineFormatterSettings
+	{
+		BNHighLevelILFunction* highLevelIL;
+		size_t desiredLineLength;
+		size_t minimumContentLength;
+		size_t tabWidth;
+		char* languageName;
+		char* commentStartString;
+		char* commentEndString;
+		char* annotationStartString;
+		char* annotationEndString;
+	} BNLineFormatterSettings;
+
+	typedef struct BNCustomLineFormatter
+	{
+		void* context;
+		BNDisassemblyTextLine* (*formatLines)(void* ctxt, BNDisassemblyTextLine* inLines, size_t inCount,
+			const BNLineFormatterSettings* settings, size_t* outCount);
+		void (*freeLines)(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
+	} BNCustomLineFormatter;
+
+	typedef struct BNRenderLayerCallbacks
+	{
+		void* context;
+		void (*applyToFlowGraph)(void* ctxt, BNFlowGraph* graph);
+		void (*applyToLinearViewObject)(
+			void* ctxt,
+			BNLinearViewObject* obj,
+			BNLinearViewObject* prev,
+			BNLinearViewObject* next,
+			BNLinearDisassemblyLine* inLines,
+			size_t inLineCount,
+			BNLinearDisassemblyLine** outLines,
+			size_t* outLineCount
+		);
+		void (*freeLines)(void* ctxt, BNLinearDisassemblyLine* lines, size_t count);
+	} BNRenderLayerCallbacks;
+
+	typedef enum BNRenderLayerDefaultEnableState
+	{
+		DisabledByDefaultRenderLayerDefaultEnableState,
+		EnabledByDefaultRenderLayerDefaultEnableState,
+		AlwaysEnabledRenderLayerDefaultEnableState,
+	} BNRenderLayerDefaultEnableState;
 
 	BINARYNINJACOREAPI char* BNAllocString(const char* contents);
+	BINARYNINJACOREAPI char* BNAllocStringWithLength(const char* contents, size_t len);
 	BINARYNINJACOREAPI void BNFreeString(char* str);
 	BINARYNINJACOREAPI char** BNAllocStringList(const char** contents, size_t size);
 	BINARYNINJACOREAPI void BNFreeStringList(char** strs, size_t count);
@@ -5101,6 +5151,10 @@ extern "C"
 	BINARYNINJACOREAPI BNLinearDisassemblyLine* BNGetLinearViewCursorLines(BNLinearViewCursor* cursor, size_t* count);
 	BINARYNINJACOREAPI int BNCompareLinearViewCursors(BNLinearViewCursor* a, BNLinearViewCursor* b);
 
+	BINARYNINJACOREAPI BNRenderLayer** BNGetLinearViewCursorRenderLayers(BNLinearViewCursor* cursor, size_t* count);
+	BINARYNINJACOREAPI void BNAddLinearViewCursorRenderLayer(BNLinearViewCursor* cursor, BNRenderLayer* layer);
+	BINARYNINJACOREAPI void BNRemoveLinearViewCursorRenderLayer(BNLinearViewCursor* cursor, BNRenderLayer* layer);
+
 	BINARYNINJACOREAPI void BNDefineDataVariable(BNBinaryView* view, uint64_t addr, BNTypeWithConfidence* type);
 	BINARYNINJACOREAPI void BNDefineUserDataVariable(BNBinaryView* view, uint64_t addr, BNTypeWithConfidence* type);
 	BINARYNINJACOREAPI void BNUndefineDataVariable(BNBinaryView* view, uint64_t addr, bool blacklist);
@@ -5399,6 +5453,7 @@ extern "C"
 
 	// Activity
 	BINARYNINJACOREAPI BNActivity* BNCreateActivity(const char* configuration, void* ctxt, void (*action)(void*, BNAnalysisContext*));
+	BINARYNINJACOREAPI BNActivity* BNCreateActivityWithEligibility(const char* configuration, void* ctxt, void (*action)(void*, BNAnalysisContext*), bool (*eligibilityHandler)(void*, BNActivity*, BNAnalysisContext*));
 	BINARYNINJACOREAPI BNActivity* BNNewActivityReference(BNActivity* activity);
 	BINARYNINJACOREAPI void BNFreeActivity(BNActivity* activity);
 
@@ -5452,6 +5507,9 @@ extern "C"
 
 	// Disassembly settings
 	BINARYNINJACOREAPI BNDisassemblySettings* BNCreateDisassemblySettings(void);
+	BINARYNINJACOREAPI BNDisassemblySettings* BNDefaultDisassemblySettings(void);
+	BINARYNINJACOREAPI BNDisassemblySettings* BNDefaultGraphDisassemblySettings(void);
+	BINARYNINJACOREAPI BNDisassemblySettings* BNDefaultLinearDisassemblySettings(void);
 	BINARYNINJACOREAPI BNDisassemblySettings* BNNewDisassemblySettingsReference(BNDisassemblySettings* settings);
 	BINARYNINJACOREAPI BNDisassemblySettings* BNDuplicateDisassemblySettings(BNDisassemblySettings* settings);
 	BINARYNINJACOREAPI void BNFreeDisassemblySettings(BNDisassemblySettings* settings);
@@ -5520,13 +5578,20 @@ extern "C"
 	BINARYNINJACOREAPI BNFlowGraphNode** BNGetFlowGraphNodesInRegion(
 	    BNFlowGraph* graph, int left, int top, int right, int bottom, size_t* count);
 	BINARYNINJACOREAPI void BNFreeFlowGraphNodeList(BNFlowGraphNode** nodes, size_t count);
+	BINARYNINJACOREAPI size_t BNGetFlowGraphNodeCount(BNFlowGraph* graph);
 	BINARYNINJACOREAPI bool BNFlowGraphHasNodes(BNFlowGraph* graph);
 	BINARYNINJACOREAPI size_t BNAddFlowGraphNode(BNFlowGraph* graph, BNFlowGraphNode* node);
+	BINARYNINJACOREAPI void BNReplaceFlowGraphNode(BNFlowGraph* graph, size_t i, BNFlowGraphNode* newNode);
+	BINARYNINJACOREAPI void BNClearFlowGraphNodes(BNFlowGraph* graph);
 
 	BINARYNINJACOREAPI int BNGetFlowGraphWidth(BNFlowGraph* graph);
 	BINARYNINJACOREAPI int BNGetFlowGraphHeight(BNFlowGraph* graph);
 	BINARYNINJACOREAPI void BNFlowGraphSetWidth(BNFlowGraph* graph, int width);
 	BINARYNINJACOREAPI void BNFlowGraphSetHeight(BNFlowGraph* graph, int height);
+
+	BINARYNINJACOREAPI BNRenderLayer** BNGetFlowGraphRenderLayers(BNFlowGraph* graph, size_t* count);
+	BINARYNINJACOREAPI void BNAddFlowGraphRenderLayer(BNFlowGraph* graph, BNRenderLayer* layer);
+	BINARYNINJACOREAPI void BNRemoveFlowGraphRenderLayer(BNFlowGraph* graph, BNRenderLayer* layer);
 
 	BINARYNINJACOREAPI BNFlowGraphNode* BNCreateFlowGraphNode(BNFlowGraph* graph);
 	BINARYNINJACOREAPI BNFlowGraphNode* BNNewFlowGraphNodeReference(BNFlowGraphNode* node);
@@ -6142,15 +6207,19 @@ extern "C"
 		BNLanguageRepresentationFunctionType* type, BNBinaryView* view);
 	BINARYNINJACOREAPI BNTypePrinter* BNGetLanguageRepresentationFunctionTypePrinter(BNLanguageRepresentationFunctionType* type);
 	BINARYNINJACOREAPI BNTypeParser* BNGetLanguageRepresentationFunctionTypeParser(BNLanguageRepresentationFunctionType* type);
+	BINARYNINJACOREAPI BNLineFormatter* BNGetLanguageRepresentationFunctionTypeLineFormatter(
+		BNLanguageRepresentationFunctionType* type);
 	BINARYNINJACOREAPI BNDisassemblyTextLine* BNGetLanguageRepresentationFunctionTypeFunctionTypeTokens(
 		BNLanguageRepresentationFunctionType* type, BNFunction* func, BNDisassemblySettings* settings, size_t* count);
 
 	BINARYNINJACOREAPI BNLanguageRepresentationFunction* BNCreateCustomLanguageRepresentationFunction(
-		BNArchitecture* arch, BNFunction* func, BNHighLevelILFunction* highLevelIL,
-		BNCustomLanguageRepresentationFunction* callbacks);
+		BNLanguageRepresentationFunctionType* type, BNArchitecture* arch, BNFunction* func,
+		BNHighLevelILFunction* highLevelIL, BNCustomLanguageRepresentationFunction* callbacks);
 	BINARYNINJACOREAPI BNLanguageRepresentationFunction* BNNewLanguageRepresentationFunctionReference(
 		BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI void BNFreeLanguageRepresentationFunction(BNLanguageRepresentationFunction* func);
+	BINARYNINJACOREAPI BNLanguageRepresentationFunctionType* BNGetLanguageRepresentationType(
+		BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI BNArchitecture* BNGetLanguageRepresentationArchitecture(BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI BNFunction* BNGetLanguageRepresentationOwnerFunction(BNLanguageRepresentationFunction* func);
 	BINARYNINJACOREAPI BNHighLevelILFunction* BNGetLanguageRepresentationILFunction(BNLanguageRepresentationFunction* func);
@@ -6513,6 +6582,8 @@ extern "C"
 	BINARYNINJACOREAPI BNBinaryView* BNLoadFilename(const char* const filename, const bool updateAnalysis, const char* options, BNProgressFunction progress, void* progressContext);
 	BINARYNINJACOREAPI BNBinaryView* BNLoadProjectFile(BNProjectFile* projectFile, const bool updateAnalysis, const char* options, BNProgressFunction progress, void* progressContext);
 	BINARYNINJACOREAPI BNBinaryView* BNLoadBinaryView(BNBinaryView* view, const bool updateAnalysis, const char* options, BNProgressFunction progress, void* progressContext);
+
+	BINARYNINJACOREAPI BNBinaryView* BNParseTextFormat(const char* filename);
 
 	BINARYNINJACOREAPI BNExternalLibrary* BNBinaryViewAddExternalLibrary(BNBinaryView* view, const char* name, BNProjectFile* backingFile, bool isAuto);
 	BINARYNINJACOREAPI void BNBinaryViewRemoveExternalLibrary(BNBinaryView* view, const char* name);
@@ -8037,12 +8108,63 @@ extern "C"
 	BINARYNINJACOREAPI int BNFirmwareNinjaQueryBoardDevices(BNFirmwareNinja* fn, BNArchitecture* arch, const char* board, BNFirmwareNinjaDevice** devices);
 	BINARYNINJACOREAPI int BNFirmwareNinjaFindSectionsWithEntropy(BNFirmwareNinja* fn, BNFirmwareNinjaSection** sections, float highCodeEntropyThreshold, float lowCodeEntropyThreshold, size_t blockSize, BNFirmwareNinjaSectionAnalysisMode mode);
 	BINARYNINJACOREAPI void BNFirmwareNinjaFreeSections(BNFirmwareNinjaSection *sections, int size);
-	BINARYNINJACOREAPI int BNFirmwareNinjaGetFunctionMemoryAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** mmio, BNProgressFunction progress, void* progressContext);
-	BINARYNINJACOREAPI void BNFirmwareNinjaFreeFunctionMemoryAccesses(BNFirmwareNinjaFunctionMemoryAccesses **mmio, int size);
-	BINARYNINJACOREAPI void BNFirmwareNinjaStoreFunctionMemoryAccessesToMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** mmio, int size);
-	BINARYNINJACOREAPI int BNFirmwareNinjaQueryFunctionMemoryAccessesFromMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** mmio);
-	BINARYNINJACOREAPI int BNFirmwareNinjaGetBoardDeviceAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** mmio, int size, BNFirmwareNinjaDeviceAccesses** accesses, BNArchitecture* arch);
+	BINARYNINJACOREAPI int BNFirmwareNinjaGetFunctionMemoryAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** fma, BNProgressFunction progress, void* progressContext);
+	BINARYNINJACOREAPI void BNFirmwareNinjaFreeFunctionMemoryAccesses(BNFirmwareNinjaFunctionMemoryAccesses **fma, int size);
+	BINARYNINJACOREAPI void BNFirmwareNinjaStoreFunctionMemoryAccessesToMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** fma, int size);
+	BINARYNINJACOREAPI int BNFirmwareNinjaQueryFunctionMemoryAccessesFromMetadata(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses*** fma);
+	BINARYNINJACOREAPI int BNFirmwareNinjaGetBoardDeviceAccesses(BNFirmwareNinja* fn, BNFirmwareNinjaFunctionMemoryAccesses** fma, int size, BNFirmwareNinjaDeviceAccesses** accesses, BNArchitecture* arch);
 	BINARYNINJACOREAPI void BNFirmwareNinjaFreeBoardDeviceAccesses(BNFirmwareNinjaDeviceAccesses *accesses, int size);
+	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode* BNFirmwareNinjaGetMemoryRegionReferenceTree(BNFirmwareNinja* fn, uint64_t start, uint64_t end, BNFirmwareNinjaFunctionMemoryAccesses** fma, int size, uint64_t* value);
+	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode* BNFirmwareNinjaGetAddressReferenceTree(BNFirmwareNinja* fn, uint64_t address, BNFirmwareNinjaFunctionMemoryAccesses** fma, int size, uint64_t* value);
+
+	BINARYNINJACOREAPI bool BNFirmwareNinjaReferenceNodeIsFunction(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI bool BNFirmwareNinjaReferenceNodeIsDataVariable(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI bool BNFirmwareNinjaReferenceNodeHasChildren(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI BNFunction* BNFirmwareNinjaReferenceNodeGetFunction(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI BNDataVariable* BNFirmwareNinjaReferenceNodeGetDataVariable(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode** BNFirmwareNinjaReferenceNodeGetChildren(BNFirmwareNinjaReferenceNode* parent, size_t* count);
+	BINARYNINJACOREAPI void BNFreeFirmwareNinjaReferenceNode(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI BNFirmwareNinjaReferenceNode* BNNewFirmwareNinjaReferenceNodeReference(BNFirmwareNinjaReferenceNode* node);
+	BINARYNINJACOREAPI void BNFreeFirmwareNinjaReferenceNodes(BNFirmwareNinjaReferenceNode** nodes, size_t count);
+
+	// Line formatters
+	BINARYNINJACOREAPI BNLineFormatter* BNRegisterLineFormatter(const char* name, BNCustomLineFormatter* callbacks);
+	BINARYNINJACOREAPI BNLineFormatter** BNGetLineFormatterList(size_t* count);
+	BINARYNINJACOREAPI void BNFreeLineFormatterList(BNLineFormatter** formatters);
+	BINARYNINJACOREAPI BNLineFormatter* BNGetLineFormatterByName(const char* name);
+	BINARYNINJACOREAPI BNLineFormatter* BNGetDefaultLineFormatter();
+
+	BINARYNINJACOREAPI char* BNGetLineFormatterName(BNLineFormatter* formatter);
+
+	BINARYNINJACOREAPI BNDisassemblyTextLine* BNFormatLines(BNLineFormatter* formatter, BNDisassemblyTextLine* inLines,
+		size_t inCount, const BNLineFormatterSettings* settings, size_t* outCount);
+
+	BINARYNINJACOREAPI BNLineFormatterSettings* BNGetDefaultLineFormatterSettings(
+		BNDisassemblySettings* settings, BNHighLevelILFunction* func);
+	BINARYNINJACOREAPI BNLineFormatterSettings* BNGetLanguageRepresentationLineFormatterSettings(
+		BNDisassemblySettings* settings, BNLanguageRepresentationFunction* func);
+	BINARYNINJACOREAPI void BNFreeLineFormatterSettings(BNLineFormatterSettings* settings);
+
+	// Render Layers
+	BINARYNINJACOREAPI BNRenderLayer* BNRegisterRenderLayer(const char* name, BNRenderLayerCallbacks* callbacks, BNRenderLayerDefaultEnableState enableState);
+	BINARYNINJACOREAPI BNRenderLayer** BNGetRenderLayerList(size_t* count);
+	BINARYNINJACOREAPI void BNFreeRenderLayerList(BNRenderLayer** renderLayers);
+	BINARYNINJACOREAPI BNRenderLayer* BNGetRenderLayerByName(const char* name);
+	BINARYNINJACOREAPI char* BNGetRenderLayerName(BNRenderLayer* renderLayer);
+	BINARYNINJACOREAPI BNRenderLayerDefaultEnableState BNGetRenderLayerDefaultEnableState(BNRenderLayer* renderLayer);
+
+	BINARYNINJACOREAPI void BNApplyRenderLayerToFlowGraph(BNRenderLayer* renderLayer, BNFlowGraph* graph);
+	BINARYNINJACOREAPI void BNApplyRenderLayerToLinearViewObject(
+		BNRenderLayer* renderLayer,
+		BNLinearViewObject* obj,
+		BNLinearViewObject* prev,
+		BNLinearViewObject* next,
+		BNLinearDisassemblyLine* inLines,
+		size_t inLineCount,
+		BNLinearDisassemblyLine** outLines,
+		size_t* outLineCount
+	);
+
 #ifdef __cplusplus
 }
 #endif

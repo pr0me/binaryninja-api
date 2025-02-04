@@ -23,10 +23,9 @@ namespace SharedCacheCore {
 		DSCViewStateLoadedWithImages,
 	};
 
-
 	const std::string SharedCacheMetadataTag = "SHAREDCACHE-SharedCacheData";
 
-	struct MemoryRegion : public MetadataSerializable
+	struct MemoryRegion : public MetadataSerializable<MemoryRegion>
 	{
 		std::string prettyName;
 		uint64_t start;
@@ -36,7 +35,7 @@ namespace SharedCacheCore {
 		bool headerInitialized = false;
 		BNSegmentFlag flags;
 
-		void Store() override
+		void Store(SerializationContext& context) const
 		{
 			MSS(prettyName);
 			MSS(start);
@@ -46,7 +45,7 @@ namespace SharedCacheCore {
 			MSS_CAST(flags, uint64_t);
 		}
 
-		void Load() override
+		void Load(DeserializationContext& context)
 		{
 			MSL(prettyName);
 			MSL(start);
@@ -57,30 +56,30 @@ namespace SharedCacheCore {
 		}
 	};
 
-	struct CacheImage : public MetadataSerializable
+	struct CacheImage : public MetadataSerializable<CacheImage>
 	{
 		std::string installName;
 		uint64_t headerLocation;
 		std::vector<MemoryRegion> regions;
 
-		void Store() override
+		void Store(SerializationContext& context) const
 		{
 			MSS(installName);
 			MSS(headerLocation);
-			rapidjson::Value key("regions", m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
+			Serialize(context, "regions");
+			context.writer.StartArray();
 			for (auto& region : regions)
 			{
-				bArr.PushBack(rapidjson::Value(region.AsString().c_str(), m_activeContext.allocator), m_activeContext.allocator);
+				Serialize(context, region.AsString());
 			}
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
+			context.writer.EndArray();
 		}
 
-		void Load() override
+		void Load(DeserializationContext& context)
 		{
 			MSL(installName);
 			MSL(headerLocation);
-			auto bArr = m_activeDeserContext.doc["regions"].GetArray();
+			auto bArr = context.doc["regions"].GetArray();
 			regions.clear();
 			for (auto& region : bArr)
 			{
@@ -88,26 +87,6 @@ namespace SharedCacheCore {
 				r.LoadFromString(region.GetString());
 				regions.push_back(r);
 			}
-		}
-	};
-
-	struct BackingCache : public MetadataSerializable
-	{
-		std::string path;
-		bool isPrimary = false;
-		std::vector<std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> mappings;
-
-		void Store() override
-		{
-			MSS(path);
-			MSS(isPrimary);
-			MSS(mappings);
-		}
-		void Load() override
-		{
-			MSL(path);
-			MSL(isPrimary);
-			MSL(mappings);
 		}
 	};
 
@@ -132,10 +111,36 @@ namespace SharedCacheCore {
 		uint32_t initProt;
 	};
 
+	struct BackingCache : public MetadataSerializable<BackingCache>
+	{
+		std::string path;
+		bool isPrimary = false;
+		std::vector<dyld_cache_mapping_info> mappings;
+
+		void Store(SerializationContext& context) const;
+		void Load(DeserializationContext& context);
+	};
+
 	struct LoadedMapping
 	{
 		std::shared_ptr<MMappedFileAccessor> backingFile;
 		dyld_cache_mapping_info mappingInfo;
+	};
+
+	struct dyld_cache_slide_info
+	{
+		uint32_t    version;
+		uint32_t    toc_offset;
+		uint32_t    toc_count;
+		uint32_t    entries_offset;
+		uint32_t    entries_count;
+		uint32_t    entries_size;
+		// uint16_t toc[toc_count];
+		// entrybitmap entries[entries_count];
+	};
+
+	struct dyld_cache_slide_info_entry {
+		uint8_t  bits[4096/(8*4)]; // 128-byte bitmap
 	};
 
 	struct PACKED_STRUCT dyld_cache_mapping_and_slide_info
@@ -161,6 +166,11 @@ namespace SharedCacheCore {
 		uint64_t delta_mask;
 		uint64_t value_add;
 	};
+	#define DYLD_CACHE_SLIDE_PAGE_ATTR_EXTRA           0x8000  // index is into extras array (not starts array)
+	#define DYLD_CACHE_SLIDE_PAGE_ATTR_NO_REBASE       0x4000  // page has no rebasing
+	#define DYLD_CACHE_SLIDE_PAGE_ATTR_END             0x8000  // last chain entry for page
+
+	#define DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE    0xFFFF    // page has no rebasing
 
 	struct PACKED_STRUCT dyld_cache_slide_info_v3
 	{
@@ -202,6 +212,7 @@ namespace SharedCacheCore {
 		uint32_t    version;            // currently 5
 		uint32_t    page_size;          // currently 4096 (may also be 16384)
 		uint32_t    page_starts_count;
+		uint32_t    pad;                // padding to ensure the value below is on an 8-byte boundary
 		uint64_t    value_add;
 		// uint16_t    page_starts[/* page_starts_count */];
 	};
@@ -267,74 +278,84 @@ namespace SharedCacheCore {
 
 	struct PACKED_STRUCT dyld_cache_header
 	{
-		char magic[16];					 // e.g. "dyld_v0    i386"
-		uint32_t mappingOffset;			 // file offset to first dyld_cache_mapping_info
-		uint32_t mappingCount;			 // number of dyld_cache_mapping_info entries
-		uint32_t imagesOffsetOld;		 // UNUSED: moved to imagesOffset to prevent older dsc_extarctors from crashing
-		uint32_t imagesCountOld;		 // UNUSED: moved to imagesCount to prevent older dsc_extarctors from crashing
-		uint64_t dyldBaseAddress;		 // base address of dyld when cache was built
-		uint64_t codeSignatureOffset;	 // file offset of code signature blob
-		uint64_t codeSignatureSize;		 // size of code signature blob (zero means to end of file)
-		uint64_t slideInfoOffsetUnused;	 // unused.  Used to be file offset of kernel slid info
-		uint64_t slideInfoSizeUnused;	 // unused.  Used to be size of kernel slid info
-		uint64_t localSymbolsOffset;	 // file offset of where local symbols are stored
-		uint64_t localSymbolsSize;		 // size of local symbols information
-		uint8_t uuid[16];				 // unique value for each shared cache file
-		uint64_t cacheType;				 // 0 for development, 1 for production // Kat: , 2 for iOS 16?
-		uint32_t branchPoolsOffset;		 // file offset to table of uint64_t pool addresses
-		uint32_t branchPoolsCount;		 // number of uint64_t entries
-		uint64_t accelerateInfoAddr;	 // (unslid) address of optimization info
-		uint64_t accelerateInfoSize;	 // size of optimization info
-		uint64_t imagesTextOffset;		 // file offset to first dyld_cache_image_text_info
-		uint64_t imagesTextCount;		 // number of dyld_cache_image_text_info entries
-		uint64_t patchInfoAddr;			 // (unslid) address of dyld_cache_patch_info
-		uint64_t patchInfoSize;	 // Size of all of the patch information pointed to via the dyld_cache_patch_info
-		uint64_t otherImageGroupAddrUnused;	 // unused
-		uint64_t otherImageGroupSizeUnused;	 // unused
-		uint64_t progClosuresAddr;			 // (unslid) address of list of program launch closures
-		uint64_t progClosuresSize;			 // size of list of program launch closures
-		uint64_t progClosuresTrieAddr;		 // (unslid) address of trie of indexes into program launch closures
-		uint64_t progClosuresTrieSize;		 // size of trie of indexes into program launch closures
-		uint32_t platform;					 // platform number (macOS=1, etc)
-		uint32_t formatVersion : 8,			 // dyld3::closure::kFormatVersion
-			dylibsExpectedOnDisk : 1,  // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
-			simulator : 1,			   // for simulator of specified platform
-			locallyBuiltCache : 1,	   // 0 for B&I built cache, 1 for locally built cache
-			builtFromChainedFixups : 1,	 // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
-			padding : 20;				 // TBD
-		uint64_t sharedRegionStart;		 // base load address of cache if not slid
-		uint64_t sharedRegionSize;		 // overall size required to map the cache and all subCaches, if any
-		uint64_t maxSlide;				 // runtime slide of cache can be between zero and this value
-		uint64_t dylibsImageArrayAddr;	 // (unslid) address of ImageArray for dylibs in this cache
-		uint64_t dylibsImageArraySize;	 // size of ImageArray for dylibs in this cache
-		uint64_t dylibsTrieAddr;		 // (unslid) address of trie of indexes of all cached dylibs
-		uint64_t dylibsTrieSize;		 // size of trie of cached dylib paths
-		uint64_t otherImageArrayAddr;	 // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
-		uint64_t otherImageArraySize;	 // size of ImageArray for dylibs and bundles with dlopen closures
-		uint64_t otherTrieAddr;	 // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
-		uint64_t otherTrieSize;	 // size of trie of dylibs and bundles with dlopen closures
-		uint32_t mappingWithSlideOffset;		 // file offset to first dyld_cache_mapping_and_slide_info
-		uint32_t mappingWithSlideCount;			 // number of dyld_cache_mapping_and_slide_info entries
-		uint64_t dylibsPBLStateArrayAddrUnused;	 // unused
-		uint64_t dylibsPBLSetAddr;				 // (unslid) address of PrebuiltLoaderSet of all cached dylibs
-		uint64_t programsPBLSetPoolAddr;		 // (unslid) address of pool of PrebuiltLoaderSet for each program
-		uint64_t programsPBLSetPoolSize;		 // size of pool of PrebuiltLoaderSet for each program
-		uint64_t programTrieAddr;				 // (unslid) address of trie mapping program path to PrebuiltLoaderSet
-		uint32_t programTrieSize;
-		uint32_t osVersion;				// OS Version of dylibs in this cache for the main platform
-		uint32_t altPlatform;			// e.g. iOSMac on macOS
-		uint32_t altOsVersion;			// e.g. 14.0 for iOSMac
-		uint64_t swiftOptsOffset;		// file offset to Swift optimizations header
-		uint64_t swiftOptsSize;			// size of Swift optimizations header
-		uint32_t subCacheArrayOffset;	// file offset to first dyld_subcache_entry
-		uint32_t subCacheArrayCount;	// number of subCache entries
-		uint8_t symbolFileUUID[16];		// unique value for the shared cache file containing unmapped local symbols
-		uint64_t rosettaReadOnlyAddr;	// (unslid) address of the start of where Rosetta can add read-only/executable data
-		uint64_t rosettaReadOnlySize;	// maximum size of the Rosetta read-only/executable region
-		uint64_t rosettaReadWriteAddr;	// (unslid) address of the start of where Rosetta can add read-write data
-		uint64_t rosettaReadWriteSize;	// maximum size of the Rosetta read-write region
-		uint32_t imagesOffset;			// file offset to first dyld_cache_image_info
-		uint32_t imagesCount;			// number of dyld_cache_image_info entries
+		char        magic[16];              // e.g. "dyld_v0    i386"
+		uint32_t    mappingOffset;          // file offset to first dyld_cache_mapping_info
+		uint32_t    mappingCount;           // number of dyld_cache_mapping_info entries
+		uint32_t    imagesOffsetOld;        // UNUSED: moved to imagesOffset to prevent older dsc_extarctors from crashing
+		uint32_t    imagesCountOld;         // UNUSED: moved to imagesCount to prevent older dsc_extarctors from crashing
+		uint64_t    dyldBaseAddress;        // base address of dyld when cache was built
+		uint64_t    codeSignatureOffset;    // file offset of code signature blob
+		uint64_t    codeSignatureSize;      // size of code signature blob (zero means to end of file)
+		uint64_t    slideInfoOffsetUnused;  // unused.  Used to be file offset of kernel slid info
+		uint64_t    slideInfoSizeUnused;    // unused.  Used to be size of kernel slid info
+		uint64_t    localSymbolsOffset;     // file offset of where local symbols are stored
+		uint64_t    localSymbolsSize;       // size of local symbols information
+		uint8_t     uuid[16];               // unique value for each shared cache file
+		uint64_t    cacheType;              // 0 for development, 1 for production, 2 for multi-cache
+		uint32_t    branchPoolsOffset;      // file offset to table of uint64_t pool addresses
+		uint32_t    branchPoolsCount;       // number of uint64_t entries
+		uint64_t    dyldInCacheMH;          // (unslid) address of mach_header of dyld in cache
+		uint64_t    dyldInCacheEntry;       // (unslid) address of entry point (_dyld_start) of dyld in cache
+		uint64_t    imagesTextOffset;       // file offset to first dyld_cache_image_text_info
+		uint64_t    imagesTextCount;        // number of dyld_cache_image_text_info entries
+		uint64_t    patchInfoAddr;          // (unslid) address of dyld_cache_patch_info
+		uint64_t    patchInfoSize;          // Size of all of the patch information pointed to via the dyld_cache_patch_info
+		uint64_t    otherImageGroupAddrUnused;    // unused
+		uint64_t    otherImageGroupSizeUnused;    // unused
+		uint64_t    progClosuresAddr;       // (unslid) address of list of program launch closures
+		uint64_t    progClosuresSize;       // size of list of program launch closures
+		uint64_t    progClosuresTrieAddr;   // (unslid) address of trie of indexes into program launch closures
+		uint64_t    progClosuresTrieSize;   // size of trie of indexes into program launch closures
+		uint32_t    platform;               // platform number (macOS=1, etc)
+		uint32_t    formatVersion          : 8,  // dyld3::closure::kFormatVersion
+					dylibsExpectedOnDisk   : 1,  // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
+					simulator              : 1,  // for simulator of specified platform
+					locallyBuiltCache      : 1,  // 0 for B&I built cache, 1 for locally built cache
+					builtFromChainedFixups : 1,  // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
+					padding                : 20; // TBD
+		uint64_t    sharedRegionStart;      // base load address of cache if not slid
+		uint64_t    sharedRegionSize;       // overall size required to map the cache and all subCaches, if any
+		uint64_t    maxSlide;               // runtime slide of cache can be between zero and this value
+		uint64_t    dylibsImageArrayAddr;   // (unslid) address of ImageArray for dylibs in this cache
+		uint64_t    dylibsImageArraySize;   // size of ImageArray for dylibs in this cache
+		uint64_t    dylibsTrieAddr;         // (unslid) address of trie of indexes of all cached dylibs
+		uint64_t    dylibsTrieSize;         // size of trie of cached dylib paths
+		uint64_t    otherImageArrayAddr;    // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
+		uint64_t    otherImageArraySize;    // size of ImageArray for dylibs and bundles with dlopen closures
+		uint64_t    otherTrieAddr;          // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
+		uint64_t    otherTrieSize;          // size of trie of dylibs and bundles with dlopen closures
+		uint32_t    mappingWithSlideOffset; // file offset to first dyld_cache_mapping_and_slide_info
+		uint32_t    mappingWithSlideCount;  // number of dyld_cache_mapping_and_slide_info entries
+		uint64_t    dylibsPBLStateArrayAddrUnused;    // unused
+		uint64_t    dylibsPBLSetAddr;           // (unslid) address of PrebuiltLoaderSet of all cached dylibs
+		uint64_t    programsPBLSetPoolAddr;     // (unslid) address of pool of PrebuiltLoaderSet for each program 
+		uint64_t    programsPBLSetPoolSize;     // size of pool of PrebuiltLoaderSet for each program
+		uint64_t    programTrieAddr;            // (unslid) address of trie mapping program path to PrebuiltLoaderSet
+		uint32_t    programTrieSize;
+		uint32_t    osVersion;                  // OS Version of dylibs in this cache for the main platform
+		uint32_t    altPlatform;                // e.g. iOSMac on macOS
+		uint32_t    altOsVersion;               // e.g. 14.0 for iOSMac
+		uint64_t    swiftOptsOffset;        // VM offset from cache_header* to Swift optimizations header
+		uint64_t    swiftOptsSize;          // size of Swift optimizations header
+		uint32_t    subCacheArrayOffset;    // file offset to first dyld_subcache_entry
+		uint32_t    subCacheArrayCount;     // number of subCache entries
+		uint8_t     symbolFileUUID[16];     // unique value for the shared cache file containing unmapped local symbols
+		uint64_t    rosettaReadOnlyAddr;    // (unslid) address of the start of where Rosetta can add read-only/executable data
+		uint64_t    rosettaReadOnlySize;    // maximum size of the Rosetta read-only/executable region
+		uint64_t    rosettaReadWriteAddr;   // (unslid) address of the start of where Rosetta can add read-write data
+		uint64_t    rosettaReadWriteSize;   // maximum size of the Rosetta read-write region
+		uint32_t    imagesOffset;           // file offset to first dyld_cache_image_info
+		uint32_t    imagesCount;            // number of dyld_cache_image_info entries
+		uint32_t    cacheSubType;           // 0 for development, 1 for production, when cacheType is multi-cache(2)
+		uint32_t    padding2;
+		uint64_t    objcOptsOffset;         // VM offset from cache_header* to ObjC optimizations header
+		uint64_t    objcOptsSize;           // size of ObjC optimizations header
+		uint64_t    cacheAtlasOffset;       // VM offset from cache_header* to embedded cache atlas for process introspection
+		uint64_t    cacheAtlasSize;         // size of embedded cache atlas
+		uint64_t    dynamicDataOffset;      // VM offset from cache_header* to the location of dyld_cache_dynamic_data_header
+		uint64_t    dynamicDataMaxSize;     // maximum size of space reserved from dynamic data
+		uint32_t    tproMappingsOffset;     // file offset to first dyld_cache_tpro_mapping_info
+		uint32_t    tproMappingsCount;      // number of dyld_cache_tpro_mapping_info entries
 	};
 
 	struct PACKED_STRUCT dyld_subcache_entry
@@ -350,6 +371,18 @@ namespace SharedCacheCore {
 		char fileExtension[32];
 	};
 
+	struct ObjCOptimizationHeader
+	{
+		uint32_t version;
+		uint32_t flags;
+		uint64_t headerInfoROCacheOffset;
+		uint64_t headerInfoRWCacheOffset;
+		uint64_t selectorHashTableCacheOffset;
+		uint64_t classHashTableCacheOffset;
+		uint64_t protocolHashTableCacheOffset;
+		uint64_t relativeMethodSelectorBaseAddressOffset;
+	};
+
 	#if defined(_MSC_VER)
 		#pragma pack(pop)
 	#else
@@ -357,7 +390,7 @@ namespace SharedCacheCore {
 	#endif
 
 	using namespace BinaryNinja;
-	struct SharedCacheMachOHeader : public MetadataSerializable
+	struct SharedCacheMachOHeader : public MetadataSerializable<SharedCacheMachOHeader>
 	{
 		uint64_t textBase = 0;
 		uint64_t loadCommandOffset = 0;
@@ -402,419 +435,8 @@ namespace SharedCacheCore {
 		bool routinesPresent = false;
 		bool functionStartsPresent = false;
 		bool relocatable = false;
-		void Serialize(const std::string& name, mach_header_64 b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			bArr.PushBack(b.magic, m_activeContext.allocator);
-			bArr.PushBack(b.cputype, m_activeContext.allocator);
-			bArr.PushBack(b.cpusubtype, m_activeContext.allocator);
-			bArr.PushBack(b.filetype, m_activeContext.allocator);
-			bArr.PushBack(b.ncmds, m_activeContext.allocator);
-			bArr.PushBack(b.sizeofcmds, m_activeContext.allocator);
-			bArr.PushBack(b.flags, m_activeContext.allocator);
-			bArr.PushBack(b.reserved, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
 
-		void Deserialize(const std::string& name, mach_header_64& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			b.magic = bArr[0].GetUint();
-			b.cputype = bArr[1].GetUint();
-			b.cpusubtype = bArr[2].GetUint();
-			b.filetype = bArr[3].GetUint();
-			b.ncmds = bArr[4].GetUint();
-			b.sizeofcmds = bArr[5].GetUint();
-			b.flags = bArr[6].GetUint();
-			b.reserved = bArr[7].GetUint();
-		}
-
-		void Serialize(const std::string& name, symtab_command b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			bArr.PushBack(b.cmd, m_activeContext.allocator);
-			bArr.PushBack(b.cmdsize, m_activeContext.allocator);
-			bArr.PushBack(b.symoff, m_activeContext.allocator);
-			bArr.PushBack(b.nsyms, m_activeContext.allocator);
-			bArr.PushBack(b.stroff, m_activeContext.allocator);
-			bArr.PushBack(b.strsize, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, symtab_command& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			b.cmd = bArr[0].GetUint();
-			b.cmdsize = bArr[1].GetUint();
-			b.symoff = bArr[2].GetUint();
-			b.nsyms = bArr[3].GetUint();
-			b.stroff = bArr[4].GetUint();
-			b.strsize = bArr[5].GetUint();
-		}
-
-		void Serialize(const std::string& name, dysymtab_command b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			bArr.PushBack(b.cmd, m_activeContext.allocator);
-			bArr.PushBack(b.cmdsize, m_activeContext.allocator);
-			bArr.PushBack(b.ilocalsym, m_activeContext.allocator);
-			bArr.PushBack(b.nlocalsym, m_activeContext.allocator);
-			bArr.PushBack(b.iextdefsym, m_activeContext.allocator);
-			bArr.PushBack(b.nextdefsym, m_activeContext.allocator);
-			bArr.PushBack(b.iundefsym, m_activeContext.allocator);
-			bArr.PushBack(b.nundefsym, m_activeContext.allocator);
-			bArr.PushBack(b.tocoff, m_activeContext.allocator);
-			bArr.PushBack(b.ntoc, m_activeContext.allocator);
-			bArr.PushBack(b.modtaboff, m_activeContext.allocator);
-			bArr.PushBack(b.nmodtab, m_activeContext.allocator);
-			bArr.PushBack(b.extrefsymoff, m_activeContext.allocator);
-			bArr.PushBack(b.nextrefsyms, m_activeContext.allocator);
-			bArr.PushBack(b.indirectsymoff, m_activeContext.allocator);
-			bArr.PushBack(b.nindirectsyms, m_activeContext.allocator);
-			bArr.PushBack(b.extreloff, m_activeContext.allocator);
-			bArr.PushBack(b.nextrel, m_activeContext.allocator);
-			bArr.PushBack(b.locreloff, m_activeContext.allocator);
-			bArr.PushBack(b.nlocrel, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, dysymtab_command& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			b.cmd = bArr[0].GetUint();
-			b.cmdsize = bArr[1].GetUint();
-			b.ilocalsym = bArr[2].GetUint();
-			b.nlocalsym = bArr[3].GetUint();
-			b.iextdefsym = bArr[4].GetUint();
-			b.nextdefsym = bArr[5].GetUint();
-			b.iundefsym = bArr[6].GetUint();
-			b.nundefsym = bArr[7].GetUint();
-			b.tocoff = bArr[8].GetUint();
-			b.ntoc = bArr[9].GetUint();
-			b.modtaboff = bArr[10].GetUint();
-			b.nmodtab = bArr[11].GetUint();
-			b.extrefsymoff = bArr[12].GetUint();
-			b.nextrefsyms = bArr[13].GetUint();
-			b.indirectsymoff = bArr[14].GetUint();
-			b.nindirectsyms = bArr[15].GetUint();
-			b.extreloff = bArr[16].GetUint();
-			b.nextrel = bArr[17].GetUint();
-			b.locreloff = bArr[18].GetUint();
-			b.nlocrel = bArr[19].GetUint();
-		}
-
-		void Serialize(const std::string& name, dyld_info_command b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			bArr.PushBack(b.cmd, m_activeContext.allocator);
-			bArr.PushBack(b.cmdsize, m_activeContext.allocator);
-			bArr.PushBack(b.rebase_off, m_activeContext.allocator);
-			bArr.PushBack(b.rebase_size, m_activeContext.allocator);
-			bArr.PushBack(b.bind_off, m_activeContext.allocator);
-			bArr.PushBack(b.bind_size, m_activeContext.allocator);
-			bArr.PushBack(b.weak_bind_off, m_activeContext.allocator);
-			bArr.PushBack(b.weak_bind_size, m_activeContext.allocator);
-			bArr.PushBack(b.lazy_bind_off, m_activeContext.allocator);
-			bArr.PushBack(b.lazy_bind_size, m_activeContext.allocator);
-			bArr.PushBack(b.export_off, m_activeContext.allocator);
-			bArr.PushBack(b.export_size, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, dyld_info_command& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			b.cmd = bArr[0].GetUint();
-			b.cmdsize = bArr[1].GetUint();
-			b.rebase_off = bArr[2].GetUint();
-			b.rebase_size = bArr[3].GetUint();
-			b.bind_off = bArr[4].GetUint();
-			b.bind_size = bArr[5].GetUint();
-			b.weak_bind_off = bArr[6].GetUint();
-			b.weak_bind_size = bArr[7].GetUint();
-			b.lazy_bind_off = bArr[8].GetUint();
-			b.lazy_bind_size = bArr[9].GetUint();
-			b.export_off = bArr[10].GetUint();
-			b.export_size = bArr[11].GetUint();
-		}
-
-		void Serialize(const std::string& name, routines_command_64 b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			bArr.PushBack(b.cmd, m_activeContext.allocator);
-			bArr.PushBack(b.cmdsize, m_activeContext.allocator);
-			bArr.PushBack(b.init_address, m_activeContext.allocator);
-			bArr.PushBack(b.init_module, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, routines_command_64& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			b.cmd = bArr[0].GetUint();
-			b.cmdsize = bArr[1].GetUint();
-			b.init_address = bArr[2].GetUint();
-			b.init_module = bArr[3].GetUint();
-		}
-
-		void Serialize(const std::string& name, function_starts_command b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			bArr.PushBack(b.cmd, m_activeContext.allocator);
-			bArr.PushBack(b.cmdsize, m_activeContext.allocator);
-			bArr.PushBack(b.funcoff, m_activeContext.allocator);
-			bArr.PushBack(b.funcsize, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, function_starts_command& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			b.cmd = bArr[0].GetUint();
-			b.cmdsize = bArr[1].GetUint();
-			b.funcoff = bArr[2].GetUint();
-			b.funcsize = bArr[3].GetUint();
-		}
-
-		void Serialize(const std::string& name, std::vector<section_64> b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			for (auto& s : b)
-			{
-				rapidjson::Value sArr(rapidjson::kArrayType);
-				std::string sectNameStr;
-				char sectName[16];
-				memcpy(sectName, s.sectname, 16);
-				sectName[15] = 0;
-				sectNameStr = std::string(sectName);
-				sArr.PushBack(
-					rapidjson::Value(sectNameStr.c_str(), m_activeContext.allocator), m_activeContext.allocator);
-				std::string segNameStr;
-				char segName[16];
-				memcpy(segName, s.segname, 16);
-				segName[15] = 0;
-				segNameStr = std::string(segName);
-				sArr.PushBack(
-					rapidjson::Value(segNameStr.c_str(), m_activeContext.allocator), m_activeContext.allocator);
-				sArr.PushBack(s.addr, m_activeContext.allocator);
-				sArr.PushBack(s.size, m_activeContext.allocator);
-				sArr.PushBack(s.offset, m_activeContext.allocator);
-				sArr.PushBack(s.align, m_activeContext.allocator);
-				sArr.PushBack(s.reloff, m_activeContext.allocator);
-				sArr.PushBack(s.nreloc, m_activeContext.allocator);
-				sArr.PushBack(s.flags, m_activeContext.allocator);
-				sArr.PushBack(s.reserved1, m_activeContext.allocator);
-				sArr.PushBack(s.reserved2, m_activeContext.allocator);
-				sArr.PushBack(s.reserved3, m_activeContext.allocator);
-				bArr.PushBack(sArr, m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, std::vector<section_64>& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			for (auto& s : bArr)
-			{
-				section_64 sec;
-				auto s2 = s.GetArray();
-				std::string sectNameStr = s2[0].GetString();
-				memset(sec.sectname, 0, 16);
-				memcpy(sec.sectname, sectNameStr.c_str(), sectNameStr.size());
-				std::string segNameStr = s2[1].GetString();
-				memset(sec.segname, 0, 16);
-				memcpy(sec.segname, segNameStr.c_str(), segNameStr.size());
-				sec.addr = s2[2].GetUint64();
-				sec.size = s2[3].GetUint64();
-				sec.offset = s2[4].GetUint();
-				sec.align = s2[5].GetUint();
-				sec.reloff = s2[6].GetUint();
-				sec.nreloc = s2[7].GetUint();
-				sec.flags = s2[8].GetUint();
-				sec.reserved1 = s2[9].GetUint();
-				sec.reserved2 = s2[10].GetUint();
-				sec.reserved3 = s2[11].GetUint();
-				b.push_back(sec);
-			}
-		}
-
-		void Serialize(const std::string& name, linkedit_data_command b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			bArr.PushBack(b.cmd, m_activeContext.allocator);
-			bArr.PushBack(b.cmdsize, m_activeContext.allocator);
-			bArr.PushBack(b.dataoff, m_activeContext.allocator);
-			bArr.PushBack(b.datasize, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, linkedit_data_command& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			b.cmd = bArr[0].GetUint();
-			b.cmdsize = bArr[1].GetUint();
-			b.dataoff = bArr[2].GetUint();
-			b.datasize = bArr[3].GetUint();
-		}
-
-		void Serialize(const std::string& name, segment_command_64 b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			std::string segNameStr;
-			char segName[16];
-			memcpy(segName, b.segname, 16);
-			segName[15] = 0;
-			segNameStr = std::string(segName);
-			bArr.PushBack(rapidjson::Value(segNameStr.c_str(), m_activeContext.allocator), m_activeContext.allocator);
-			bArr.PushBack(b.vmaddr, m_activeContext.allocator);
-			bArr.PushBack(b.vmsize, m_activeContext.allocator);
-			bArr.PushBack(b.fileoff, m_activeContext.allocator);
-			bArr.PushBack(b.filesize, m_activeContext.allocator);
-			bArr.PushBack(b.maxprot, m_activeContext.allocator);
-			bArr.PushBack(b.initprot, m_activeContext.allocator);
-			bArr.PushBack(b.nsects, m_activeContext.allocator);
-			bArr.PushBack(b.flags, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, segment_command_64& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			std::string segNameStr = bArr[0].GetString();
-			memset(b.segname, 0, 16);
-			memcpy(b.segname, segNameStr.c_str(), segNameStr.size());
-			b.vmaddr = bArr[1].GetUint64();
-			b.vmsize = bArr[2].GetUint64();
-			b.fileoff = bArr[3].GetUint64();
-			b.filesize = bArr[4].GetUint64();
-			b.maxprot = bArr[5].GetUint();
-			b.initprot = bArr[6].GetUint();
-			b.nsects = bArr[7].GetUint();
-			b.flags = bArr[8].GetUint();
-		}
-
-		void Serialize(const std::string& name, std::vector<segment_command_64> b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			for (auto& s : b)
-			{
-				rapidjson::Value sArr(rapidjson::kArrayType);
-				std::string segNameStr;
-				char segName[16];
-				memcpy(segName, s.segname, 16);
-				segName[15] = 0;
-				segNameStr = std::string(segName);
-				sArr.PushBack(
-					rapidjson::Value(segNameStr.c_str(), m_activeContext.allocator), m_activeContext.allocator);
-				sArr.PushBack(s.vmaddr, m_activeContext.allocator);
-				sArr.PushBack(s.vmsize, m_activeContext.allocator);
-				sArr.PushBack(s.fileoff, m_activeContext.allocator);
-				sArr.PushBack(s.filesize, m_activeContext.allocator);
-				sArr.PushBack(s.maxprot, m_activeContext.allocator);
-				sArr.PushBack(s.initprot, m_activeContext.allocator);
-				sArr.PushBack(s.nsects, m_activeContext.allocator);
-				sArr.PushBack(s.flags, m_activeContext.allocator);
-				bArr.PushBack(sArr, m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, std::vector<segment_command_64>& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			for (auto& s : bArr)
-			{
-				segment_command_64 sec;
-				auto s2 = s.GetArray();
-				std::string segNameStr = s2[0].GetString();
-				memset(sec.segname, 0, 16);
-				memcpy(sec.segname, segNameStr.c_str(), segNameStr.size());
-				sec.vmaddr = s2[1].GetUint64();
-				sec.vmsize = s2[2].GetUint64();
-				sec.fileoff = s2[3].GetUint64();
-				sec.filesize = s2[4].GetUint64();
-				sec.maxprot = s2[5].GetUint();
-				sec.initprot = s2[6].GetUint();
-				sec.nsects = s2[7].GetUint();
-				sec.flags = s2[8].GetUint();
-				b.push_back(sec);
-			}
-		}
-
-		void Serialize(const std::string& name, build_version_command b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			bArr.PushBack(b.cmd, m_activeContext.allocator);
-			bArr.PushBack(b.cmdsize, m_activeContext.allocator);
-			bArr.PushBack(b.platform, m_activeContext.allocator);
-			bArr.PushBack(b.minos, m_activeContext.allocator);
-			bArr.PushBack(b.sdk, m_activeContext.allocator);
-			bArr.PushBack(b.ntools, m_activeContext.allocator);
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, build_version_command& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			b.cmd = bArr[0].GetUint();
-			b.cmdsize = bArr[1].GetUint();
-			b.platform = bArr[2].GetUint();
-			b.minos = bArr[3].GetUint();
-			b.sdk = bArr[4].GetUint();
-			b.ntools = bArr[5].GetUint();
-		}
-
-		void Serialize(const std::string& name, std::vector<build_tool_version> b)
-		{
-			S();
-			rapidjson::Value key(name.c_str(), m_activeContext.allocator);
-			rapidjson::Value bArr(rapidjson::kArrayType);
-			for (auto& s : b)
-			{
-				rapidjson::Value sArr(rapidjson::kArrayType);
-				sArr.PushBack(s.tool, m_activeContext.allocator);
-				sArr.PushBack(s.version, m_activeContext.allocator);
-				bArr.PushBack(sArr, m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember(key, bArr, m_activeContext.allocator);
-		}
-
-		void Deserialize(const std::string& name, std::vector<build_tool_version>& b)
-		{
-			auto bArr = m_activeDeserContext.doc[name.c_str()].GetArray();
-			for (auto& s : bArr)
-			{
-				build_tool_version sec;
-				auto s2 = s.GetArray();
-				sec.tool = s2[0].GetUint();
-				sec.version = s2[1].GetUint();
-				b.push_back(sec);
-			}
-		}
-
-		void Store() override
+		void Store(SerializationContext& context) const
 		{
 			MSS(textBase);
 			MSS(loadCommandOffset);
@@ -851,7 +473,7 @@ namespace SharedCacheCore {
 			MSS(functionStartsPresent);
 			MSS(relocatable);
 		}
-		void Load() override
+		void Load(DeserializationContext& context)
 		{
 			MSL(textBase);
 			MSL(loadCommandOffset);
@@ -906,7 +528,7 @@ namespace SharedCacheCore {
 
 	static std::atomic<uint64_t> sharedCacheReferences = 0;
 
-	class SharedCache : public MetadataSerializable
+	class SharedCache : public MetadataSerializable<SharedCache>
 	{
 		IMPLEMENT_SHAREDCACHE_API_OBJECT(BNSharedCache);
 
@@ -938,208 +560,28 @@ namespace SharedCacheCore {
 			iOS16CacheFormat,
 		};
 
-		void Store() override
-		{
-			m_activeContext.doc.AddMember("metadataVersion", METADATA_VERSION, m_activeContext.allocator);
+		void Store(SerializationContext& context) const;
+		void Load(DeserializationContext& context);
 
-			MSS(m_viewState);
-			MSS_CAST(m_cacheFormat, uint8_t);
-			MSS(m_imageStarts);
-			MSS(m_baseFilePath);
-			rapidjson::Value headers(rapidjson::kArrayType);
-			for (auto [k, v] : m_headers)
-			{
-				headers.PushBack(v.AsDocument(), m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember("headers", headers, m_activeContext.allocator);
-			// std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> m_exportInfos
-			// std::vector<std::pair<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>> exportInfos;
-			rapidjson::Document exportInfos(rapidjson::kArrayType);
+		struct State;
 
-			for (const auto& pair1 : m_exportInfos)
-			{
-				rapidjson::Value subObj(rapidjson::kObjectType);
-				rapidjson::Value subArr(rapidjson::kArrayType);
-				for (const auto& pair2 : pair1.second)
-				{
-					rapidjson::Value subSubObj(rapidjson::kObjectType);
-					subSubObj.AddMember("key", pair2.first, m_activeContext.allocator);
-					subSubObj.AddMember("val1", pair2.second.first, m_activeContext.allocator);
-					subSubObj.AddMember("val2", pair2.second.second, m_activeContext.allocator);
-					subArr.PushBack(subSubObj, m_activeContext.allocator);
-				}
-
-				subObj.AddMember("key", pair1.first, m_activeContext.allocator);
-				subObj.AddMember("value", subArr, m_activeContext.allocator);
-
-				exportInfos.PushBack(subObj, m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember("exportInfos", exportInfos, m_activeContext.allocator);
-
-			rapidjson::Value backingCaches(rapidjson::kArrayType);
-			for (auto bc : m_backingCaches)
-			{
-				backingCaches.PushBack(bc.AsDocument(), m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember("backingCaches", backingCaches, m_activeContext.allocator);
-			rapidjson::Value stubIslands(rapidjson::kArrayType);
-			for (auto si : m_stubIslandRegions)
-			{
-				stubIslands.PushBack(si.AsDocument(), m_activeContext.allocator);
-			}
-			rapidjson::Value images(rapidjson::kArrayType);
-			for (auto img : m_images)
-			{
-				images.PushBack(img.AsDocument(), m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember("images", images, m_activeContext.allocator);
-			rapidjson::Value regionsMappedIntoMemory(rapidjson::kArrayType);
-			for (auto r : m_regionsMappedIntoMemory)
-			{
-				regionsMappedIntoMemory.PushBack(r.AsDocument(), m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember("regionsMappedIntoMemory", regionsMappedIntoMemory, m_activeContext.allocator);
-			m_activeContext.doc.AddMember("stubIslands", stubIslands, m_activeContext.allocator);
-			rapidjson::Value dyldDataSections(rapidjson::kArrayType);
-			for (auto si : m_dyldDataRegions)
-			{
-				dyldDataSections.PushBack(si.AsDocument(), m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember("dyldDataSections", dyldDataSections, m_activeContext.allocator);
-			rapidjson::Value nonImageRegions(rapidjson::kArrayType);
-			for (auto si : m_nonImageRegions)
-			{
-				nonImageRegions.PushBack(si.AsDocument(), m_activeContext.allocator);
-			}
-			m_activeContext.doc.AddMember("nonImageRegions", nonImageRegions, m_activeContext.allocator);
-		}
-		void Load() override
-		{
-			if (m_activeDeserContext.doc.HasMember("metadataVersion"))
-			{
-				if (m_activeDeserContext.doc["metadataVersion"].GetUint() != METADATA_VERSION)
-				{
-					m_logger->LogError("Shared Cache metadata version mismatch");
-					return;
-				}
-			}
-			else
-			{
-				m_logger->LogError("Shared Cache metadata version missing");
-				return;
-			}
-			m_viewState = MSL_CAST(m_viewState, uint8_t, DSCViewState);
-			m_cacheFormat = MSL_CAST(m_cacheFormat, uint8_t, SharedCacheFormat);
-			m_headers.clear();
-			for (auto& startAndHeader : m_activeDeserContext.doc["headers"].GetArray())
-			{
-				SharedCacheMachOHeader header;
-				header.LoadFromValue(startAndHeader);
-				m_headers[header.textBase] = header;
-			}
-			MSL(m_imageStarts);
-			MSL(m_baseFilePath);
-			m_exportInfos.clear();
-			for (const auto& obj1 : m_activeDeserContext.doc["exportInfos"].GetArray())
-			{
-				std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> innerVec;
-				for (const auto& obj2 : obj1["value"].GetArray())
-				{
-					std::pair<BNSymbolType, std::string> innerPair = { (BNSymbolType)obj2["val1"].GetUint64(), obj2["val2"].GetString() };
-					innerVec.push_back({ obj2["key"].GetUint64(), innerPair });
-				}
-
-				m_exportInfos[obj1["key"].GetUint64()] = innerVec;
-			}
-			m_symbolInfos.clear();
-			for (auto& symbolInfo : m_activeDeserContext.doc["symbolInfos"].GetArray())
-			{
-				std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>> symbolInfoVec;
-				for (auto& symbolInfoPair : symbolInfo.GetArray())
-				{
-					symbolInfoVec.push_back({symbolInfoPair[0].GetUint64(),
-						{(BNSymbolType)symbolInfoPair[1].GetUint(), symbolInfoPair[2].GetString()}});
-				}
-				m_symbolInfos[symbolInfo[0].GetUint64()] = symbolInfoVec;
-			}
-			m_backingCaches.clear();
-			for (auto& bcV : m_activeDeserContext.doc["backingCaches"].GetArray())
-			{
-				BackingCache bc;
-				bc.LoadFromValue(bcV);
-				m_backingCaches.push_back(bc);
-			}
-			m_images.clear();
-			for (auto& imgV : m_activeDeserContext.doc["images"].GetArray())
-			{
-				CacheImage img;
-				img.LoadFromValue(imgV);
-				m_images.push_back(img);
-			}
-			m_regionsMappedIntoMemory.clear();
-			for (auto& rV : m_activeDeserContext.doc["regionsMappedIntoMemory"].GetArray())
-			{
-				MemoryRegion r;
-				r.LoadFromValue(rV);
-				m_regionsMappedIntoMemory.push_back(r);
-			}
-			m_stubIslandRegions.clear();
-			for (auto& siV : m_activeDeserContext.doc["stubIslands"].GetArray())
-			{
-				MemoryRegion si;
-				si.LoadFromValue(siV);
-				m_stubIslandRegions.push_back(si);
-			}
-			m_dyldDataRegions.clear();
-			for (auto& siV : m_activeDeserContext.doc["dyldDataSections"].GetArray())
-			{
-				MemoryRegion si;
-				si.LoadFromValue(siV);
-				m_dyldDataRegions.push_back(si);
-			}
-			m_nonImageRegions.clear();
-			for (auto& siV : m_activeDeserContext.doc["nonImageRegions"].GetArray())
-			{
-				MemoryRegion si;
-				si.LoadFromValue(siV);
-				m_nonImageRegions.push_back(si);
-			}
-
-			m_metadataValid = true;
-		}
+		struct ViewSpecificState;
 
 	private:
 		Ref<Logger> m_logger;
 		/* VIEW STATE BEGIN -- SERIALIZE ALL OF THIS AND STORE IT IN RAW VIEW */
 
 		// Updated as the view is loaded further, more images are added, etc
-		DSCViewState m_viewState = DSCViewStateUnloaded;
-		std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>
-			m_exportInfos;
-		std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, std::pair<BNSymbolType, std::string>>>>
-			m_symbolInfos;
-		// ---
+		// NOTE: Access via `State()` or `MutableState()` below.
+		// `WillMutateState()` must be called before the first access to `MutableState()`.
+		std::shared_ptr<State> m_state;
+		bool m_stateIsShared = false;
 
 		// Serialized once by PerformInitialLoad and available after m_viewState == Loaded
 		bool m_metadataValid = false;
 
-		std::string m_baseFilePath;
-		SharedCacheFormat m_cacheFormat;
-
-		std::unordered_map<std::string, uint64_t> m_imageStarts;
-		std::unordered_map<uint64_t, SharedCacheMachOHeader> m_headers;
-
-		std::vector<CacheImage> m_images;
-
-		std::vector<MemoryRegion> m_regionsMappedIntoMemory;
-
-		std::vector<BackingCache> m_backingCaches;
-
-		std::vector<MemoryRegion> m_stubIslandRegions;
-		std::vector<MemoryRegion> m_dyldDataRegions;
-		std::vector<MemoryRegion> m_nonImageRegions;
-
 		/* VIEWSTATE END -- NOTHING PAST THIS IS SERIALIZED */
+		std::shared_ptr<ViewSpecificState> m_viewSpecificState;
 
 		/* API VIEW START */
 		BinaryNinja::Ref<BinaryNinja::BinaryView> m_dscView;
@@ -1159,45 +601,62 @@ namespace SharedCacheCore {
 		void ParseAndApplySlideInfoForFile(std::shared_ptr<MMappedFileAccessor> file);
 		std::optional<uint64_t> GetImageStart(std::string installName);
 		std::optional<SharedCacheMachOHeader> HeaderForAddress(uint64_t);
-		bool LoadImageWithInstallName(std::string installName);
+		bool LoadImageWithInstallName(std::string installName, bool skipObjC);
 		bool LoadSectionAtAddress(uint64_t address);
-		bool LoadImageContainingAddress(uint64_t address);
+		bool LoadImageContainingAddress(uint64_t address, bool skipObjC);
+		void ProcessObjCSectionsForImageWithInstallName(std::string installName);
+		void ProcessAllObjCSections();
 		std::string NameForAddress(uint64_t address);
 		std::string ImageNameForAddress(uint64_t address);
 		std::vector<std::string> GetAvailableImages();
 
 		std::vector<MemoryRegion> GetMappedRegions() const;
+		bool IsMemoryMapped(uint64_t address);
 
 		std::vector<std::pair<std::string, Ref<Symbol>>> LoadAllSymbolsAndWait();
 
-		std::unordered_map<std::string, uint64_t> AllImageStarts() const { return m_imageStarts; }
-		std::unordered_map<uint64_t, SharedCacheMachOHeader> AllImageHeaders() const { return m_headers; }
+		const std::unordered_map<std::string, uint64_t>& AllImageStarts() const;
+		const std::unordered_map<uint64_t, SharedCacheMachOHeader>& AllImageHeaders() const;
 
 		std::string SerializedImageHeaderForAddress(uint64_t address);
 		std::string SerializedImageHeaderForName(std::string name);
 
 		void FindSymbolAtAddrAndApplyToAddr(uint64_t symbolLocation, uint64_t targetLocation, bool triggerReanalysis);
 
-		std::vector<BackingCache> BackingCaches() const {
+		const std::vector<BackingCache>& BackingCaches() const;
 
-			return m_backingCaches;
-		}
-
-		DSCViewState State() const { return m_viewState; }
+		DSCViewState ViewState() const;
 
 		explicit SharedCache(BinaryNinja::Ref<BinaryNinja::BinaryView> rawView);
-		~SharedCache() override;
+		virtual ~SharedCache();
 
+		size_t GetObjCRelativeMethodBaseAddress(const VMReader& reader) const;
+
+private:
 		std::optional<SharedCacheMachOHeader> LoadHeaderForAddress(
 			std::shared_ptr<VM> vm, uint64_t address, std::string installName);
 		void InitializeHeader(
-			Ref<BinaryView> view, VM* vm, SharedCacheMachOHeader header, std::vector<MemoryRegion*> regionsToLoad);
-		void ReadExportNode(std::vector<Ref<Symbol>>& symbolList, SharedCacheMachOHeader& header, DataBuffer& buffer, uint64_t textBase,
-			const std::string& currentText, size_t cursor, uint32_t endGuard);
+			Ref<BinaryView> view, VM* vm, const SharedCacheMachOHeader& header, std::vector<MemoryRegion*> regionsToLoad);
+		void ReadExportNode(std::vector<Ref<Symbol>>& symbolList, const SharedCacheMachOHeader& header, const uint8_t* begin,
+			const uint8_t *end, const uint8_t* current, uint64_t textBase, const std::string& currentText);
 		std::vector<Ref<Symbol>> ParseExportTrie(
-			std::shared_ptr<MMappedFileAccessor> linkeditFile, SharedCacheMachOHeader header);
-	};
+			std::shared_ptr<MMappedFileAccessor> linkeditFile, const SharedCacheMachOHeader& header);
 
+		Ref<TypeLibrary> TypeLibraryForImage(const std::string& installName);
+
+		size_t GetBaseAddress() const;
+		std::optional<ObjCOptimizationHeader> GetObjCOptimizationHeader(VMReader reader) const;
+
+		const State& State() const { return *m_state; }
+		struct State& MutableState() { AssertMutable(); return *m_state; }
+
+		void AssertMutable() const;
+
+		// Ensures that the state is uniquely owned, copying it if it is not.
+		// Must be called before first access to `MutableState()` after the state
+		// is loaded from the cache. Can safely be called multiple times.
+		void WillMutateState();
+	};
 
 }
 

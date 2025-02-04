@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 
 project(rust_api)
 
-set(CARGO_API_VERSION 1.77.0)
+set(CARGO_API_VERSION 1.83.0)
 
 file(GLOB RUST_API_SOURCES CONFIGURE_DEPENDS
 	../binaryninjacore.h
@@ -14,10 +14,12 @@ file(GLOB RUST_API_SOURCES CONFIGURE_DEPENDS
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 	set(CARGO_CHECK_OPTS --workspace)
-	set(CARGO_DOC_OPTS --no-deps)
+	# Documentation for both binaryninja and binaryninjacore-sys crates
+	set(CARGO_DOC_OPTS --no-deps -p binaryninja -p binaryninjacore-sys)
 else()
 	set(CARGO_CHECK_OPTS --workspace --release)
-	set(CARGO_DOC_OPTS --no-deps --release)
+	# Documentation for both binaryninja and binaryninjacore-sys crates
+	set(CARGO_DOC_OPTS --no-deps --release -p binaryninja -p binaryninjacore-sys)
 endif()
 
 if (BN_BUILD_NUMBER)
@@ -57,7 +59,3 @@ add_custom_command(
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 	DEPENDS ${RUST_API_SOURCES}
 )
-
-if(BN_API_BUILD_EXAMPLES)
-		add_subdirectory(examples/basic_script)
-endif()

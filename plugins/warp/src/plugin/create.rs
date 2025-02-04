@@ -1,11 +1,11 @@
 use crate::cache::{cached_function, cached_type_references};
 use crate::matcher::invalidate_function_matcher_cache;
-use binaryninja::binaryview::{BinaryView, BinaryViewExt};
+use crate::user_signature_dir;
+use binaryninja::binary_view::{BinaryView, BinaryViewExt};
 use binaryninja::command::Command;
 use binaryninja::function::Function;
 use binaryninja::rc::Guard;
 use rayon::prelude::*;
-use std::io::Write;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::thread;
@@ -20,21 +20,20 @@ impl Command for CreateSignatureFile {
         let is_function_named = |f: &Guard<Function>| {
             !f.symbol().short_name().as_str().contains("sub_") || f.has_user_annotations()
         };
-
-        let mut signature_dir = binaryninja::user_directory().unwrap().join("signatures/");
+        let mut signature_dir = user_signature_dir();
         if let Some(default_plat) = view.default_platform() {
             // If there is a default platform, put the signature in there.
+            // TODO: We should instead use the platform of the function.
             signature_dir.push(default_plat.name().to_string());
         }
         let view = view.to_owned();
         thread::spawn(move || {
             let total_functions = view.functions().len();
             let done_functions = AtomicUsize::default();
-            let background_task = binaryninja::backgroundtask::BackgroundTask::new(
+            let background_task = binaryninja::background_task::BackgroundTask::new(
                 format!("Generating signatures... ({}/{})", 0, total_functions),
                 true,
-            )
-            .unwrap();
+            );
 
             let start = Instant::now();
 
@@ -44,7 +43,11 @@ impl Command for CreateSignatureFile {
                     .par_iter()
                     .inspect(|_| {
                         done_functions.fetch_add(1, Relaxed);
-                        background_task.set_progress_text(format!("Generating signatures... ({}/{})", done_functions.load(Relaxed), total_functions))
+                        background_task.set_progress_text(format!(
+                            "Generating signatures... ({}/{})",
+                            done_functions.load(Relaxed),
+                            total_functions
+                        ))
                     })
                     .filter(is_function_named)
                     .filter(|f| !f.analysis_skipped())
@@ -65,29 +68,27 @@ impl Command for CreateSignatureFile {
             }
 
             log::info!("Signature generation took {:?}", start.elapsed());
-
-            if let Some(sig_file_name) = binaryninja::interaction::get_text_line_input(
-                "Signature File",
-                "Create Signature File",
-            ) {
-                let save_file = signature_dir.join(sig_file_name + ".sbin");
-                log::info!("Saving to signatures to {:?}...", &save_file);
-                // TODO: Should we overwrite? Prompt user.
-                if let Ok(mut file) = std::fs::File::create(&save_file) {
-                    match file.write_all(&data.to_bytes()) {
-                        Ok(_) => {
-                            log::info!("Signature file saved successfully.");
-                            // Force rebuild platform matcher.
-                            invalidate_function_matcher_cache();
-                        }
-                        Err(e) => log::error!("Failed to write data to signature file: {:?}", e),
-                    }
-                } else {
-                    log::error!("Could not create signature file: {:?}", save_file);
-                }
-            }
-
             background_task.finish();
+
+            // NOTE: Because we only can consume signatures from a specific directory, we don't need to use the interaction API.
+            // If we did need to save signature files to a project than this would need to change.
+            let Some(save_file) = rfd::FileDialog::new()
+                .add_filter("Signature Files", &["sbin"])
+                .set_file_name(format!("{}.sbin", view.file().filename()))
+                .set_directory(signature_dir)
+                .save_file()
+            else {
+                return;
+            };
+
+            match std::fs::write(&save_file, data.to_bytes()) {
+                Ok(_) => {
+                    log::info!("Signature file saved successfully.");
+                    // Force rebuild platform matcher.
+                    invalidate_function_matcher_cache();
+                }
+                Err(e) => log::error!("Failed to write data to signature file: {:?}", e),
+            }
         });
     }
 

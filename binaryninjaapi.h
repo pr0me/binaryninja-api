@@ -24,6 +24,7 @@
 	#define NOMINMAX
 #endif
 	#include <windows.h>
+	#define FMT_UNICODE 0
 #endif
 #include <cstddef>
 #include <string>
@@ -243,9 +244,9 @@ namespace BinaryNinja {
 #endif
 
 	  public:
-		Ref<T>() : m_obj(nullptr) {}
+		Ref() : m_obj(nullptr) {}
 
-		Ref<T>(T* obj) : m_obj(obj)
+		Ref(T* obj) : m_obj(obj)
 		{
 			if (m_obj)
 			{
@@ -256,7 +257,7 @@ namespace BinaryNinja {
 			}
 		}
 
-		Ref<T>(const Ref<T>& obj) : m_obj(obj.m_obj)
+		Ref(const Ref<T>& obj) : m_obj(obj.m_obj)
 		{
 			if (m_obj)
 			{
@@ -267,7 +268,7 @@ namespace BinaryNinja {
 			}
 		}
 
-		Ref<T>(Ref<T>&& other) : m_obj(other.m_obj)
+		Ref(Ref<T>&& other) : m_obj(other.m_obj)
 		{
 			other.m_obj = 0;
 #ifdef BN_REF_COUNT_DEBUG
@@ -275,7 +276,7 @@ namespace BinaryNinja {
 #endif
 		}
 
-		~Ref<T>()
+		~Ref()
 		{
 			if (m_obj)
 			{
@@ -369,8 +370,8 @@ namespace BinaryNinja {
 		T* m_obj;
 
 	public:
-		CallbackRef<T>(void* obj) : m_obj((T*)obj) { m_obj->AddRefForCallback(); }
-		~CallbackRef<T>() { m_obj->ReleaseForCallback(); }
+		CallbackRef(void* obj) : m_obj((T*)obj) { m_obj->AddRefForCallback(); }
+		~CallbackRef() { m_obj->ReleaseForCallback(); }
 		operator T*() const { return m_obj; }
 		T* operator->() const { return m_obj; }
 		T& operator*() const { return *m_obj; }
@@ -1548,6 +1549,8 @@ namespace BinaryNinja {
 	    \return Constructed view, or a nullptr Ref<BinaryView>
 	*/
 	Ref<BinaryView> Load(Ref<ProjectFile> rawData, bool updateAnalysis = true, const std::string& options = "{}", std::function<bool(size_t, size_t)> progress = {});
+
+	Ref<BinaryView> ParseTextFormat(const std::string& filename);
 
 	/*!
 		Deprecated. Use non-metadata version.
@@ -4056,6 +4059,10 @@ namespace BinaryNinja {
 		DisassemblyTextLineTypeInfo typeInfo;
 
 		DisassemblyTextLine();
+
+		size_t GetTotalWidth() const;
+		size_t GetAddressAndIndentationWidth() const;
+		std::vector<InstructionTextToken> GetAddressAndIndentationTokens() const;
 	};
 
 	/*!
@@ -4068,7 +4075,9 @@ namespace BinaryNinja {
 		Ref<BasicBlock> block;
 		DisassemblyTextLine contents;
 
-		static LinearDisassemblyLine FromAPIObject(BNLinearDisassemblyLine* line);
+		BNLinearDisassemblyLine GetAPIObject() const;
+		static LinearDisassemblyLine FromAPIObject(const BNLinearDisassemblyLine* line);
+		static void FreeAPIObject(BNLinearDisassemblyLine* line);
 	};
 
 	class NamedTypeReference;
@@ -7931,7 +7940,7 @@ namespace BinaryNinja {
 		static BNFlagConditionForSemanticClass* GetFlagConditionsForSemanticFlagGroupCallback(
 		    void* ctxt, uint32_t semGroup, size_t* count);
 		static void FreeFlagConditionsForSemanticFlagGroupCallback(
-		    void* ctxt, BNFlagConditionForSemanticClass* conditions);
+		    void* ctxt, BNFlagConditionForSemanticClass* conditions, size_t count);
 		static uint32_t* GetFlagsWrittenByFlagWriteTypeCallback(void* ctxt, uint32_t writeType, size_t* count);
 		static uint32_t GetSemanticClassForFlagWriteTypeCallback(void* ctxt, uint32_t writeType);
 		static size_t GetFlagWriteLowLevelILCallback(void* ctxt, BNLowLevelILOperation op, size_t size,
@@ -7940,7 +7949,7 @@ namespace BinaryNinja {
 		static size_t GetFlagConditionLowLevelILCallback(
 		    void* ctxt, BNLowLevelILFlagCondition cond, uint32_t semClass, BNLowLevelILFunction* il);
 		static size_t GetSemanticFlagGroupLowLevelILCallback(void* ctxt, uint32_t semGroup, BNLowLevelILFunction* il);
-		static void FreeRegisterListCallback(void* ctxt, uint32_t* regs);
+		static void FreeRegisterListCallback(void* ctxt, uint32_t* regs, size_t len);
 		static void GetRegisterInfoCallback(void* ctxt, uint32_t reg, BNRegisterInfo* result);
 		static uint32_t GetStackPointerRegisterCallback(void* ctxt);
 		static uint32_t GetLinkRegisterCallback(void* ctxt);
@@ -9942,15 +9951,19 @@ namespace BinaryNinja {
 	{
 	  protected:
 		std::function<void(Ref<AnalysisContext> analysisContext)> m_action;
+		std::function<bool(Ref<Activity>, Ref<AnalysisContext>)> m_eligibility;
 
-		static void Run(void* ctxt, BNAnalysisContext* analysisContext);
+		static void RunAction(void* ctxt, BNAnalysisContext* analysisContext);
+		static bool CheckEligibility(void* ctxt, BNActivity* activity, BNAnalysisContext* analysisContext);
 
 	  public:
 		/*!
 			\param configuration a JSON representation of the activity configuration
 			\param action Workflow action, a function taking a Ref<AnalysisContext> as an argument.
+			\param eligibility A function that determines whether the activity is eligible to run
 		*/
-		Activity(const std::string& configuration, const std::function<void(Ref<AnalysisContext>)>& action);
+		Activity(const std::string& configuration, const std::function<void(Ref<AnalysisContext>)>& action,
+			const std::function<bool(Ref<Activity>, Ref<AnalysisContext>)>& eligibility = nullptr);
 		Activity(BNActivity* activity);
 		virtual ~Activity();
 
@@ -10169,6 +10182,10 @@ namespace BinaryNinja {
 		DisassemblySettings();
 		DisassemblySettings(BNDisassemblySettings* settings);
 		DisassemblySettings* Duplicate();
+
+		static Ref<DisassemblySettings> GetDefaultSettings();
+		static Ref<DisassemblySettings> GetDefaultGraphSettings();
+		static Ref<DisassemblySettings> GetDefaultLinearSettings();
 
 		bool IsOptionSet(BNDisassemblyOption option) const;
 		void SetOption(BNDisassemblyOption option, bool state = true);
@@ -10401,17 +10418,23 @@ namespace BinaryNinja {
 		*/
 		bool IsILBlock() const;
 
+		/*! Whether the basic block contains Low Level IL
+
+			\return Whether the basic block contains Low Level IL
+		*/
+		bool IsLowLevelILBlock() const;
+
 		/*! Whether the basic block contains Medium Level IL
 
 			\return Whether the basic block contains Medium Level IL
 		*/
-		bool IsLowLevelILBlock() const;
+		bool IsMediumLevelILBlock() const;
 
 		/*! Whether the basic block contains High Level IL
 
 			\return Whether the basic block contains High Level IL
 		*/
-		bool IsMediumLevelILBlock() const;
+		bool IsHighLevelILBlock() const;
 
 		/*! Get the Low Level IL Function for this basic block
 
@@ -11430,6 +11453,12 @@ namespace BinaryNinja {
 		*/
 		Ref<FlowGraphNode> GetNode(size_t i);
 
+		/*! Get the total number of nodes in the graph
+
+			\return Node count
+		 */
+		size_t GetNodeCount() const;
+
 		/*! Whether the FlowGraph has any nodes added
 
 			\return Whether the FlowGraph has any nodes added
@@ -11438,12 +11467,29 @@ namespace BinaryNinja {
 
 		/*! Add a node to this flowgraph
 
+			\note After the graph has completed layout, this function has no effect.
+
 			\param node Node to be added.
 			\return Index of the node
 		*/
 		size_t AddNode(FlowGraphNode* node);
 
+		/*! Replace an existing node in the graph with a new node.
+			Any existing edges referencing the old node will be updated to point to
+			the new node.
 
+			\note After the graph has completed layout, this function has no effect.
+
+			\param i Index of the node to replace
+			\param newNode New node with which to replace the old node
+		 */
+		void ReplaceNode(size_t i, FlowGraphNode* newNode);
+
+		/*! Clear all the nodes in the graph
+
+			\note After the graph has completed layout, this function has no effect.
+		 */
+		void ClearNodes();
 
 		/*! Flow graph width
 
@@ -11535,6 +11581,26 @@ namespace BinaryNinja {
 
 		void SetOption(BNFlowGraphOption option, bool value = true);
 		bool IsOptionSet(BNFlowGraphOption option);
+
+		/*! Get the list of Render Layers which will be applied to this Flow Graph,
+			after it calls PopulateNodes.
+
+			\return List of Render Layers
+		 */
+		std::vector<class RenderLayer*> GetRenderLayers() const;
+
+		/*! Add a Render Layer to be applied to this Flow Graph. Note that layers will
+			be applied in the order in which they are added.
+
+			\param layer Render Layer to add
+		 */
+		void AddRenderLayer(class RenderLayer* layer);
+
+		/*! Remove a Render Layer from being applied to this Flow Graph
+
+			\param layer Render Layer to remove
+		 */
+		void RemoveRenderLayer(class RenderLayer* layer);
 	};
 
 	/*!
@@ -12160,7 +12226,7 @@ namespace BinaryNinja {
 			\param b RHS expression
 			\param flags Flags to set
 			\param loc Optional IL Location this expression was added from.
-			\return The expression <tt>sbc.<size>{<flags>}(a, b)</tt>
+			\return The expression <tt>mul.<size>{<flags>}(a, b)</tt>
 		*/
 		ExprId Mult(
 		    size_t size, ExprId a, ExprId b, uint32_t flags = 0, const ILSourceLocation& loc = ILSourceLocation());
@@ -13693,6 +13759,82 @@ namespace BinaryNinja {
 		std::set<SSAVariable> GetSSAVariables();
 	};
 
+	struct LineFormatterSettings
+	{
+		Ref<HighLevelILFunction> highLevelIL;
+		size_t desiredLineLength;
+		size_t minimumContentLength;
+		size_t tabWidth;
+		std::string languageName;
+		std::string commentStartString;
+		std::string commentEndString;
+		std::string annotationStartString;
+		std::string annotationEndString;
+
+		/*! Gets the default line formatter settings for High Level IL code.
+
+		    \param settings The settings for reformatting.
+		    \param func High Level IL function to be reformatted.
+		    \return Settings for reformatting.
+		*/
+		static LineFormatterSettings GetDefault(DisassemblySettings* settings, HighLevelILFunction* func);
+
+		/*! Gets the default line formatter settings for a language representation function.
+
+		    \param settings The settings for reformatting.
+		    \param func Language representation function to be reformatted.
+		    \return Settings for reformatting.
+		*/
+		static LineFormatterSettings GetLanguageRepresentationSettings(
+			DisassemblySettings* settings, LanguageRepresentationFunction* func);
+
+		static LineFormatterSettings FromAPIObject(const BNLineFormatterSettings* settings);
+		BNLineFormatterSettings ToAPIObject() const;
+	};
+
+	class LineFormatter : public StaticCoreRefCountObject<BNLineFormatter>
+	{
+		std::string m_nameForRegister;
+
+		static BNDisassemblyTextLine* FormatLinesCallback(void* ctxt, BNDisassemblyTextLine* inLines, size_t inCount,
+			const BNLineFormatterSettings* settings, size_t* outCount);
+		static void FreeLinesCallback(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
+
+	public:
+		LineFormatter(const std::string& name);
+		LineFormatter(BNLineFormatter* formatter);
+
+		/*! Registers the line formatter.
+
+		    \param formatter The line formatter to register.
+		*/
+		static void Register(LineFormatter* formatter);
+
+		static std::vector<Ref<LineFormatter>> GetList();
+		static Ref<LineFormatter> GetByName(const std::string& name);
+		static Ref<LineFormatter> GetDefault();
+
+		/*! Reformats the given list of lines. Returns a new list of lines containing the reformatted code.
+
+		    \param lines The lines to reformat.
+		    \param settings The settings for reformatting.
+		    \return A new list of reformatted lines.
+		*/
+		virtual std::vector<DisassemblyTextLine> FormatLines(
+			const std::vector<DisassemblyTextLine>& lines, const LineFormatterSettings& settings) = 0;
+	};
+
+	class CoreLineFormatter : public LineFormatter
+	{
+	public:
+		CoreLineFormatter(BNLineFormatter* formatter);
+
+		std::vector<DisassemblyTextLine> FormatLines(
+			const std::vector<DisassemblyTextLine>& lines, const LineFormatterSettings& settings) override;
+	};
+
+	class LanguageRepresentationFunctionType;
+
 	/*! LanguageRepresentationFunction represents a single function in a registered high level language.
 
 	    \ingroup highlevelil
@@ -13702,7 +13844,8 @@ namespace BinaryNinja {
 	        BNFreeLanguageRepresentationFunction>
 	{
 	public:
-		LanguageRepresentationFunction(Architecture* arch, Function* func, HighLevelILFunction* highLevelIL);
+		LanguageRepresentationFunction(LanguageRepresentationFunctionType* type, Architecture* arch, Function* func,
+			HighLevelILFunction* highLevelIL);
 		LanguageRepresentationFunction(BNLanguageRepresentationFunction* func);
 
 		/*! Gets the lines of tokens for a given High Level IL instruction.
@@ -13741,6 +13884,7 @@ namespace BinaryNinja {
 		*/
 		BNHighlightColor GetHighlight(BasicBlock* block);
 
+		Ref<LanguageRepresentationFunctionType> GetLanguage() const;
 		Ref<Architecture> GetArchitecture() const;
 		Ref<Function> GetFunction() const;
 		Ref<HighLevelILFunction> GetHighLevelILFunction() const;
@@ -13889,6 +14033,13 @@ namespace BinaryNinja {
 		*/
 		virtual Ref<TypeParser> GetTypeParser() { return nullptr; }
 
+		/*! Returns the line formatter for formatting code in this language. If NULL is returned, the default
+		    formatter will be used.
+
+		    \return The optional formatter for formatting code in this language.
+		*/
+		virtual Ref<LineFormatter> GetLineFormatter() { return nullptr; }
+
 		/*! Returns a list of lines representing a function prototype in this language. If no lines are returned, the
 		    default C-style prototype will be used.
 
@@ -13915,6 +14066,7 @@ namespace BinaryNinja {
 		static bool IsValidCallback(void* ctxt, BNBinaryView* view);
 		static BNTypePrinter* GetTypePrinterCallback(void* ctxt);
 		static BNTypeParser* GetTypeParserCallback(void* ctxt);
+		static BNLineFormatter* GetLineFormatterCallback(void* ctxt);
 		static BNDisassemblyTextLine* GetFunctionTypeTokensCallback(
 			void* ctxt, BNFunction* func, BNDisassemblySettings* settings, size_t* count);
 		static void FreeLinesCallback(void* ctxt, BNDisassemblyTextLine* lines, size_t count);
@@ -13929,6 +14081,7 @@ namespace BinaryNinja {
 		bool IsValid(BinaryView* view) override;
 		Ref<TypePrinter> GetTypePrinter() override;
 		Ref<TypeParser> GetTypeParser() override;
+		Ref<LineFormatter> GetLineFormatter() override;
 		std::vector<DisassemblyTextLine> GetFunctionTypeTokens(
 			Function* func, DisassemblySettings* settings = nullptr) override;
 	};
@@ -15026,7 +15179,7 @@ namespace BinaryNinja {
 		static uint32_t* GetCalleeSavedRegistersCallback(void* ctxt, size_t* count);
 		static uint32_t* GetIntegerArgumentRegistersCallback(void* ctxt, size_t* count);
 		static uint32_t* GetFloatArgumentRegistersCallback(void* ctxt, size_t* count);
-		static void FreeRegisterListCallback(void* ctxt, uint32_t* regs);
+		static void FreeRegisterListCallback(void* ctxt, uint32_t* regs, size_t len);
 
 		static bool AreArgumentRegistersSharedIndexCallback(void* ctxt);
 		static bool AreArgumentRegistersUsedForVarArgsCallback(void* ctxt);
@@ -17001,6 +17154,26 @@ namespace BinaryNinja {
 
 		Ref<LinearViewCursor> Duplicate();
 
+		/*! Get the list of Render Layers which will be applied to this cursor, at the
+			end of calls to GetLines.
+
+			\return List of Render Layers
+		 */
+		std::vector<class RenderLayer*> GetRenderLayers() const;
+
+		/*! Add a Render Layer to be applied to this cursor. Note that layers will
+			be applied in the order in which they are added.
+
+			\param layer Render Layer to add
+		 */
+		void AddRenderLayer(class RenderLayer* layer);
+
+		/*! Remove a Render Layer from being applied to this cursor
+
+			\param layer Render Layer to remove
+		 */
+		void RemoveRenderLayer(class RenderLayer* layer);
+
 		static int Compare(LinearViewCursor* a, LinearViewCursor* b);
 	};
 
@@ -18396,6 +18569,59 @@ namespace BinaryNinja {
 		size_t unique;
 	};
 
+
+	/*! FirmwareNinjaReferenceNode is a class used to build reference trees to memory regions, functions, and data
+		variables. This class is only available in the Ultimate Edition of Binary Ninja.
+
+		\ingroup firmwareninja
+	*/
+	class FirmwareNinjaReferenceNode : public CoreRefCountObject<BNFirmwareNinjaReferenceNode, BNNewFirmwareNinjaReferenceNodeReference, BNFreeFirmwareNinjaReferenceNode>
+	{
+		BNFirmwareNinjaReferenceNode* m_object;
+	public:
+		FirmwareNinjaReferenceNode(BNFirmwareNinjaReferenceNode* node);
+		~FirmwareNinjaReferenceNode();
+
+		/*! Determine if the reference tree node is for a function
+
+			\return true if the reference tree node is for a function, false otherwise
+		 */
+		bool IsFunction();
+
+		/*! Determine if the reference tree node is for a data variable
+
+			\return true if the reference tree node is for a data variable, false otherwise
+		 */
+		bool IsDataVariable();
+
+		/*! Determine if the reference tree node contains child nodes
+
+			\return true if the reference tree node contains child nodes, false otherwise
+		 */
+		bool HasChildren();
+
+		/*! Query the function contained in the reference tree node
+
+			\param function Output function object
+			\return true if the function was queried successfully, false otherwise
+		 */
+		bool GetFunction(Ref<Function>& function);
+
+		/*! Query the data variable contained in the reference tree node
+
+			\param function Output data variable object
+			\return true if the data variable was queried successfully, false otherwise
+		 */
+		bool GetDataVariable(DataVariable& variable);
+
+		/*! Query the child nodes contained in the reference tree node
+
+			\return Vector of child reference tree nodes
+		 */
+		std::vector<Ref<FirmwareNinjaReferenceNode>> GetChildren();
+	};
+
+
 	/*! FirmwareNinja is a class containing features specific to embedded firmware analysis. This class is only
 		available in the Ultimate Edition of Binary Ninja.
 
@@ -18484,6 +18710,47 @@ namespace BinaryNinja {
 		 */
 		std::vector<FirmwareNinjaDeviceAccesses> GetBoardDeviceAccesses(
 			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma);
+
+
+		/*! Returns a tree of reference nodes that reference the memory region represented by the given device
+
+			\param device Firmware Ninja device
+			\param fma Vector of Firmware Ninja function memory accesses information
+			\param value (Optional) only include components that originate with a write of this value to the device
+			\return Root reference node of tree
+		 */
+		Ref<FirmwareNinjaReferenceNode> GetReferenceTree(
+			FirmwareNinjaDevice& device,
+			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma,
+			uint64_t* value = nullptr
+		);
+
+		/*! Returns a tree of reference nodes that reference the memory region represented by the given section
+
+			\param device Firmware Ninja device
+			\param fma Vector of Firmware Ninja function memory accesses information
+			\param value (Optional) only include components that originate with a write of this value to the device
+			\return Root reference node of tree
+		 */
+		Ref<FirmwareNinjaReferenceNode> GetReferenceTree(
+			Section& section,
+			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma,
+			uint64_t* value = nullptr
+		);
+
+
+		/*! Returns a tree of reference nodes that reference the given address
+
+			\param device Firmware Ninja device
+			\param fma Vector of Firmware Ninja function memory accesses information
+			\param value (Optional) only include components that originate with a write of this value to the device
+			\return Root reference node of tree
+		 */
+		Ref<FirmwareNinjaReferenceNode> GetReferenceTree(
+			uint64_t address,
+			const std::vector<FirmwareNinjaFunctionMemoryAccesses>& fma,
+			uint64_t* value = nullptr
+		);
 	};
 
 
@@ -18812,6 +19079,248 @@ namespace BinaryNinja {
 		*/
 		static void AddNamesForOuterStructureMembers(
 			BinaryView* data, Type* type, const HighLevelILInstruction& var, std::vector<std::string>& nameList);
+	};
+
+	/*! RenderLayer is a plugin class that allows you to customize the presentation of
+		Linear and Graph view output, adding, changing, or removing lines before they are
+		presented in the UI.
+	 */
+	class RenderLayer: public StaticCoreRefCountObject<BNRenderLayer>
+	{
+		std::string m_nameForRegister;
+		static std::unordered_map<BNRenderLayer*, RenderLayer*> g_registeredInstances;
+
+	protected:
+		explicit RenderLayer(const std::string& name);
+		RenderLayer(BNRenderLayer* layer);
+		virtual ~RenderLayer() = default;
+		static void ApplyToFlowGraphCallback(void* ctxt, BNFlowGraph* graph);
+		static void ApplyToLinearViewObjectCallback(
+			void* ctxt,
+			BNLinearViewObject* obj,
+			BNLinearViewObject* prev,
+			BNLinearViewObject* next,
+			BNLinearDisassemblyLine* inLines,
+			size_t inLineCount,
+			BNLinearDisassemblyLine** outLines,
+			size_t* outLineCount
+		);
+		static void FreeLinesCallback(void* ctxt, BNLinearDisassemblyLine* lines, size_t count);
+
+	public:
+		/*! Register a custom Render Layer.
+
+			Specify enableState to change whether the layer is enabled by default in the UI.
+			If it is set to AlwaysEnabled, the Render Layer will always be enabled
+			and will not be displayed in the UI.
+
+			\param layer Render Layer to register
+			\param enableState Whether the layer should be enabled by default
+		*/
+		static void Register(RenderLayer* layer, BNRenderLayerDefaultEnableState enableState = DisabledByDefaultRenderLayerDefaultEnableState);
+
+		/*! Get the list of all currently registered Render Layers.
+
+			\return List of Render Layers
+		*/
+		static std::vector<Ref<RenderLayer>> GetList();
+
+		/*! Look up a Render Layer by its name
+
+			\param name Name of Render Layer
+			\return Render Layer, if it exists. Otherwise, nullptr.
+		*/
+		static Ref<RenderLayer> GetByName(const std::string& name);
+
+		/*! Get the name of a Render Layer
+
+			\return Render Layer's name
+		*/
+		std::string GetName() const;
+
+		/*! Get whether the Render Layer is enabled by default
+
+			\return Default enable state
+		 */
+		BNRenderLayerDefaultEnableState GetDefaultEnableState() const;
+
+		/*! Apply this Render Layer to a single Basic Block of Disassembly lines.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the block.
+
+			\note This function will only handle Disassembly lines, and not any ILs.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToDisassemblyBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		)
+		{
+			(void)block;
+			(void)lines;
+		}
+
+		/*! Apply this Render Layer to a single Basic Block of Low Level IL lines.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the block.
+
+			\note This function will only handle Lifted IL/LLIL/LLIL(SSA) lines.
+			You can use the block's `function_graph_type` property to determine which is being handled.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToLowLevelILBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		)
+		{
+			(void)block;
+			(void)lines;
+		}
+
+		/*! Apply this Render Layer to a single Basic Block of Medium Level IL lines.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the block.
+
+			\note This function will only handle MLIL/MLIL(SSA)/Mapped MLIL/Mapped MLIL(SSA) lines.
+			You can use the block's `function_graph_type` property to determine which is being handled.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToMediumLevelILBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		)
+		{
+			(void)block;
+			(void)lines;
+		}
+
+		/*! Apply this Render Layer to a single Basic Block of High Level IL lines.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the block.
+
+			\note This function will only handle HLIL/HLIL(SSA)/Language Representation lines.
+			You can use the block's `function_graph_type` property to determine which is being handled.
+
+			\warning This function will NOT apply to High Level IL bodies as displayed
+			in Linear View! Those are handled by `ApplyToHighLevelILBody` instead as they
+			do not have a Basic Block associated with them.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToHighLevelILBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		)
+		{
+			(void)block;
+			(void)lines;
+		}
+
+		/*! Apply this Render Layer to the entire body of a High Level IL function.
+			Subclasses should modify the input `lines` list to make modifications to
+			the presentation of the function.
+
+			\warning This function only applies to Linear View, and not to Graph View!
+			If you want to handle Graph View too, you will need to use `ApplyToHighLevelILBlock`
+			and handle the lines one block at a time.
+
+			\param function Function containing those lines
+			\param lines Lines of text for the function, to be modified by this function
+		 */
+		virtual void ApplyToHighLevelILBody(
+			Ref<Function> function,
+			std::vector<LinearDisassemblyLine>& lines
+		)
+		{
+			(void)function;
+			(void)lines;
+		}
+
+		/*! Apply to lines generated by Linear View that are not part of a function.
+			It is up to your implementation to figure out which type of Linear View Object
+			lines these are, and what to do with them.
+
+			\param obj Linear View Object being rendered
+			\param prev Linear View Object located directly above this one
+			\param next Linear View Object located directly below this one
+			\param lines Lines rendered by `obj`, to be modified by this function
+		 */
+		virtual void ApplyToMiscLinearLines(
+			Ref<LinearViewObject> obj,
+			Ref<LinearViewObject> prev,
+			Ref<LinearViewObject> next,
+			std::vector<LinearDisassemblyLine>& lines
+		)
+		{
+			(void)obj;
+			(void)prev;
+			(void)next;
+			(void)lines;
+		}
+
+		/*! Apply to lines generated by a Basic Block, of any type. If not overridden, this
+			function will call the appropriate ApplyToXLevelILBlock function.
+
+			\param block Basic Block containing those lines
+			\param lines Lines of text for the block, to be modified by this function
+		 */
+		virtual void ApplyToBlock(
+			Ref<BasicBlock> block,
+			std::vector<DisassemblyTextLine>& lines
+		);
+
+		/*! Apply this Render Layer to a Flow Graph, potentially modifying its nodes,
+			their edges, their lines, and their lines' content.
+
+			\note If you override this function, you will need to call the parent
+			implementation if you want to use the higher level ApplyToXLevelILBlock
+			functionality.
+
+			\param graph Graph to modify
+		*/
+		virtual void ApplyToFlowGraph(Ref<FlowGraph> graph);
+
+		/*! Apply this Render Layer to the lines produced by a LinearViewObject for rendering
+			in Linear View, potentially modifying the lines and their contents.
+
+			\note If you override this function, you will need to call the parent
+			implementation if you want to use the higher level ApplyToXLevelILBlock
+			functionality.
+
+			\param obj Linear View Object being rendered
+			\param prev Linear View Object located directly above this one
+			\param next Linear View Object located directly below this one
+			\param lines Lines originally rendered by the Linear View Object
+			\return Updated set of lines to display in Linear View
+		*/
+		virtual void ApplyToLinearViewObject(
+			Ref<LinearViewObject> obj,
+			Ref<LinearViewObject> prev,
+			Ref<LinearViewObject> next,
+			std::vector<LinearDisassemblyLine>& lines
+		);
+	};
+
+	class CoreRenderLayer: public RenderLayer
+	{
+	public:
+		CoreRenderLayer(BNRenderLayer* layer);
+		virtual ~CoreRenderLayer() = default;
+
+		virtual void ApplyToFlowGraph(Ref<FlowGraph> graph) override;
+		virtual void ApplyToLinearViewObject(
+			Ref<LinearViewObject> obj,
+			Ref<LinearViewObject> prev,
+			Ref<LinearViewObject> next,
+			std::vector<LinearDisassemblyLine>& lines
+		) override;
 	};
 }  // namespace BinaryNinja
 
@@ -19983,7 +20492,7 @@ struct fmt::formatter<T, char, std::enable_if_t<std::is_enum_v<T>, void>>
 	{
 		auto it = ctx.begin(), end = ctx.end();
 		if (it != end && (*it == 's' || *it == 'S' || *it == 'd' || *it == 'x')) presentation = *it++;
-		if (it != end && *it != '}') detail::throw_format_error("invalid format");
+		if (it != end && *it != '}') report_error("invalid format");
 		return it;
 	}
 };

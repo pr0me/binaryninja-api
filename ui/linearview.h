@@ -242,6 +242,8 @@ class BINARYNINJAUIAPI LinearView : public QAbstractScrollArea, public View, pub
 	QWidget* m_dataButtonContainer = nullptr;
 	QHBoxLayout* m_dataButtonLayout = nullptr;
 
+	std::set<std::string> m_layers;
+
 	void setTopToAddress(uint64_t addr);
 	void setTopToOrderingIndex(uint64_t idx);
 	void refreshLines(size_t lineOffset = 0, bool refreshUIContext = true);
@@ -249,6 +251,7 @@ class BINARYNINJAUIAPI LinearView : public QAbstractScrollArea, public View, pub
 	bool cacheNextLines();
 	void updateCache();
 	void updateBounds();
+	void updateHighlight();
 	void refreshAtCurrentLocation(bool cursorFixup = false);
 	bool navigateToAddress(uint64_t addr, bool center, bool updateHighlight, bool navByRef = false);
 	bool navigateToLine(
@@ -458,6 +461,12 @@ public:
 	virtual void OnTagRemoved(BinaryNinja::BinaryView* view, const BinaryNinja::TagReference& tagRef) override;
 	virtual void OnTypeDefined(BinaryNinja::BinaryView* view, const BinaryNinja::QualifiedName& name, BinaryNinja::Type* type) override;
 	virtual void OnTypeUndefined(BinaryNinja::BinaryView* view, const BinaryNinja::QualifiedName& name, BinaryNinja::Type* type) override;
+	virtual void OnSegmentAdded(BinaryNinja::BinaryView* data, BinaryNinja::Segment* segment) override;
+	virtual void OnSegmentUpdated(BinaryNinja::BinaryView* data, BinaryNinja::Segment* segment) override;
+	virtual void OnSegmentRemoved(BinaryNinja::BinaryView* data, BinaryNinja::Segment* segment) override;
+	virtual void OnSectionAdded(BinaryNinja::BinaryView* data, BinaryNinja::Section* section) override;
+	virtual void OnSectionUpdated(BinaryNinja::BinaryView* data, BinaryNinja::Section* section) override;
+	virtual void OnSectionRemoved(BinaryNinja::BinaryView* data, BinaryNinja::Section* section) override;
 	virtual void MarkUpdatesForRegion(uint64_t start, uint64_t end);
 	virtual void MarkUpdatesForFunction(BinaryNinja::Function* func);
 	virtual void MarkUpdatesForType(BinaryNinja::BinaryView* view, const BinaryNinja::QualifiedName& name, BinaryNinja::Type* type);
@@ -492,6 +501,9 @@ public:
 	void setDisplayedFileName();
 	void setAddressBaseOffset(bool toHere);
 
+	void toggleRenderLayer(const std::string& layer);
+	BinaryNinja::Ref<BinaryNinja::LinearViewCursor> applyRenderLayers(BinaryNinja::Ref<BinaryNinja::LinearViewCursor> cursor);
+
 	virtual bool goToReference(FunctionRef func, uint64_t source, uint64_t target) override;
 	QFont getFont() override { return m_render.getFont(); }
 
@@ -523,6 +535,7 @@ protected:
 	void moveToStartOfView();
 	void moveToEndOfView();
 	void selectNone();
+	void selectAll();
 	void navigateToHighlightedToken();
 	void splitToNewTabAndNavigateFromCursorPosition();
 	void splitToNewWindowAndNavigateFromCursorPosition();

@@ -2,11 +2,14 @@ cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 
 project(sharedcache)
 
-if((NOT BN_API_PATH) AND (NOT BN_INTERNAL_BUILD))
-    set(BN_API_PATH $ENV{BN_API_PATH} CACHE STRING "Path to Binary Ninja API source")
-    if(NOT BN_API_PATH)
-        message(FATAL_ERROR "Provide path to Binary Ninja API source in BN_API_PATH")
-    endif()
+if(NOT BN_INTERNAL_BUILD)
+    find_path(
+        BN_API_PATH
+        NAMES binaryninjaapi.h
+        HINTS ../.. binaryninjaapi $ENV{BN_API_PATH}
+        REQUIRED
+    )
+    add_subdirectory(${BN_API_PATH} binaryninjaapi)
 endif()
 
 if (NOT BN_INTERNAL_BUILD)
@@ -30,7 +33,7 @@ endif()
 set(HARD_FAIL_MODE OFF CACHE BOOL "Enable hard fail mode")
 set(SLIDEINFO_DEBUG_TAGS OFF CACHE BOOL "Enable debug tags in slideinfo")
 set(VIEW_NAME "DSCView" CACHE STRING "Name of the view")
-set(METADATA_VERSION 2 CACHE STRING "Version of the metadata")
+set(METADATA_VERSION 4 CACHE STRING "Version of the metadata")
 
 add_subdirectory(core)
 add_subdirectory(api)
